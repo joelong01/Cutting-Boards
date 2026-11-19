@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "name": "Hard maple and black walnut grid",
+  "style": "grid",
+  "autoName": true,
+  "target": {
+    "length": 16,
+    "width": 12,
+    "thickness": 1.125
+  },
+  "autoFit": true,
+  "finish": {
+    "groove": {
+      "on": true,
+      "inset": 0.75,
+      "width": 0.5,
+      "depth": 0.25,
+      "cornerRadius": 0,
+      "align": true
+    },
+    "chamfer": {
+      "on": true,
+      "size": 0.5
+    },
+    "corners": {
+      "on": true,
+      "radius": 0.5
+    },
+    "roundover": {
+      "on": true,
+      "radius": 0.125
+    }
+  },
+  "layup": {
+    "length": 20.75,
+    "thickness": 1,
+    "repeat": 7,
+    "closeWithFirst": true,
+    "strips": [
+      {
+        "id": "mwlb7psq-0-582w",
+        "species": "maple",
+        "width": 1.5
+      },
+      {
+        "id": "mwlb7psq-1-fifw",
+        "species": "walnut",
+        "width": 0.125
+      }
+    ]
+  },
+  "steps": [
+    {
+      "type": "crosscut",
+      "width": 1.25,
+      "kerf": 0.125,
+      "angle": 0,
+      "id": "mwlb7psq-2-aktj"
+    },
+    {
+      "type": "turn",
+      "sel": {
+        "mode": "all"
+      },
+      "id": "mwlb7psq-3-i6j1"
+    },
+    {
+      "type": "insert",
+      "species": "walnut",
+      "thickness": 0.125,
+      "every": 1,
+      "id": "mwlb7psq-4-r5x3"
+    },
+    {
+      "type": "glue",
+      "id": "mwlb7psq-5-ipus"
+    },
+    {
+      "type": "flatten",
+      "top": 0.0625,
+      "bottom": 0.0625,
+      "id": "mwlb7psq-6-5ll2"
+    }
+  ],
+  "customSpecies": []
+}
