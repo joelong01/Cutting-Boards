@@ -225,10 +225,18 @@ h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing
 .print-sheet h3 { color: #444; }
 .print-sheet .note, .print-sheet .dim, .print-sheet .cutlist thead th { color: #444; }
 .print-sheet .cutlist th, .print-sheet .cutlist td, .print-sheet .cutlist ol { font-size: 10.5pt; }
-.print-stages { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8pt 12pt; margin: 8pt 0; }
-.print-stages figure { margin: 0; break-inside: avoid; }
-.print-stages img { width: 100%; height: 110pt; object-fit: contain; }
-.print-stages figcaption { font-size: 9.5pt; text-align: center; }
+/* The illustrated order of operations: each step's picture beside what to do. */
+.print-steps h3 { margin-bottom: 4pt; }
+.print-steps figure {
+  display: grid; grid-template-columns: 2.6in 1fr; gap: 12pt; align-items: center;
+  margin: 0; padding: 6pt 0; border-top: 1px solid #ddd; break-inside: avoid;
+}
+.print-steps img, .print-steps .no-picture { width: 2.6in; height: 1.62in; object-fit: contain; }
+.print-steps figcaption { font-size: 10.5pt; line-height: 1.35; }
+.print-steps figcaption strong { display: block; font-size: 11.5pt; }
+.print-steps figcaption .dim { color: #444; font-size: 9.5pt; }
+.print-steps figcaption p { margin: 3pt 0 0; }
+.export-menu { min-width: 340px; }
 
 @media print {
   @page { margin: 12mm; }
@@ -260,7 +268,7 @@ h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing
 .crumbs li.on { background: var(--ink); color: #fff; }
 .wizard-sizes, .wizard-types, .wizard-examples { display: grid; gap: 10px; margin-top: 14px; }
 .wizard-sizes { grid-template-columns: repeat(4, 1fr); }
-.wizard-types { grid-template-columns: 1fr 1fr; }
+.wizard-types { grid-template-columns: repeat(3, 1fr); }
 .wizard-examples { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
 .wizard-sizes button, .wizard-types button, .wizard-examples button {
   display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px; white-space: normal;
@@ -302,3 +310,6 @@ h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing
 /* The view is on an earlier step: say so, with a way back to the finished board. */
 .overlay.info .not-final { color: var(--ink); margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line, rgba(60,40,20,0.15)); }
 .overlay.info .not-final button { display: block; margin-top: 6px; border-color: var(--accent); }
+
+/* The chess board's own choices: two woods, the square, the thickness. */
+.wizard-chess { align-items: flex-end; gap: 14px; margin-top: 10px; }

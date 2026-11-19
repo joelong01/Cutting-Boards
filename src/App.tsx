@@ -4,7 +4,7 @@ import { fitToTarget, withAutoFit } from './model/fit';
 import { inches } from './model/fractions';
 import { withAutoName } from './model/naming';
 import { matches, pieceCount, run } from './model/pipeline';
-import { PRESETS, defaultDesign, type BoardType } from './model/presets';
+import { PRESETS, defaultDesign } from './model/presets';
 import { allSpecies, speciesById } from './model/species';
 import {
   desktop, download, exportDesign, fileSafe, library as store, loadCurrent, saveCurrent, validateDesign, type LibraryEntry,
@@ -90,13 +90,13 @@ export function App() {
   /** Reload the list of saved designs, reporting a failure in the message bar. */
   const refreshLibrary = useCallback(() => store.list().then(setLibrary, (e) => setMessage(`Could not list saved designs: ${String(e)}`)), []);
   useEffect(() => void refreshLibrary(), [refreshLibrary]);
-  const [menu, setMenu] = useState<'new' | 'open' | null>(null);
+  const [menu, setMenu] = useState<'new' | 'open' | 'export' | null>(null);
   const wizardParam = params.get('wizard');
   const [wizard, setWizard] = useState(wizardParam !== null);
   const [message, setMessage] = useState<string | null>(null);
   const [sheet, setSheet] = useState<string[]>([]);
   const [preview, setPreview] = useState(params.get('preview') !== null);
-  const [withPictures, setWithPictures] = useState(false);
+  const [withPictures, setWithPictures] = useState(params.get('pictures') !== null);
   const [sideWidth, setSideWidth] = useState(savedSideWidth);
   const dragging = useRef(false);
   /** A side panel width kept between its minimum and what leaves the 3D view its minimum. */
@@ -219,31 +219,60 @@ export function App() {
   const saveRef = useRef(save);
   saveRef.current = save;
 
-  /** Render a picture of every stage into the print sheet, then print it or save it as a PDF. */
+  /** Draw a picture of every stage for the print sheet, as the design is now. */
+  const drawSheet = () => {
+    const v = viewport.current;
+    if (v) setSheet(stages.map((s) => (s.error ? '' : v.snapshot(s, [900, 560]))));
+  };
+
+  // While the preview is open with pictures on, keep them in step with the design.
+  useEffect(() => {
+    if (preview && withPictures) drawSheet();
+    // drawSheet is a new function each render; the pictures depend only on these.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview, withPictures, stages]);
+
   /**
    * Open the print preview: the sheet exactly as it will print. The cut list and steps are always
-   * on it; pictures of each stage are added only when asked for.
+   * on it; with pictures on, each step is shown beside its instruction.
    */
   const openPreview = () => {
     setPreview(true);
     setMenu(null);
   };
 
-  /** Turn the stage pictures on the sheet on or off, drawing them the first time they are wanted. */
-  const setPictures = (on: boolean) => {
-    setWithPictures(on);
-    const v = viewport.current;
-    if (on && v) setSheet(stages.map((s) => (s.error ? '' : v.snapshot(s, [900, 560]))));
+  /** Ask where to save the sheet as it stands and write it there as a PDF. Desktop app only. */
+  const savePdf = () => {
+    desktop?.savePdf(fileSafe(design.name)).then(
+      (where) => where && setMessage(`PDF saved to ${where}`),
+      (e) => setMessage(`PDF failed: ${String(e)}`),
+    );
   };
 
   /** Send the sheet in the preview to the printer, or save it as a PDF. */
   const print = (toPdf: boolean) => {
-    if (toPdf && desktop) {
-      desktop.savePdf(fileSafe(design.name)).then(
-        (where) => where && setMessage(`PDF saved to ${where}`),
-        (e) => setMessage(`PDF failed: ${String(e)}`),
-      );
-    } else window.print();
+    if (toPdf && desktop) savePdf();
+    else window.print();
+  };
+
+  /**
+   * Export the cut list and steps as a PDF, with or without a picture of each step. The sheet is
+   * in the page even while the preview is closed, so it is set up, given a moment to draw and
+   * load its pictures, and saved. In a plain browser there is no file dialog to call, so the
+   * preview opens instead and the browser's own print dialog can save a PDF.
+   */
+  const exportPdf = (pictures: boolean) => {
+    setMenu(null);
+    setWithPictures(pictures);
+    if (pictures) drawSheet();
+    if (!desktop) {
+      setPreview(true);
+      return;
+    }
+    setTimeout(() => {
+      const images = [...document.querySelectorAll<HTMLImageElement>('.print-sheet img')];
+      void Promise.all(images.map((img) => img.decode().catch(() => undefined))).then(savePdf);
+    }, 80);
   };
 
   const final = stages[stages.length - 1];
@@ -299,7 +328,26 @@ export function App() {
             </div>
           )}
         </div>
-        <button onClick={() => exportDesign(design)} title="Save a copy of this design somewhere else">Export</button>
+        <div className="menu">
+          <button onClick={() => setMenu(menu === 'export' ? null : 'export')}>Export ▾</button>
+          {menu === 'export' && (
+            <div className="dropdown export-menu">
+              <button onClick={() => exportPdf(false)}>
+                <strong>PDF: cut list and steps…</strong><small>The stock to mill and the written order of operations.</small>
+              </button>
+              <button onClick={() => exportPdf(true)}>
+                <strong>PDF with a picture of each step…</strong><small>The same, with every step drawn beside its instruction.</small>
+              </button>
+              <hr />
+              <button
+                onClick={() => {
+                  setMenu(null);
+                  exportDesign(design);
+                }}
+              ><strong>Design file (.board.json)…</strong><small>A copy of this design to keep somewhere else or send to someone.</small></button>
+            </div>
+          )}
+        </div>
         <input
           ref={fileInput}
           type="file"
@@ -448,7 +496,7 @@ export function App() {
       {wizard && (
         <BoardWizard
           initial={design.target}
-          startType={wizardParam === 'end' || wizardParam === 'edge' ? (wizardParam as BoardType) : undefined}
+          startType={wizardParam === 'end' || wizardParam === 'edge' || wizardParam === 'chess' ? wizardParam : undefined}
           snapshot={(s) => viewport.current?.snapshot(s, [560, 340]) ?? ''}
           onClose={() => setWizard(false)}
           onCreate={(d) => {
@@ -462,8 +510,8 @@ export function App() {
         <div className="preview-bar" onClick={(e) => e.stopPropagation()}>
           <strong>Print preview</strong>
           <label className="check">
-            <input type="checkbox" checked={withPictures} onChange={(e) => setPictures(e.target.checked)} />
-            Include a picture of each stage
+            <input type="checkbox" checked={withPictures} onChange={(e) => setWithPictures(e.target.checked)} />
+            Show a picture of each step
           </label>
           <span className="spacer" />
           <button className="primary" onClick={() => print(false)}>Print</button>
@@ -472,17 +520,23 @@ export function App() {
         </div>
         <div className="print-sheet" onClick={(e) => e.stopPropagation()}>
           <h1>{design.name}</h1>
+          <CutListPanel design={design} cutList={cutList} species={species} steps={!withPictures} />
           {withPictures && (
-            <div className="print-stages">
+            <div className="print-steps">
+              <h3>Order of operations</h3>
               {stages.map((s, i) => (
                 <figure key={i}>
-                  {sheet[i] && <img src={sheet[i]} alt="" />}
-                  <figcaption><strong>{i + 1}. {s.title}</strong></figcaption>
+                  {sheet[i] ? <img src={sheet[i]} alt="" /> : <div className="no-picture" />}
+                  <figcaption>
+                    <strong>{i + 1}. {s.title}</strong>
+                    <span className="dim">{inches(s.size[0])} × {inches(s.size[2])} × {inches(s.size[1])} thick{s.kind === 'slices' ? `, ${s.slices.length} slices` : ''}</span>
+                    <p>{s.summary}</p>
+                    {(s.error ?? s.warning) && <p className="warning">Check: {s.error ?? s.warning}</p>}
+                  </figcaption>
                 </figure>
               ))}
             </div>
           )}
-          <CutListPanel design={design} cutList={cutList} species={species} />
         </div>
       </div>
     </div>

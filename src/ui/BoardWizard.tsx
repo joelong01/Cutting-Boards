@@ -2,15 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 import { fitThickness, fitToTarget } from '../model/fit';
 import { inches } from '../model/fractions';
 import { run } from '../model/pipeline';
-import { PRESETS, type BoardType, type Preset } from '../model/presets';
+import { CHESS_SQUARES, PRESETS, chessBoard, type BoardType, type Preset } from '../model/presets';
+import { BUILTIN_SPECIES } from '../model/species';
 import type { Design, Stage } from '../model/types';
-import { Len } from './inputs';
+import { Len, SpeciesSelect } from './inputs';
+
+/** What the wizard can start: a board by which grain faces up, or a chess board. */
+export type WizardType = BoardType | 'chess';
 
 interface Props {
   /** Starting size, normally the current design's target. */
   initial: Design['target'];
   /** Open straight at the examples for this type; used by the smoke test. */
-  startType?: BoardType;
+  startType?: WizardType;
   /** Render a stage to a PNG data URL, for the example thumbnails. */
   snapshot: (stage: Stage) => string;
   onCreate: (design: Design) => void;
@@ -24,7 +28,7 @@ const COMMON_SIZES: { label: string; size: Design['target'] }[] = [
   { label: 'Butcher block', size: { length: 20, width: 16, thickness: 2 } },
 ];
 
-const TYPES: { type: BoardType; title: string; text: string }[] = [
+const TYPES: { type: WizardType; title: string; text: string }[] = [
   {
     type: 'end',
     title: 'End grain',
@@ -35,10 +39,22 @@ const TYPES: { type: BoardType; title: string; text: string }[] = [
     title: 'Edge grain',
     text: 'Long strips glued side by side, fibres running the length of the board. One glue-up, less wood lost to the saw, and the quickest board to make. Shows knife marks sooner.',
   },
+  {
+    type: 'chess',
+    title: 'Chess board',
+    text: `Always ${CHESS_SQUARES} × ${CHESS_SQUARES} squares in two woods. You choose the woods and the size of a square; the board is eight squares each way, whatever size was entered on the first page.`,
+  },
 ];
 
-interface Example {
-  preset: Preset;
+/** One design the wizard offers on its last page, before it is built and drawn. */
+interface Candidate {
+  key: string;
+  label: string;
+  blurb: string;
+  make: () => Design;
+}
+
+interface Example extends Candidate {
   design: Design;
   final: Stage;
   image: string;
@@ -58,14 +74,40 @@ const sameSize = (a: Design['target'], b: Design['target']) =>
 const sizeText = (s: Stage) =>
   `${inches(Math.max(s.size[0], s.size[2]))} × ${inches(Math.min(s.size[0], s.size[2]))} × ${inches(s.size[1])}`;
 
-/** Three-page dialog for starting a board: its size, its grain type, then a common example of that type built to that size. */
+/**
+ * Three-page dialog for starting a board: its size, its type, then designs of that type to pick
+ * from. For end grain and edge grain those are the starter designs built to the size asked for.
+ * A chess board is always eight squares each way, so its last page asks for the square size and
+ * the two woods instead, and offers it end grain or face grain.
+ */
 export function BoardWizard({ initial, startType, snapshot, onCreate, onClose }: Props) {
   const [target, setTarget] = useState(initial);
-  const [type, setType] = useState<BoardType | null>(startType ?? null);
+  const [type, setType] = useState<WizardType | null>(startType ?? null);
   const [page, setPage] = useState<1 | 2 | 3>(startType ? 3 : 1);
   const [examples, setExamples] = useState<Example[]>([]);
+  const [chess, setChess] = useState({ square: 2, dark: 'walnut', light: 'maple' });
 
-  const presets = useMemo(() => PRESETS.filter((p) => p.type === type), [type]);
+  const candidates = useMemo<Candidate[]>(() => {
+    if (type === 'chess') {
+      const options = { ...chess, thickness: target.thickness };
+      return [
+        {
+          key: 'chess-end',
+          label: 'End-grain chess board',
+          blurb: 'Two glue-ups: eight strips, then eight slices turned on end with every other one turned end for end. The strips are milled square, as thick as a square is wide.',
+          make: () => chessBoard({ ...options, grain: 'end' }),
+        },
+        {
+          key: 'chess-face',
+          label: 'Face-grain chess board',
+          blurb: 'The classic look, and thinner stock: eight strips, cross cut into eight slices, every other one turned end for end. Solid wood this wide moves with the seasons, so do not glue it into a tight frame.',
+          make: () => chessBoard({ ...options, grain: 'face' }),
+        },
+      ];
+    }
+    return PRESETS.filter((p) => p.type === type)
+      .map((p) => ({ key: p.key, label: p.label, blurb: p.blurb, make: () => sized(p, target) }));
+  }, [type, target, chess]);
 
   // Sizing and drawing an example takes a moment, so add them one per tick: the page paints
   // first and each card appears as it is ready, instead of the dialog freezing until all are done.
@@ -75,12 +117,12 @@ export function BoardWizard({ initial, startType, snapshot, onCreate, onClose }:
     let timer = 0;
     /** Build example i, show it, and schedule the next one. */
     const next = (i: number) => {
-      if (i >= presets.length) return;
-      const preset = presets[i];
-      const design = sized(preset, target);
+      if (i >= candidates.length) return;
+      const candidate = candidates[i];
+      const design = candidate.make();
       const stages = run(design);
       const final = stages[stages.length - 1];
-      const example = { preset, design, final, image: final.error ? '' : snapshot(final) };
+      const example = { ...candidate, design, final, image: final.error ? '' : snapshot(final) };
       setExamples((list) => [...list, example]);
       timer = window.setTimeout(() => next(i + 1), 0);
     };
@@ -88,7 +130,7 @@ export function BoardWizard({ initial, startType, snapshot, onCreate, onClose }:
     return () => clearTimeout(timer);
     // snapshot is a new function each render; the examples depend only on the choices made.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, presets, target]);
+  }, [page, candidates]);
 
   useEffect(() => {
     /** Close the wizard on Escape. */
@@ -134,13 +176,14 @@ export function BoardWizard({ initial, startType, snapshot, onCreate, onClose }:
                 </button>
               ))}
             </div>
+            <p className="note">A chess board takes only its thickness from here: it is always eight squares each way.</p>
             <footer><button className="primary" onClick={() => setPage(2)}>Next: type ▶</button></footer>
           </section>
         )}
 
         {page === 2 && (
           <section>
-            <p>Which way should the grain face?</p>
+            <p>What kind of board?</p>
             <div className="wizard-types">
               {TYPES.map((t) => (
                 <button
@@ -160,20 +203,42 @@ export function BoardWizard({ initial, startType, snapshot, onCreate, onClose }:
           </section>
         )}
 
-        {page === 3 && (
+        {page === 3 && type === 'chess' && (
           <section>
             <p>
-              Common {type === 'end' ? 'end-grain' : 'edge-grain'} boards, built as close to{' '}
-              {inches(target.length)} × {inches(target.width)} × {inches(target.thickness)} as their block sizes allow.
-              Pick one to start from; everything in it can be changed.
+              A chess board: {CHESS_SQUARES} × {CHESS_SQUARES} squares, {inches(chess.square * CHESS_SQUARES)} each way.
+              Choose the two woods and the size of a square, then pick how to build it.
             </p>
-            {examples.length < presets.length && <p className="note">Drawing examples… {examples.length} of {presets.length}</p>}
+            <div className="row wizard-chess">
+              <label className="field"><span>Dark squares</span>
+                <SpeciesSelect value={chess.dark} species={BUILTIN_SPECIES} onChange={(dark) => setChess({ ...chess, dark })} />
+              </label>
+              <label className="field"><span>Light squares</span>
+                <SpeciesSelect value={chess.light} species={BUILTIN_SPECIES} onChange={(light) => setChess({ ...chess, light })} />
+              </label>
+              <Len label="Square" value={chess.square} min={0.5} onChange={(square) => setChess({ ...chess, square })} />
+              <Len label="Thickness" value={target.thickness} min={0.375} onChange={(thickness) => setTarget({ ...target, thickness })} />
+            </div>
+            {chess.dark === chess.light && <p className="note">Both woods are the same, so the squares will not show.</p>}
+          </section>
+        )}
+
+        {page === 3 && (
+          <section>
+            {type !== 'chess' && (
+              <p>
+                Common {type === 'end' ? 'end-grain' : 'edge-grain'} boards, built as close to{' '}
+                {inches(target.length)} × {inches(target.width)} × {inches(target.thickness)} as their block sizes allow.
+                Pick one to start from; everything in it can be changed.
+              </p>
+            )}
+            {examples.length < candidates.length && <p className="note">Drawing examples… {examples.length} of {candidates.length}</p>}
             <div className="wizard-examples">
               {examples.map((ex) => (
-                <button key={ex.preset.key} disabled={!!ex.final.error} onClick={() => onCreate(ex.design)}>
+                <button key={ex.key} disabled={!!ex.final.error} onClick={() => onCreate(ex.design)}>
                   {ex.image && <img src={ex.image} alt="" />}
-                  <strong>{ex.preset.label}</strong>
-                  <span>{ex.preset.blurb}</span>
+                  <strong>{ex.label}</strong>
+                  <span>{ex.blurb}</span>
                   <small>{ex.final.error ? ex.final.error : `Finishes at ${sizeText(ex.final)}`}</small>
                 </button>
               ))}

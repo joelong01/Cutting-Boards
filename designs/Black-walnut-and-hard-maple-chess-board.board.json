@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "name": "Black walnut and hard maple chess board",
+  "style": "chess board",
+  "autoName": true,
+  "target": {
+    "length": 16,
+    "width": 16,
+    "thickness": 1.5
+  },
+  "autoFit": false,
+  "finish": {
+    "groove": {
+      "on": false,
+      "inset": 0.75,
+      "width": 0.5,
+      "depth": 0.25,
+      "cornerRadius": 0,
+      "align": true
+    },
+    "chamfer": {
+      "on": true,
+      "size": 0.25
+    },
+    "corners": {
+      "on": true,
+      "radius": 0.5
+    },
+    "roundover": {
+      "on": true,
+      "radius": 0.125
+    }
+  },
+  "layup": {
+    "length": 17.375,
+    "thickness": 1.75,
+    "repeat": 4,
+    "closeWithFirst": false,
+    "strips": [
+      {
+        "id": "mwmuuare-9-oxy9",
+        "species": "walnut",
+        "width": 2
+      },
+      {
+        "id": "mwmuuare-a-sojf",
+        "species": "maple",
+        "width": 2
+      }
+    ]
+  },
+  "steps": [
+    {
+      "type": "flatten",
+      "top": 0.0625,
+      "bottom": 0.0625,
+      "id": "mwmuuare-b-8xvd"
+    },
+    {
+      "type": "trim",
+      "auto": false,
+      "x0": 0.25,
+      "x1": 0.25,
+      "z0": 0,
+      "z1": 0,
+      "id": "mwmuuare-c-5p3f"
+    },
+    {
+      "type": "crosscut",
+      "width": 2,
+      "kerf": 0.125,
+      "angle": 0,
+      "id": "mwmuuare-d-gxkg"
+    },
+    {
+      "type": "flip",
+      "sel": {
+        "mode": "every",
+        "n": 2,
+        "offset": 1
+      },
+      "how": "end",
+      "id": "mwmuuare-e-5h2c"
+    },
+    {
+      "type": "glue",
+      "id": "mwmuuare-f-lqi8"
+    },
+    {
+      "type": "flatten",
+      "top": 0.0625,
+      "bottom": 0.0625,
+      "id": "mwmuuare-g-k3qc"
+    }
+  ],
+  "customSpecies": []
+}

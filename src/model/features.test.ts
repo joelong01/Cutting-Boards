@@ -6,7 +6,7 @@ import { NO_FINISH } from './finish';
 import { fitThickness, fitToTarget } from './fit';
 import { bbox, volume } from './geometry';
 import { describeSelector, expandStrips, matches, run, stepNeeds } from './pipeline';
-import { PRESETS, insertStep, newStep } from './presets';
+import { CHESS_SQUARES, PRESETS, chessBoard, insertStep, newStep } from './presets';
 import { allSpecies, speciesById } from './species';
 import { fileSafe, validateDesign } from './storage';
 import type { Design, Piece, Stage, Step, StepType } from './types';
@@ -332,5 +332,62 @@ describe('board wizard: every starter design resized to every common size', () =
     expect(size[0]).toBeLessThan(target.length + 3);
     expect(size[2]).toBeLessThan(target.width + 3.5);
     expect(size[1]).toBeCloseTo(target.thickness, 6);
+  });
+});
+
+describe('chess board', () => {
+  const cases = (['end', 'face'] as const).flatMap((grain) => [1.5, 2, 2.25].map((square) => [grain, square] as const));
+
+  it.each(cases)('%s grain with %s inch squares is 8 x 8 squares of two woods, alternating both ways', (grain, square) => {
+    const d = chessBoard({ square, dark: 'walnut', light: 'maple', thickness: 1.25, grain });
+    const stages = run({ ...d, finish: NO_FINISH });
+    for (const s of stages) {
+      expect(s.error, `${s.title}: ${s.error}`).toBeUndefined();
+      expect(s.warning, `${s.title}: ${s.warning}`).toBeUndefined();
+    }
+    const last = stages.at(-1)!;
+    expect(last.size[0]).toBeCloseTo(8 * square, 9);
+    expect(last.size[2]).toBeCloseTo(8 * square, 9);
+    expect(last.size[1]).toBeCloseTo(1.25, 9);
+    const pieces = last.slices[0].pieces;
+    expect(pieces.length).toBe(CHESS_SQUARES * CHESS_SQUARES);
+    const seen = new Set<string>();
+    for (const p of pieces) {
+      const b = bbox([p]);
+      // Every piece is one whole square, sitting on the grid.
+      expect(b.max[0] - b.min[0]).toBeCloseTo(square, 9);
+      expect(b.max[2] - b.min[2]).toBeCloseTo(square, 9);
+      const col = Math.round(b.min[0] / square), row = Math.round(b.min[2] / square);
+      expect(b.min[0]).toBeCloseTo(col * square, 9);
+      expect(b.min[2]).toBeCloseTo(row * square, 9);
+      seen.add(`${col},${row}`);
+      expect(p.species).toBe((col + row) % 2 === 0 ? 'walnut' : 'maple');
+      // End grain has the fibres pointing up; face grain has them lying flat.
+      expect(Math.abs(p.grain[1])).toBeCloseTo(grain === 'end' ? 1 : 0, 9);
+    }
+    expect(seen.size).toBe(64);
+  });
+
+  it('is named for its woods, has no juice groove, and does not refit itself to a target', () => {
+    const d = chessBoard({ square: 2, dark: 'walnut', light: 'maple', thickness: 1.5, grain: 'end' });
+    expect(d.name).toBe('Black walnut and hard maple chess board');
+    expect(d.finish!.groove.on).toBe(false);
+    expect(d.autoFit).toBe(false);
+    expect(d.target).toEqual({ length: 16, width: 16, thickness: 1.5 });
+    expect(run(d).at(-1)!.title).toBe('Finish');
+  });
+
+  it('the cross cut uses the whole panel: eight slices and no offcut', () => {
+    for (const grain of ['end', 'face'] as const) {
+      const cut = run(chessBoard({ square: 2, dark: 'walnut', light: 'maple', thickness: 1.25, grain })).find((s) => s.title === 'Cross cut')!;
+      expect(cut.slices.length).toBe(8);
+      expect(cut.summary).not.toContain('offcut');
+    }
+  });
+
+  it('other woods can be chosen', () => {
+    const d = chessBoard({ square: 2, dark: 'wenge', light: 'ash', thickness: 1, grain: 'face' });
+    expect(new Set(run(d).at(-1)!.slices[0].pieces.map((p) => p.species))).toEqual(new Set(['wenge', 'ash']));
+    expect(d.name).toBe('Wenge and ash chess board');
   });
 });

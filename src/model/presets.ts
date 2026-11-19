@@ -1,3 +1,4 @@
+import { DEFAULT_FINISH } from './finish';
 import { withAutoName } from './naming';
 import { BUILTIN_SPECIES } from './species';
 import type { Design, Selector, Step, StripSpec } from './types';
@@ -279,4 +280,63 @@ export function newStep(type: Step['type']): Step {
 export function insertStep(design: Design, at: number, step: Step): Design {
   const i = Math.min(Math.max(0, Math.floor(at)), design.steps.length);
   return { ...design, steps: [...design.steps.slice(0, i), step, ...design.steps.slice(i)] };
+}
+
+/** Squares along each side of a chess board. */
+export const CHESS_SQUARES = 8;
+
+export interface ChessOptions {
+  /** Width of one square. The board is eight of these each way. */
+  square: number;
+  /** Wood ids for the two colours. */
+  dark: string;
+  light: string;
+  /** Finished thickness of the board. */
+  thickness: number;
+  /** End grain up (blocks on end) or face grain up (the classic flat board). */
+  grain: 'end' | 'face';
+}
+
+/**
+ * A chess board: always eight squares by eight in two woods, with no juice groove. Eight strips
+ * a square wide are glued up, cross cut into eight slices, and every other slice is turned end
+ * for end. For end grain the strips are milled square and each slice is turned up, so the stock
+ * thickness sets the square and the cross cut sets the board's thickness; for face grain it is
+ * the other way round. Stock and cuts carry 1/16 a face for each flattening, a kerf between
+ * slices and 1/4 to square each end. The design does not hold a target size: refitting it could
+ * change the number of squares.
+ */
+export function chessBoard(o: ChessOptions): Design {
+  const kerf = 0.125, flat = 0.0625, endTrim = 0.25;
+  const end = o.grain === 'end';
+  // What is cut off each slice's width by the cross cut: the board's thickness or the square.
+  const cut = end ? o.thickness + 2 * flat : o.square;
+  const flatten = { type: 'flatten', top: flat, bottom: flat } as const;
+  const side = o.square * CHESS_SQUARES;
+  return withAutoName({
+    version: 1,
+    name: 'Chess board',
+    style: 'chess board',
+    autoName: true,
+    target: { length: side, width: side, thickness: o.thickness },
+    autoFit: false,
+    finish: { ...DEFAULT_FINISH, groove: { ...DEFAULT_FINISH.groove, on: false } },
+    layup: {
+      length: CHESS_SQUARES * cut + (CHESS_SQUARES - 1) * kerf + 2 * endTrim,
+      thickness: (end ? o.square : o.thickness + 2 * flat) + 2 * flat,
+      repeat: CHESS_SQUARES / 2,
+      closeWithFirst: false,
+      strips: [strip(o.dark, o.square), strip(o.light, o.square)],
+    },
+    steps: steps(
+      flatten,
+      { type: 'trim', auto: false, x0: endTrim, x1: endTrim, z0: 0, z1: 0 },
+      { type: 'crosscut', width: cut, kerf, angle: 0 },
+      ...(end ? [{ type: 'turn', sel: ALL } as const] : []),
+      { type: 'flip', sel: everyOther, how: 'end' },
+      { type: 'glue' },
+      flatten,
+    ),
+    customSpecies: [],
+  }, BUILTIN_SPECIES);
 }

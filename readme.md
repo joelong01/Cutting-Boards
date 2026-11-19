@@ -17,6 +17,7 @@ npm start            # build, then open the desktop app
 npm run dev          # desktop app with hot reload, for changing the code
 npm test             # geometry and recipe tests
 npm run smoke        # build, then check the real app window feature by feature
+npm run check        # both of the above: about 25 seconds
 npm run web          # the same page in a browser (designs save to browser storage instead of files)
 ```
 
@@ -61,10 +62,14 @@ If `npm install` reports that Electron's install script was skipped, run
   designs are versioned with the repo. Delete moves the file to the recycle bin. Undo and redo
   with Ctrl+Z and Ctrl+Y.
 - **Print preview.** **Print…** (or Ctrl+P) shows the sheet as it will print: the cut list and the
-  order of operations, with a tick box to add a picture of each stage. Print it or save it as a
-  PDF from there. **PNG** saves the current 3D view.
+  order of operations. Tick "Show a picture of each step" and every step is drawn beside its
+  instruction. Print it or save it as a PDF from there. **PNG** saves the current 3D view.
+- **Export.** A PDF of the cut list and steps, the same PDF with a picture of each step, or
+  the design file itself.
 
-**New ▸ Board wizard** asks for the finished size, then end grain or edge grain, then shows the
+**New ▸ Board wizard** asks for the finished size, then end grain, edge grain or chess board. A
+chess board is always 8 × 8 squares: it asks for the two woods and the size of a square, and
+offers the board end grain or face grain. For the other two types the wizard shows the
 common boards of that type already resized to fit, each with a picture. Picking one opens it for
 editing. The same eight starting designs are listed under **New** at their default sizes:
 
@@ -107,15 +112,18 @@ so there is no stored geometry to go stale. A design file holds only the strips 
 ## Checks
 
 ```powershell
-npm test                                   # 169 tests of the model: geometry, every step, presets, resizing, cut list, design files, finish, naming
-npm run smoke                              # builds, then 13 checks of the real window: 3D view, wizard, print preview, edge tags, add step, save and open
+npm test                                   # 178 tests of the model: geometry, every step, presets, resizing, cut list, design files, finish, naming
+npm run smoke                              # builds, then 18 checks of the real window: 3D view, wizard, print preview, edge tags, add step, save and open
 node scripts/run.mjs --selftest            # save, list, read and delete a design through the app
 node scripts/run.mjs --screenshot=out.png --query=preset=brick   # render one frame and exit
 ```
 
 `--pdf=out.pdf` writes the PDF that **Save as PDF** writes, with no file dialog, and exits.
 
-`--query` takes `preset=<key>`, `stage=<n>`, `tab=cutlist` and `wizard=end` or `wizard=edge`.
+`--query` takes `preset=<key>`, `stage=<n>`, `tab=cutlist`, `preview`, `pictures` and `wizard=end`, `wizard=edge` or `wizard=chess`.
+`--ready=<expression>` makes a test run look as soon as the expression is true in the page
+instead of waiting a fixed `--wait`, and `--profile=<name>` gives it a settings folder of its own
+so several can run at once; the smoke checks use both.
 `--eval=<expression>` runs one expression in the page and prints the result; the 3D scene is
 reachable there as `window.boardScene`.
 

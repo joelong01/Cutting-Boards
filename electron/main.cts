@@ -83,6 +83,25 @@ function registerIpc() {
   });
 }
 
+/**
+ * Give the page time to settle before a test looks at it. With `--ready=<expression>` that is as
+ * soon as the expression is true in the page, checked every 50 ms, and `--wait` is only the
+ * longest to wait; without it, the whole of `--wait` (or `fallback` milliseconds).
+ */
+async function settle(win: BrowserWindow, fallback: number): Promise<void> {
+  const ready = arg('ready');
+  const wait = Number(arg('wait') ?? (ready ? 15000 : fallback));
+  if (!ready) {
+    await new Promise((r) => setTimeout(r, wait));
+    return;
+  }
+  const until = Date.now() + wait;
+  while (Date.now() < until) {
+    if (await win.webContents.executeJavaScript(`(() => { try { return !!(${ready}); } catch { return false; } })()`)) return;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+}
+
 /** Open the app window and load the page. With --selftest or --screenshot, run that check and exit instead of staying open. */
 async function createWindow() {
   const shot = arg('screenshot');
@@ -145,7 +164,7 @@ async function createWindow() {
   const probe = arg('eval');
   if (probe) {
     // Diagnostic: run one expression in the page after it settles and print the result.
-    await new Promise((r) => setTimeout(r, Number(arg('wait') ?? 2500)));
+    await settle(win, 2500);
     console.log(`eval ${JSON.stringify(await win.webContents.executeJavaScript(probe))}`);
     // A probe on its own is a one-shot check; with --screenshot the capture below ends the run.
     if (!shot) app.quit();
@@ -154,7 +173,7 @@ async function createWindow() {
   const pdfOut = arg('pdf');
   if (pdfOut) {
     // Smoke test: `--pdf=out.pdf` does what Save as PDF does once the file has been chosen, and exits.
-    await new Promise((r) => setTimeout(r, Number(arg('wait') ?? 1500)));
+    await settle(win, 1500);
     console.log(`pdf written: ${await writeSheetPdf(win.webContents, pdfOut)}`);
     app.quit();
     return;
@@ -187,11 +206,12 @@ const APP_ID = 'Shop.CuttingBoards';
 // design left open last time, so that folder is pinned to where it has always been.
 app.setName('Cutting Boards');
 // Test runs get a settings folder of their own. Sharing the real one let a smoke test replace the
-// design the user had left open with whichever starter design the test loaded.
+// design the user had left open with whichever starter design the test loaded. `--profile=<name>`
+// picks a separate one again, so several test runs can be open at the same time.
 const TEST_RUN = process.argv.includes('--selftest')
   || ['screenshot', 'eval', 'pdf'].some((name) => process.argv.some((a) => a.startsWith(`--${name}=`)));
 app.setPath('userData', TEST_RUN
-  ? path.join(app.getPath('temp'), 'cutting-boards-test')
+  ? path.join(app.getPath('temp'), `cutting-boards-test${arg('profile') ? `-${arg('profile')}` : ''}`)
   : path.join(app.getPath('appData'), 'cutting-boards'));
 // Its own taskbar identity on Windows, matching the Start Menu shortcut, so the window shows
 // this app's icon and does not group under the generic Electron one.

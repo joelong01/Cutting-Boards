@@ -10,10 +10,12 @@ interface Props {
   species: Species[];
   /** Present on screen, where the allowance can be edited; absent on the print sheet. */
   onChange?: (d: Design) => void;
+  /** False leaves out the written order of operations, for a sheet that shows it with pictures instead. */
+  steps?: boolean;
 }
 
-/** Finished size against the target, the stock to mill, and the numbered order of operations. Used on screen and in the print sheet. */
-export function CutListPanel({ design, cutList, species, onChange }: Props) {
+/** Finished size against the target, the stock to mill, and (unless `steps` is false) the numbered order of operations. Used on screen and in the print sheet. */
+export function CutListPanel({ design, cutList, species, onChange, steps = true }: Props) {
   const [fx, fy, fz] = cutList.finished;
   const long = Math.max(fx, fz), short = Math.min(fx, fz);
   const tLong = Math.max(design.target.length, design.target.width), tShort = Math.min(design.target.length, design.target.width);
@@ -73,7 +75,8 @@ export function CutListPanel({ design, cutList, species, onChange }: Props) {
         {' '}{Math.round(cutList.yield * 100)}% of that ends up in the board.
       </p>
 
-      <h3>Order of operations</h3>
+      {steps && <h3>Order of operations</h3>}
+      {steps && (
       <ol>
         {cutList.operations.map((o, i) => (
           <li key={i}>
@@ -82,6 +85,7 @@ export function CutListPanel({ design, cutList, species, onChange }: Props) {
           </li>
         ))}
       </ol>
+      )}
     </div>
   );
 }
