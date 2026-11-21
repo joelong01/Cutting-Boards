@@ -9,8 +9,12 @@ const arg = (name: string): string | undefined =>
   process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 
 // Run from the project, designs live beside the source so they are versioned with it.
-const designsDir = (): string =>
-  (app.isPackaged ? path.join(app.getPath('documents'), 'Cutting Boards') : path.join(app.getAppPath(), 'designs'));
+// A test run keeps its designs in its own throwaway settings folder: a check that saved into the
+// real folder left its file there, and the next run stopped on a "replace it?" box on screen.
+const designsDir = (): string => {
+  if (TEST_RUN) return path.join(app.getPath('userData'), 'designs');
+  return app.isPackaged ? path.join(app.getPath('documents'), 'Cutting Boards') : path.join(app.getAppPath(), 'designs');
+};
 
 const SUFFIX = '.board.json';
 
@@ -66,7 +70,9 @@ function registerIpc() {
     return full;
   });
   // To the recycle bin, not gone: a mis-click must be recoverable.
-  ipcMain.handle('designs:delete', (_e, file: string) => shell.trashItem(designPath(file)));
+  // A test run deletes outright: its file is in a throwaway folder, and sending it to the recycle
+  // bin would leave one more item there after every run.
+  ipcMain.handle('designs:delete', (_e, file: string) => (TEST_RUN ? fs.rm(designPath(file)) : shell.trashItem(designPath(file))));
   ipcMain.handle('designs:reveal', async () => {
     await fs.mkdir(designsDir(), { recursive: true });
     return shell.openPath(designsDir());
@@ -102,13 +108,21 @@ async function settle(win: BrowserWindow, fallback: number): Promise<void> {
   }
 }
 
+/** True when a test run was asked to put its window where it can be watched. */
+const ON_SCREEN = process.argv.includes('--show');
+
 /** Open the app window and load the page. With --selftest or --screenshot, run that check and exit instead of staying open. */
 async function createWindow() {
   const shot = arg('screenshot');
   const win = new BrowserWindow({
     width: Number(arg('width') ?? 1500),
     height: Number(arg('height') ?? 950),
-    show: !shot,
+    // A test run's window is never on a screen, so it cannot land on top of someone's work: it
+    // is placed far outside every monitor and kept out of the taskbar. It is still a shown
+    // window, because a hidden one draws too slowly for the checks. `--show` puts it on screen
+    // to watch it.
+    show: !TEST_RUN,
+    ...(TEST_RUN && !ON_SCREEN ? { x: -32000, y: -32000, skipTaskbar: true, focusable: false } : {}),
     title: 'Cutting Boards',
     icon: path.join(__dirname, '..', 'assets', 'icon.ico'),
     autoHideMenuBar: true,
@@ -116,9 +130,9 @@ async function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      // A hidden window pauses animation frames, which leaves the smoke-test screenshot
-      // with a half-drawn or empty 3D view. Keep frames running for that case only.
-      backgroundThrottling: !shot,
+      // A hidden or covered window pauses animation frames, which leaves a test run with a
+      // half-drawn or empty 3D view. Keep frames running for test runs only.
+      backgroundThrottling: !TEST_RUN,
     },
   });
   // Links in the page open in the real browser, never inside the app window.
@@ -128,7 +142,6 @@ async function createWindow() {
   });
 
   if (shot || arg('eval') || arg('pdf')) {
-    // Shown but not focused: a hidden window draws too few frames for the 3D view to settle.
     win.showInactive();
     // Registered before the page loads, so errors thrown during start-up are reported too.
     win.webContents.on('console-message', (_e, level, message) => {
@@ -142,7 +155,7 @@ async function createWindow() {
   else await win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { search: query });
 
   if (process.argv.includes('--selftest')) {
-    // Round-trip a design through the bridge the page uses, then put the file in the recycle bin.
+    // Round-trip a design through the bridge the page uses, then delete the file.
     const result = await win.webContents.executeJavaScript(`(async () => {
       const file = 'zz-selftest.board.json';
       const text = JSON.stringify({ version: 1, name: 'Self test', layup: { strips: [] }, steps: [] });
@@ -213,6 +226,14 @@ const TEST_RUN = process.argv.includes('--selftest')
 app.setPath('userData', TEST_RUN
   ? path.join(app.getPath('temp'), `cutting-boards-test${arg('profile') ? `-${arg('profile')}` : ''}`)
   : path.join(app.getPath('appData'), 'cutting-boards'));
+// Windows stops drawing a window that another covers completely. The smoke checks open several
+// test windows on top of one another, so some never drew a frame and their check timed out.
+// In a test run, keep every window drawing whether or not it can be seen.
+if (TEST_RUN) {
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+  app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+  app.commandLine.appendSwitch('disable-renderer-backgrounding');
+}
 // Its own taskbar identity on Windows, matching the Start Menu shortcut, so the window shows
 // this app's icon and does not group under the generic Electron one.
 app.setAppUserModelId(APP_ID);

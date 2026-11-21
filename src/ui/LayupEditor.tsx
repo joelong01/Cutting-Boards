@@ -13,10 +13,18 @@ interface Props {
   onChange: (d: Design) => void;
   /** Tell the user about a change they did not make directly. */
   onNotice: (text: string) => void;
+  /** Whether the 3D view is showing this step's result, the first glue-up. */
+  selected: boolean;
+  /** Show the first glue-up in the 3D view. */
+  onSelect: () => void;
 }
 
-/** Editor for the first glue-up: stock size, the strip pattern, custom woods, and a preview of the panel's width. */
-export function LayupEditor({ design, species, onChange, onNotice }: Props) {
+/**
+ * Step 1 of the recipe, milling the strips for the first glue-up: stock size, the strip pattern,
+ * custom woods, and a preview of the panel's width. Clicking its heading shows the glued panel in
+ * the 3D view; editing the strips leaves the view where it is.
+ */
+export function LayupEditor({ design, species, onChange, onNotice, selected, onSelect }: Props) {
   const { layup } = design;
   /** Change some layup fields, leaving the rest of the design alone. */
   const set = (patch: Partial<Layup>) => onChange({ ...design, layup: { ...layup, ...patch } });
@@ -51,8 +59,8 @@ export function LayupEditor({ design, species, onChange, onNotice }: Props) {
   };
 
   return (
-    <section className="card">
-      <h3>Strips for the first glue-up</h3>
+    <section className={`step first${selected ? ' selected' : ''}`}>
+      <header onClick={onSelect} title="Show the first glue-up"><em>1</em><strong>Mill strips for first glue-up</strong></header>
       <div className="row">
         <Len
           label="Stock length"
@@ -77,6 +85,7 @@ export function LayupEditor({ design, species, onChange, onNotice }: Props) {
               min={0.03125}
               onChange={(width) => editStrip(s.id, { width })}
             />
+            {s.spacer && <small className="spacer-tag" title="This strip only holds a place: a later cross cut saws it out, so none of it is in the finished board. Use any cheap wood.">spacer</small>}
             <span className="icons">
               <button title="Move up" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
               <button title="Move down" disabled={i === layup.strips.length - 1} onClick={() => move(i, 1)}>↓</button>

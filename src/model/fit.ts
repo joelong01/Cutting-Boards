@@ -100,7 +100,8 @@ export function fitThickness(design: Design): Design {
     if (step.type !== 'crosscut') continue;
     const width = step.width + delta;
     if (width <= 0) break;
-    const candidate = { ...design, steps: design.steps.map((s) => (s.id === step.id ? { ...step, width } : s)) };
+    // A board made from two panels cross cuts both to the same width; they change together.
+    const candidate = { ...design, steps: design.steps.map((s) => (s.type === 'crosscut' && Math.abs(s.width - step.width) < 1e-9 ? { ...s, width } : s)) };
     // The cut got wider or narrower, so the stock length has to be found again. The board keeps
     // lying the way it did: a much wider cut must not turn it round.
     if (hits(candidate)) return fitToTarget(candidate, design);

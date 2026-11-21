@@ -30,11 +30,19 @@ interface SliceNode {
 interface Shown {
   kind: Stage['kind'];
   nodes: SliceNode[];
+  /** Slices set aside while another panel is made, drawn beside the work, and how far over they sit. */
+  aside: SliceNode[];
+  asideZ: number;
+  asideDepth: number;
+  asideX: number;
   sizeX: number;
   sizeY: number;
   centerZ: number;
   sizeZ: number;
 }
+
+/** How far past the work the set-aside slices sit, and the gap drawn between them. */
+const ASIDE_GAP = 2.5, ASIDE_SPREAD = 0.3;
 
 const VIEW_DIRS: Record<ViewName, [number, number, number]> = {
   iso: [0.5, 0.72, 0.9],
@@ -264,7 +272,7 @@ export class BoardScene {
     // The pictures on the printed sheet carry no edge tags.
     this.tagsOn = false;
     const camPos = this.camera.position.clone(), target = this.controls.target.clone();
-    for (const n of keep.shown?.nodes ?? []) this.root.remove(n.group);
+    for (const n of [...(keep.shown?.nodes ?? []), ...(keep.shown?.aside ?? [])]) this.root.remove(n.group);
     this.shown = null;
     this.anim = null;
     const ratio = this.renderer.getPixelRatio();
@@ -287,7 +295,7 @@ export class BoardScene {
       this.resize();
     }
     this.shown = keep.shown;
-    if (this.shown) for (const n of this.shown.nodes) this.root.add(n.group);
+    if (this.shown) for (const n of [...this.shown.nodes, ...this.shown.aside]) this.root.add(n.group);
     this.gapMul = keep.gapMul;
     this.motionT = keep.motionT;
     this.anim = keep.anim;
@@ -330,7 +338,7 @@ export class BoardScene {
 
   /** Remove the stage on screen and free its geometry. */
   private clear() {
-    for (const n of this.shown?.nodes ?? []) {
+    for (const n of [...(this.shown?.nodes ?? []), ...(this.shown?.aside ?? [])]) {
       this.root.remove(n.group);
       n.mesh.geometry.dispose();
       n.lines.geometry.dispose();
@@ -346,9 +354,17 @@ export class BoardScene {
     const size = boxSize(all);
     const nodes = stage.slices.map((s) => this.buildSlice(s));
     for (const n of nodes) this.root.add(n.group);
+    // Slices set aside sit past edge B of the work, clear of it, in the order they were cut.
+    const aside = (stage.aside ?? []).map((s) => this.buildSlice(s));
+    for (const n of aside) this.root.add(n.group);
+    const parked = aside.length ? bbox(stage.aside!.flatMap((s) => s.pieces)) : null;
     this.shown = {
       kind: stage.kind, nodes, sizeX: size[0], sizeY: size[1], sizeZ: size[2],
       centerZ: (all.min[2] + all.max[2]) / 2,
+      aside,
+      asideZ: parked ? all.max[2] + ASIDE_GAP - parked.min[2] : 0,
+      asideDepth: parked ? parked.max[2] - parked.min[2] + ASIDE_GAP : 0,
+      asideX: parked ? parked.max[0] - parked.min[0] + (aside.length - 1) * ASIDE_SPREAD : 0,
     };
     this.applyHighlights();
   }
@@ -482,6 +498,11 @@ export class BoardScene {
       }
       n.group.matrixWorldNeedsUpdate = true;
     });
+    // The slices set aside take no part in the step: they wait beside it, a little apart.
+    s.aside.forEach((n, i) => {
+      n.group.matrix.makeTranslation(i * ASIDE_SPREAD, 0, s.asideZ);
+      n.group.matrixWorldNeedsUpdate = true;
+    });
   }
 
   /** Aim the camera to frame the stage, keeping the viewing direction. Does nothing once the user has taken over the camera, unless forced. */
@@ -490,8 +511,9 @@ export class BoardScene {
     if (!s) return;
     if (force) this.autoFit = true;
     if (!this.autoFit) return;
-    const target = new THREE.Vector3(0, s.sizeY / 2, 0);
-    const radius = 0.5 * Math.hypot(this.totalX(1), s.sizeY, s.sizeZ);
+    // With slices set aside, frame the work and them together.
+    const target = new THREE.Vector3(0, s.sizeY / 2, s.asideDepth / 2);
+    const radius = 0.5 * Math.hypot(Math.max(this.totalX(1), s.asideX), s.sizeY, s.sizeZ + s.asideDepth);
     const vFov = (this.camera.fov * Math.PI) / 180;
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
     const dist = (radius / Math.sin(Math.min(vFov, hFov) / 2)) * 1.08;

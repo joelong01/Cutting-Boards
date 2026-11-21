@@ -11,6 +11,7 @@
     "smoke": "npm run build && node scripts/smoke.mjs",
     "check": "vitest run && npm run smoke",
     "web": "vite --open",
+    "deploy": "node scripts/deploy-azure.mjs",
     "icon": "node scripts/run.mjs --icon",
     "shortcut": "tsc -p electron && node scripts/run.mjs --shortcut-only"
   },

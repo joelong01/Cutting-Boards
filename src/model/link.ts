@@ -1,3 +1,4 @@
+import { accentStrips, withAccentStrips } from './accent';
 import type { Design, StripSpec } from './types';
 
 export interface StripChange {
@@ -19,6 +20,8 @@ export interface StripChange {
  * - width: the step used the strip's wood and its thickness equalled the strip's old width.
  *
  * A step set to a different wood or thickness on purpose does not match, and is left alone.
+ * When a step puts several strips in each gap, each of them is matched on its own. A patterned
+ * strip and a border follow a change of wood, by the same rule, but never a change of width.
  */
 export function changeStrip(design: Design, stripId: string, patch: Partial<Pick<StripSpec, 'species' | 'width'>>): StripChange {
   const before = design.layup.strips.find((s) => s.id === stripId);
@@ -28,17 +31,52 @@ export function changeStrip(design: Design, stripId: string, patch: Partial<Pick
   const strips = design.layup.strips.map((s) => (s.id === stripId ? after : s));
   const oldWoodStillUsed = strips.some((s) => s.species === before.species);
   const steps = design.steps.map((step) => {
-    if (step.type !== 'insert' || step.species !== before.species) return step;
-    let next = step;
-    if (after.width !== before.width && Math.abs(step.thickness - before.width) < 1e-9) {
-      next = { ...next, thickness: after.width };
-      followed.width = true;
-    }
-    if (after.species !== before.species && !oldWoodStillUsed) {
-      next = { ...next, species: after.species };
+    // A border in a wood that is swapped out of the strips follows it too.
+    if (step.type === 'frame' && after.species !== before.species && !oldWoodStillUsed
+      && (step.species === before.species || step.lineSpecies === before.species)) {
       followed.species = true;
+      return {
+        ...step,
+        species: step.species === before.species ? after.species : step.species,
+        lineSpecies: step.lineSpecies === before.species ? after.species : step.lineSpecies,
+      };
     }
-    return next;
+    // So do the strips of a second panel, and the faces glued to them.
+    if (step.type === 'panel' && after.species !== before.species && !oldWoodStillUsed) {
+      const swap = (id: string) => (id === before.species ? after.species : id);
+      const strips = step.strips.map((st) => ({ ...st, species: swap(st.species), ...(st.faces ? { faces: { ...st.faces, species: swap(st.faces.species) } } : {}) }));
+      if (JSON.stringify(strips) === JSON.stringify(step.strips)) return step;
+      followed.species = true;
+      return { ...step, strips };
+    }
+    if (step.type !== 'insert') return step;
+    let changed = false;
+    const accents = accentStrips(step).map((a) => {
+      if (a.pattern) {
+        // A patterned strip is a panel of its own, so its widths are its own. Its woods are the
+        // board's woods, though: when a wood is swapped out of the strips, swap it here as well.
+        if (after.species === before.species || oldWoodStillUsed) return a;
+        const swap = (id: string) => (id === before.species ? after.species : id);
+        const pattern = a.pattern.map((st) => ({ ...st, species: swap(st.species), ...(st.faces ? { faces: { ...st.faces, species: swap(st.faces.species) } } : {}) }));
+        if (JSON.stringify(pattern) === JSON.stringify(a.pattern) && a.species !== before.species) return a;
+        followed.species = true;
+        changed = true;
+        return { ...a, species: swap(a.species), pattern };
+      }
+      if (a.species !== before.species) return a;
+      let next = a;
+      if (after.width !== before.width && Math.abs(a.thickness - before.width) < 1e-9) {
+        next = { ...next, thickness: after.width };
+        followed.width = true;
+      }
+      if (after.species !== before.species && !oldWoodStillUsed) {
+        next = { ...next, species: after.species };
+        followed.species = true;
+      }
+      changed ||= next !== a;
+      return next;
+    });
+    return changed ? withAccentStrips(step, accents) : step;
   });
   return { design: { ...design, layup: { ...design.layup, strips }, steps }, followed };
 }

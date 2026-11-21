@@ -6,9 +6,9 @@
 // Two things keep it quick. The checks run several at a time, each launch in a profile of its own
 // so they cannot disturb one another. And no launch waits a fixed time: it is given a `ready`
 // expression and looks the moment that turns true (`--ready` in electron/main.cts).
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { availableParallelism } from 'node:os';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,17 +16,47 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 let launches = 0;
+/** The launches still running, so none is left behind when the run ends or is interrupted. */
+const running = new Set();
 
-/** Start the app with the given arguments, in a test profile no other launch is using, and resolve to its exit code and everything it printed. */
+/** End a launch and the app it started. On Windows a plain kill would stop the launcher and leave the app running. */
+function stop(child) {
+  if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+  else child.kill();
+}
+
+/** Leave nothing behind: stop any launch still running and delete every test profile folder, including ones from earlier runs. */
+function cleanUp() {
+  for (const child of running) stop(child);
+  running.clear();
+  for (const name of readdirSync(tmpdir())) {
+    if (!name.startsWith('cutting-boards-test-smoke-')) continue;
+    try {
+      rmSync(join(tmpdir(), name), { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch {
+      // Still held by an app that is closing; the next run removes it.
+    }
+  }
+}
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    cleanUp();
+    process.exit(1);
+  });
+}
+
+/** Start the app, whose window a test run keeps off every screen, with the given arguments, in a test profile no other launch is using, and resolve to its exit code and everything it printed. */
 function launch(args) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, ['scripts/run.mjs', `--profile=smoke-${launches++}`, ...args], { cwd: root });
+    running.add(child);
     let out = '';
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { out += d; });
-    const timer = setTimeout(() => child.kill(), 60000);
+    const timer = setTimeout(() => stop(child), 60000);
     child.on('close', (code) => {
       clearTimeout(timer);
+      running.delete(child);
       resolve({ code, out });
     });
   });
@@ -64,9 +94,9 @@ const checks = [
     const { code, out } = await launch(['--selftest']);
     if (code !== 0) throw new Error(out.slice(-400));
   }],
-  ['the window is titled Cutting Boards and draws the board in 3D', async () => {
+  ['the window is titled with the design name and Cutting Boards, and draws the board in 3D', async () => {
     const r = await probe('preset=brick', `({ title: document.title, frames: window.boardScene.renderer.info.render.frame, tris: window.boardScene.renderer.info.render.triangles })`);
-    if (r.title !== 'Cutting Boards' || !(r.frames > 5) || !(r.tris > 100)) throw new Error(JSON.stringify(r));
+    if (r.title !== 'Teak brick - Cutting Boards' || !(r.frames > 5) || !(r.tris > 100)) throw new Error(JSON.stringify(r));
   }],
   ['the finished board is shown first, with no "later steps" notice and no edge tags', async () => {
     const r = await probe('preset=brick', `({ notice: !!document.querySelector('.not-final'), tags: window.boardScene.tagGroup.visible, heading: document.querySelector('.overlay.info strong').textContent })`);
@@ -88,6 +118,84 @@ const checks = [
       `({ title, visible: box.top >= 0 && box.bottom <= window.innerHeight + 1, before: n, after: document.querySelectorAll('.overlay.stepper i').length, heading: document.querySelector('.overlay.info strong').textContent })`));
     if (!/after 6\. Offset/i.test(r.title) || !r.visible || r.after !== r.before + 1 || !/7\. Insert accent strips/.test(r.heading)) throw new Error(JSON.stringify(r));
   }],
+  ['the target board stays at the top of the side panel when the list is scrolled to the bottom', async () => {
+    const r = await probe('preset=brick', later(
+      `const side = document.querySelector('.side'); side.scrollTop = side.scrollHeight`,
+      `({ scrolled: Math.round(side.scrollTop), top: Math.round(document.querySelector('.card.target').getBoundingClientRect().top - side.getBoundingClientRect().top), size: document.querySelector('.card.target .note').textContent, over: document.elementFromPoint(side.getBoundingClientRect().left + 40, side.getBoundingClientRect().top + 30)?.closest('.card.target') !== null })`));
+    if (!(r.scrolled > 100) || r.top !== 10 || !r.over || !/Finishes at/.test(r.size)) throw new Error(JSON.stringify(r));
+  }],
+  ['the strips card is step 1, "Mill strips for first glue-up", and its heading shows the first glue-up', async () => {
+    const r = await probe('preset=brick', later(
+      `const head = document.querySelector('.step.first header'); const label = head.innerText.replace(/\\s+/g, ' '); const numbers = [...document.querySelectorAll('.side .step header em')].map((e) => e.textContent).join(','); head.click()`,
+      `({ label, numbers, selected: document.querySelector('.step.first').classList.contains('selected'), heading: document.querySelector('.overlay.info strong').textContent })`));
+    if (r.label !== '1 Mill strips for first glue-up' || r.numbers !== '1,2,3,4,5,6,7,8,9,10' || !r.selected || !r.heading.startsWith('1. ')) throw new Error(JSON.stringify(r));
+  }],
+  ['an accent step takes a second strip: Add strip puts another row in it and another piece in every gap', async () => {
+    const r = await probe('preset=maple-purpleheart&stage=5', later(
+      `const card = () => [...document.querySelectorAll('.steps .step')].find((c) => c.querySelector('header strong').textContent === 'Insert accent strips'); const rows = () => card().querySelectorAll('.accents .strip-row').length; const before = { rows: rows(), heading: document.querySelector('.overlay.info').innerText }; [...card().querySelectorAll('button')].find((b) => b.textContent === '+ Add strip').click()`,
+      `({ before, rows: rows(), note: card().querySelector('.note')?.textContent ?? '', broken: !!document.querySelector('.step.broken'), heading: document.querySelector('.overlay.info').innerText })`, 500));
+    // The board is held at its size, so the extra strip changes the count of slices and pieces.
+    if (r.before.rows !== 1 || r.rows !== 2 || !/these 2 strips together/.test(r.note) || r.broken || r.heading === r.before.heading) throw new Error(JSON.stringify(r));
+  }],
+  ['the panel toggle hides the side panel so the board has the whole width, and the tab on the edge of the board shows it again', async () => {
+    const r = await probe('preset=brick', later(
+      `localStorage.removeItem('cutting-boards.side-hidden.v1'); document.querySelector('.side-toggle').click()`,
+      `(async () => { const hidden = { side: getComputedStyle(document.querySelector('.side')).display, stage: Math.round(document.querySelector('.stage').getBoundingClientRect().width), width: window.innerWidth, canvas: Math.round(document.querySelector('.viewport canvas').getBoundingClientRect().width), handle: document.querySelector('.side-handle')?.getBoundingClientRect().width ?? 0 }; document.querySelector('.side-handle').click(); await new Promise((r) => setTimeout(r, 300)); const shown = getComputedStyle(document.querySelector('.side')).display; localStorage.removeItem('cutting-boards.side-hidden.v1'); return { hidden, shown }; })()`));
+    const h = r.hidden;
+    if (h.side !== 'none' || h.stage < h.width - 2 || h.canvas < h.width - 2 || h.handle < 30 || r.shown === 'none') throw new Error(JSON.stringify(r));
+  }],
+  ['at phone width the board comes first, and the shown panel has a bar along the bottom that covers none of its buttons', async () => {
+    const expression = later(
+      `const start = { side: getComputedStyle(document.querySelector('.side')).display, tab: document.querySelector('.side-handle').innerText.replace(/\\s+/g, ' ') }; document.querySelector('.side-handle').click()`,
+      `(() => { const bar = document.querySelector('.side-handle').getBoundingClientRect(); const side = document.querySelector('.side'); return { start, bar: [Math.round(bar.left), Math.round(window.innerHeight - bar.bottom), Math.round(window.innerWidth - bar.right)], text: document.querySelector('.side-handle').innerText.trim(), stage: getComputedStyle(document.querySelector('.stage')).display, pinned: getComputedStyle(document.querySelector('.card.target')).position, room: Math.round(parseFloat(getComputedStyle(side).paddingBottom) - bar.height), icons: [...side.querySelectorAll('.icons button')].filter((b) => { const r = b.getBoundingClientRect(); return r.right > bar.left && r.left < bar.right && r.bottom > bar.top && r.top < bar.bottom && side.scrollTop + side.clientHeight >= side.scrollHeight; }).length }; })()`);
+    const { out } = await launch(['--width=400', '--height=820', '--query=preset=brick', `--eval=${expression}`, `--ready=${DRAWN}`]);
+    const line = out.split(/\r?\n/).find((l) => l.startsWith('eval '));
+    if (!line) throw new Error(out.slice(-600));
+    const r = JSON.parse(line.slice(5));
+    const ok = r.start.side === 'none' && /Edit/.test(r.start.tab) && r.bar.every((n) => Math.abs(n) <= 1) && /Show the board/.test(r.text)
+      && r.stage === 'none' && r.pinned === 'static' && r.room > 0 && r.icons === 0;
+    if (!ok) throw new Error(JSON.stringify(r));
+  }],
+  ['the toolbar has ten buttons in four named groups, each an icon over its label', async () => {
+    const r = await probe('preset=brick', `({ groups: [...document.querySelectorAll('.top .group > small')].map((e) => e.textContent), buttons: [...document.querySelectorAll('.top .rb')].map((b) => { const icon = b.querySelector('svg.icon').getBoundingClientRect(), label = b.querySelector('span').getBoundingClientRect(); return { text: b.textContent, icon: Math.round(icon.width), above: icon.bottom <= label.top + 1 }; }) })`);
+    const ok = r.groups.join('|') === 'File|Edit|Share|View' && r.buttons.map((b) => b.text).join('|') === 'New|Open|Save|Save as|Undo|Redo|Export|Print|Picture|Hide panel'
+      && r.buttons.every((b) => b.icon >= 20 && b.above);
+    if (!ok) throw new Error(JSON.stringify(r));
+  }],
+  ['Save as asks for a name, puts it in the title bar and saves the design under it', async () => {
+    const r = await probe('preset=brick', later(
+      `[...document.querySelectorAll('.top .rb')].find((b) => b.textContent === 'Save as').click(); await new Promise((r) => setTimeout(r, 150)); const box = document.querySelector('.save-as input'); const offered = box.value; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(box, 'Smoke test board'); box.dispatchEvent(new Event('input', { bubbles: true })); await new Promise((r) => setTimeout(r, 100)); document.querySelector('.save-as .primary').click()`,
+      `(async () => { [...document.querySelectorAll('.top .rb')].find((b) => b.textContent === 'Open').click(); await new Promise((r) => setTimeout(r, 200)); return { offered, title: document.title, open: !!document.querySelector('.save-as'), saved: [...document.querySelectorAll('.dropdown .saved strong')].map((e) => e.textContent) }; })()`, 600));
+    if (r.offered !== 'Teak brick' || r.title !== 'Smoke test board - Cutting Boards' || r.open || !r.saved.includes('Smoke test board')) throw new Error(JSON.stringify(r));
+  }],
+  ['the basket weave lists its second panel as ordinary steps, with the strips editable and a border step', async () => {
+    const r = await probe('preset=basket-weave', later(
+      `const titles = [...document.querySelectorAll('.side .step header strong')].map((e) => e.textContent); const card = (name) => [...document.querySelectorAll('.steps .step')].find((c) => c.querySelector('header strong').textContent === name); const info = () => document.querySelector('.overlay.info').innerText; const before = info(); const panel = card('Start another panel'); const page = { strips: panel.querySelectorAll('.panel-strip').length, faced: [...panel.querySelectorAll('.faced input[type=checkbox]')].map((c) => c.checked), auto: [...panel.querySelectorAll('label.check')].at(-1).querySelector('input').checked, aside: panel.querySelector('.result').textContent, border: [...card('Add a border').querySelectorAll('.field > span')].map((e) => e.textContent), addable: [...document.querySelectorAll('.add-step button')].map((b) => b.textContent) }; panel.querySelector('.faced input[type=checkbox]').click()`,
+      `({ titles, page, before, after: info(), broken: document.querySelectorAll('.step.broken').length })`, 700));
+    const ok = r.titles.join('|') === 'Mill strips for first glue-up|Flatten|Trim|Cross cut|Turn to end grain|Start another panel|Flatten|Trim|Cross cut|Turn to end grain|Interleave the slices|Offset|Glue up|Flatten|Trim|Add a border|Flatten|Finish'
+      && r.page.strips === 4 && r.page.faced.join() === 'true,false,false,false' && r.page.auto && /slices set aside/.test(r.page.aside)
+      && r.page.border.includes('Border') && r.page.border.includes('Line inside it')
+      && ['Start another panel', 'Interleave the slices', 'Add a border'].every((t) => r.page.addable.includes(t)) && r.before !== r.after && r.broken === 0;
+    if (!ok) throw new Error(JSON.stringify(r));
+  }],
+  ['while the second panel is worked, the 3D view draws the slices set aside beside it', async () => {
+    const r = await probe('preset=basket-weave&stage=8', `({ heading: document.querySelector('.overlay.info strong').textContent, work: window.boardScene.shown.nodes.length, aside: window.boardScene.shown.aside.length, drawn: window.boardScene.shown.aside.every((n) => n.group.parent === window.boardScene.root), past: window.boardScene.shown.asideZ > window.boardScene.shown.sizeZ })`);
+    if (!/^9\. Cross cut/.test(r.heading) || r.aside < 2 || r.work < 1 || !r.drawn || !r.past) throw new Error(JSON.stringify(r));
+  }],
+  ['typing a corner radius of 3/4 and then 1 redraws the board each time, without Enter or leaving the field', async () => {
+    const r = await probe('preset=brick', later(
+      `const wait = (ms) => new Promise((r) => setTimeout(r, ms)); const field = () => [...document.querySelectorAll('.field')].find((f) => f.querySelector('span')?.textContent === 'Corner radius').querySelector('input'); const caption = () => /to a (.*?) radius/.exec(document.querySelector('.overlay.caption').textContent)?.[1]; const mesh = () => { let sum = 0; for (const node of window.boardScene.shown.nodes) { const p = node.mesh.geometry.attributes.position; for (let i = 0; i < p.count; i++) sum += p.getX(i) + 2 * p.getZ(i); } return Math.round(sum * 100); }; const type = async (v) => { const el = field(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); await wait(1300); return { shown: field().value, caption: caption(), mesh: mesh() }; }; const start = { caption: caption(), mesh: mesh() }; const a = await type('3/4'); const b = await type('1')`,
+      `({ start, a, b })`, 50));
+    const ok = r.start.caption === '1/2″' && r.a.caption === '3/4″' && r.b.caption === '1″' && r.a.shown === '3/4' && r.b.shown === '1'
+      && new Set([r.start.mesh, r.a.mesh, r.b.mesh]).size === 3;
+    if (!ok) throw new Error(JSON.stringify(r));
+  }],
+  ['the Finish card puts each option on a line of its own, with its fields indented under it', async () => {
+    const r = await probe('preset=brick', `(() => { const card = [...document.querySelectorAll('.steps .step')].at(-1); const box = (e) => e.getBoundingClientRect(); const checks = [...card.querySelectorAll('.params > .check:not(.sub)')].map((e) => ({ top: Math.round(box(e).top), bottom: Math.round(box(e).bottom), left: Math.round(box(e).left) })); const rows = [...card.querySelectorAll('.params > .row')].map((e) => Math.round(box(e).left)); return { title: card.querySelector('header strong').textContent, checks, rows }; })()`);
+    const ok = r.title === 'Finish' && r.checks.length === 4 && r.checks.every((c, i) => i === 0 || c.top >= r.checks[i - 1].bottom)
+      && r.rows.length >= 1 && r.rows.every((x) => x > r.checks[0].left + 10);
+    if (!ok) throw new Error(JSON.stringify(r));
+  }],
   ['the splitter is there and the side panel has a width between its limits', async () => {
     const r = await probe('preset=brick', `({ splitter: !!document.querySelector('.splitter'), side: Math.round(document.querySelector('.splitter').getBoundingClientRect().left), width: window.innerWidth })`);
     if (!r.splitter || r.side < 200 || r.side > r.width - 200) throw new Error(JSON.stringify(r));
@@ -95,6 +203,18 @@ const checks = [
   ['the Cut list and steps tab lists stock and numbered instructions', async () => {
     const r = await probe('preset=maple-purpleheart&tab=cutlist', `({ text: document.querySelector('.cutlist').innerText })`);
     if (!/Hard maple/.test(r.text) || !/Purpleheart/.test(r.text) || !/Finish/.test(r.text) || !/board feet|bd ft|bf/i.test(r.text)) throw new Error(r.text.slice(0, 400));
+  }],
+  ['the cut list has a units choice: Metric adds millimetres beside the inches, and Imperial off leaves millimetres only', async () => {
+    const r = await probe('preset=brick&tab=cutlist', later(
+      `const boxes = () => [...document.querySelectorAll('.cutlist .units input')]; const text = () => [...document.querySelectorAll('.cutlist table, .cutlist ol, .cutlist .note')].map((e) => e.innerText).join(' '); const shots = [{ on: boxes().map((b) => b.checked), text: text() }]; boxes()[1].click(); setTimeout(() => { shots.push({ on: boxes().map((b) => b.checked), text: text() }); boxes()[0].click(); }, 300); setTimeout(() => { shots.push({ on: boxes().map((b) => b.checked), text: text() }); boxes()[1].click(); }, 600)`,
+      `({ shots: shots.map((s) => ({ on: s.on, inch: (s.text.match(/″/g) || []).length, mm: (s.text.match(/ mm/g) || []).length, sample: s.text.slice(0, 90) })), last: boxes().map((b) => b.checked), saved: localStorage.getItem('cutting-boards.units.v1') })`, 900));
+    const [imperial, both, metric] = r.shots;
+    const ok = imperial.on.join() === 'true,false' && imperial.inch > 10 && imperial.mm === 0
+      && both.on.join() === 'true,true' && both.inch === imperial.inch && both.mm > 10
+      && metric.on.join() === 'false,true' && metric.inch === 0 && metric.mm > 10
+      // Turning the last unit off turns the other on.
+      && r.last.join() === 'true,false' && r.saved === '{"imperial":true,"metric":false}';
+    if (!ok) throw new Error(JSON.stringify(r));
   }],
   ['print preview shows the sheet with its Print and Save as PDF buttons', async () => {
     const r = await probe('preset=brick&preview', `({ bar: document.querySelector('.preview-bar')?.innerText ?? '', sheet: document.querySelector('.print-sheet')?.innerText ?? '' })`);
@@ -152,20 +272,25 @@ const checks = [
     const r = await probe('wizard=end', `({ pictures: [...document.querySelectorAll('.wizard-examples img')].filter((i) => i.src.startsWith('data:image/png')).length })`, examples(4));
     if (r.pictures < 4) throw new Error(JSON.stringify(r));
   }],
-  ['the board wizard offers Chess board as a type', async () => {
-    const r = await probe('wizard', later(`document.querySelector('.modal footer button').click()`, `({ types: [...document.querySelectorAll('.wizard-types strong')].map((e) => e.textContent) })`), WIZARD);
-    if (r.types.join('|') !== 'End grain|Edge grain|Chess board') throw new Error(JSON.stringify(r));
-  }],
-  ['the chess board page asks for two woods and a square, and draws both ways to build it', async () => {
-    const r = await probe('wizard=chess', `({ woods: document.querySelectorAll('.wizard-chess select').length, fields: [...document.querySelectorAll('.wizard-chess .field > span:first-child')].map((e) => e.textContent), cards: [...document.querySelectorAll('.wizard-examples button')].map((b) => ({ label: b.querySelector('strong').textContent, size: b.querySelector('small').textContent, picture: !!b.querySelector('img')?.src.startsWith('data:image/png') })) })`, examples(2));
-    const ok = r.woods === 2 && r.fields.includes('Square') && r.cards.length === 2
-      && r.cards.every((c) => c.picture && /16″ × 16″/.test(c.size)) && /End-grain/.test(r.cards[0].label) && /Face-grain/.test(r.cards[1].label);
+  ['the board wizard has two pages: size with a grain choice, then that grain\'s designs with the chess and double border boards among them', async () => {
+    const r = await probe('wizard', later(
+      `const grains = () => [...document.querySelectorAll('.wizard-types [role=radio]')]; const first = { crumbs: [...document.querySelectorAll('.crumbs li')].map((e) => e.textContent), grains: grains().map((b) => b.querySelector('strong').textContent), checked: grains().map((b) => b.getAttribute('aria-checked')) }; grains()[1].click(); setTimeout(() => document.querySelector('.modal footer button.primary').click(), 100)`,
+      `({ first, labels: [...document.querySelectorAll('.wizard-examples strong')].map((e) => e.textContent), options: document.querySelectorAll('.modal select').length })`, 2500), WIZARD);
+    const ok = r.first.crumbs.join('|') === '1. Size and grain|2. Design' && r.first.grains.join('|') === 'End grain|Edge grain' && r.first.checked.join() === 'true,false'
+      && r.labels.length >= 3 && r.labels.at(-2) === 'Face-grain chess board' && r.labels.at(-1) === 'Face-grain double border' && r.options === 0;
     if (!ok) throw new Error(JSON.stringify(r));
   }],
-  ['picking a chess board opens it: 64 blocks, named for its woods', async () => {
-    const r = await probe('wizard=chess', later(`document.querySelector('.wizard-examples button').click()`,
-      `({ wizard: !!document.querySelector('.modal'), name: document.querySelector('input[title^=\\'Design name\\']').value, info: document.querySelector('.overlay.info').innerText })`, 600), examples(2));
-    if (r.wizard || r.name !== 'Black walnut and hard maple chess board' || !/16″ × 16″/.test(r.info)) throw new Error(JSON.stringify(r));
+  ['picking the chess board opens it like any other design: eight squares as wide as the board asked for, named for its woods', async () => {
+    const r = await probe('wizard=end', later(
+      `const card = [...document.querySelectorAll('.wizard-examples button')].find((b) => /chess/.test(b.textContent)); const size = card.querySelector('small').textContent; card.click()`,
+      `({ size, wizard: !!document.querySelector('.modal'), name: document.title.replace(' - Cutting Boards', ''), info: document.querySelector('.overlay.info').innerText, broken: document.querySelectorAll('.step.broken').length })`, 800), examples(7));
+    if (r.wizard || r.name !== 'Black walnut and hard maple chess board' || !/12″ × 12″/.test(r.size) || !/12″ × 12″/.test(r.info) || r.broken) throw new Error(JSON.stringify(r));
+  }],
+  ['picking the double border board opens it the same way, named for its three woods', async () => {
+    const r = await probe('wizard=end', later(
+      `const card = [...document.querySelectorAll('.wizard-examples button')].find((b) => /double border/.test(b.textContent)); const picture = !!card.querySelector('img')?.src.startsWith('data:image/png'); card.click()`,
+      `({ picture, wizard: !!document.querySelector('.modal'), name: document.title.replace(' - Cutting Boards', ''), broken: document.querySelectorAll('.step.broken').length })`, 800), examples(7));
+    if (!r.picture || r.wizard || r.name !== 'Hard maple, black walnut and white oak double border' || r.broken) throw new Error(JSON.stringify(r));
   }],
   ['the app icon files exist', async () => {
     const missing = ['assets/icon.ico', 'assets/icon.png', 'public/icon.png'].filter((f) => !existsSync(join(root, f)));
@@ -188,6 +313,22 @@ async function worker() {
     }
   }
 }
+// Start from empty test profiles, so nothing an interrupted run left behind can change a result.
+cleanUp();
+
+/**
+ * What a run must leave exactly as it found it: the real designs folder (every file's name, size
+ * and time) and the names of this app's folders in the temp directory.
+ */
+function footprint() {
+  const designs = join(root, 'designs');
+  const files = existsSync(designs)
+    ? readdirSync(designs).sort().map((f) => { const s = statSync(join(designs, f)); return `${f} ${s.size} ${s.mtimeMs}`; })
+    : [];
+  const temp = readdirSync(tmpdir()).filter((n) => n.startsWith('cutting-boards')).sort();
+  return JSON.stringify({ files, temp }, null, 1);
+}
+const before = footprint();
 const started = Date.now();
 await Promise.all(Array.from({ length: Math.min(6, Math.max(2, availableParallelism() - 2)) }, worker));
 
@@ -200,4 +341,11 @@ checks.forEach(([name], i) => {
   }
 });
 console.log(`${checks.length - failed} of ${checks.length} smoke checks passed in ${((Date.now() - started) / 1000).toFixed(1)} s`);
+cleanUp();
+// A run that changed the designs folder or left a folder behind has failed, whatever its checks said.
+const after = footprint();
+if (after !== before) {
+  failed++;
+  console.log(`FAIL  the run left things changed\n      before: ${before.replace(/\n/g, '\n      ')}\n      after: ${after.replace(/\n/g, '\n      ')}`);
+} else console.log('ok    the designs folder and the temp folder are as they were before the run');
 process.exit(failed ? 1 : 0);

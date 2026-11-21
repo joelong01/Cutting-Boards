@@ -1,3 +1,4 @@
+import { accentStrips } from './accent';
 import { speciesById } from './species';
 import type { Design, Species } from './types';
 
@@ -31,14 +32,23 @@ export function isAutoNamed(design: Pick<Design, 'autoName' | 'name'>): boolean 
 
 /**
  * The woods in a design, most used first: the strips of the first glue-up by total width, then
- * any accent wood that appears only in an "Insert accent strips" step.
+ * any wood that appears only in a second panel or an "Insert accent strips" step. Spacer strips are left
+ * out: they are sawn away, so their wood is not in the board.
  */
 export function woodsOf(design: Pick<Design, 'layup' | 'steps'>): string[] {
   const width = new Map<string, number>();
-  for (const s of design.layup.strips) width.set(s.species, (width.get(s.species) ?? 0) + s.width);
+  for (const s of design.layup.strips) if (!s.spacer) width.set(s.species, (width.get(s.species) ?? 0) + s.width);
   const woods = [...width].sort((a, b) => b[1] - a[1]).map(([id]) => id);
   for (const step of design.steps) {
-    if (step.type === 'insert' && !woods.includes(step.species)) woods.push(step.species);
+    if (step.type === 'panel') {
+      for (const st of step.strips) {
+        for (const id of st.spacer ? [] : [st.species, ...(st.faces ? [st.faces.species] : [])]) if (!woods.includes(id)) woods.push(id);
+      }
+    }
+    if (step.type !== 'insert') continue;
+    for (const a of accentStrips(step)) {
+      for (const id of [a.species, ...(a.pattern ?? []).flatMap((st) => [st.species, ...(st.faces ? [st.faces.species] : [])])]) if (!woods.includes(id)) woods.push(id);
+    }
   }
   return woods;
 }

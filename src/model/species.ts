@@ -16,6 +16,7 @@ export const BUILTIN_SPECIES: Species[] = [
   { id: 'bloodwood', name: 'Bloodwood', color: '#8d2a22' },
   { id: 'wenge', name: 'Wenge', color: '#3c2b23' },
   { id: 'beech', name: 'Beech', color: '#d9b78d' },
+  { id: 'poplar', name: 'Poplar', color: '#cdc795' },
 ];
 
 /** The built-in woods followed by the design's own custom woods. */

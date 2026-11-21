@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatLength, parseLength } from '../model/fractions';
 import type { Selector, Species } from '../model/types';
 
@@ -11,14 +11,37 @@ interface LenProps {
   disabled?: boolean;
 }
 
-/** Length field that accepts shop fractions. Up/Down nudge by 1/16; with Shift, by 1/4. */
+/** How long after the last keystroke a typed length is taken up, without waiting for Enter or a click elsewhere. */
+const TYPING_PAUSE = 600;
+
+/**
+ * Length field that accepts shop fractions. Up/Down nudge by 1/16; with Shift, by 1/4. What is
+ * typed takes effect on Enter, on leaving the field, or after a short pause in typing: clicking
+ * or dragging the 3D view does not take the cursor out of the field, so waiting to leave it
+ * could leave the board showing the old value.
+ */
 export function Len({ value, onChange, min = 0, label, title, disabled }: LenProps) {
   const [text, setText] = useState(formatLength(value));
   const [bad, setBad] = useState(false);
+  // The newest text, value and handler, for the pause timer, which must not act on old ones.
+  const live = useRef({ text, value, onChange });
+  live.current = { text, value, onChange };
   useEffect(() => {
-    setText(formatLength(value));
+    // Leave the text alone when it already says this value: the change came from this field's
+    // own pause timer, and rewriting "0.75" as "3/4" would move the cursor mid-edit.
+    const typed = parseLength(live.current.text);
+    if (typed === null || Math.abs(typed - value) > 1e-9) setText(formatLength(value));
     setBad(false);
   }, [value]);
+  // After a pause in typing, take up what is there if it is a valid length that differs.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const now = live.current;
+      const v = parseLength(now.text);
+      if (v !== null && v >= min && Math.abs(v - now.value) > 1e-9) now.onChange(v);
+    }, TYPING_PAUSE);
+    return () => clearTimeout(timer);
+  }, [text, min]);
   /** Parse the typed text and pass it up; mark the field bad and keep the old value when it is not a valid length. */
   const commit = () => {
     const v = parseLength(text);

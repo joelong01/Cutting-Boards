@@ -1,9 +1,10 @@
 import {
   bbox, box, boxCenter, boxSize, clipAxis, rotateY, rotateZ, toOrigin, translate, volume,
 } from './geometry';
+import { accentStrips, patternPeriod } from './accent';
 import { applyFinish, finishOf } from './finish';
 import { inches } from './fractions';
-import type { Design, Layup, Piece, Selector, Slice, Stage, Step, StockLine, StripSpec } from './types';
+import type { AccentStrip, Design, Layup, Piece, Selector, Slice, Stage, Step, StockLine, StripSpec } from './types';
 
 type Names = (speciesId: string) => string;
 
@@ -77,36 +78,133 @@ function failed(prev: Stage, title: string, error: string): Stage {
   };
 }
 
-/** The first glue-up: one box per strip laid side by side across Z, with the stock list and the milling instruction. */
-export function buildLayup(layup: Layup, names: Names): Stage {
-  const strips = expandStrips(layup);
+/**
+ * A panel glued up from strips: one box per strip laid side by side across Z (three, stacked, for
+ * a strip with a wood glued to both faces), with its stock list and milling instruction. `which`
+ * names the panel in the stock list, "First glue-up" or "Second panel".
+ */
+function buildPanel(strips: StripSpec[], length: number, thickness: number, names: Names, which: string): { pieces: Piece[]; stock: StockLine[]; summary: string; width: number } {
   const pieces: Piece[] = [];
   let z = 0;
   strips.forEach((s, i) => {
-    pieces.push(box([0, 0, z], [layup.length, layup.thickness, z + s.width], s.species, [1, 0, 0], tone(i)));
+    const f = s.faces && s.faces.thickness > 0 && 2 * s.faces.thickness < thickness ? s.faces : undefined;
+    if (f) {
+      pieces.push(box([0, 0, z], [length, f.thickness, z + s.width], f.species, [1, 0, 0], tone(500 + i)));
+      pieces.push(box([0, f.thickness, z], [length, thickness - f.thickness, z + s.width], s.species, [1, 0, 0], tone(i)));
+      pieces.push(box([0, thickness - f.thickness, z], [length, thickness, z + s.width], f.species, [1, 0, 0], tone(700 + i)));
+    } else pieces.push(box([0, 0, z], [length, thickness, z + s.width], s.species, [1, 0, 0], tone(i)));
     z += s.width;
   });
   const groups = new Map<string, StockLine>();
-  for (const s of strips) {
-    const key = `${s.species}|${s.width}`;
+  /** Count one more piece of this size, starting its stock line if it is the first. */
+  const need = (species: string, thick: number, width: number, use: string, count = 1) => {
+    const key = `${species}|${thick}|${width}|${use}`;
     const line = groups.get(key);
-    if (line) line.count++;
-    else {
-      groups.set(key, {
-        species: s.species, count: 1, thickness: layup.thickness, width: s.width,
-        length: layup.length, use: 'First glue-up: runs the length of the panel',
-      });
+    if (line) line.count += count;
+    else groups.set(key, { species, count, thickness: thick, width, length, use });
+  };
+  const faced = new Map<string, { strip: StripSpec; count: number }>();
+  for (const s of strips) {
+    const f = s.faces && s.faces.thickness > 0 && 2 * s.faces.thickness < thickness ? s.faces : undefined;
+    if (!f) {
+      need(s.species, thickness, s.width, `${which}: runs the length of the panel`);
+      continue;
     }
+    need(s.species, thickness - 2 * f.thickness, s.width, `${which}: a plank that gets a face glued to each side`);
+    need(f.species, f.thickness, s.width, `${which}: the faces glued to both sides of a plank`, 2);
+    const key = `${s.species}|${s.width}|${f.species}|${f.thickness}`;
+    const entry = faced.get(key);
+    if (entry) entry.count++;
+    else faced.set(key, { strip: s, count: 1 });
   }
   const stock = [...groups.values()];
-  const parts = stock.map((l) => `${l.count} × ${names(l.species)} ${inches(l.width)} wide`).join(', ');
-  const summary = strips.length
-    ? `Mill ${strips.length} strips ${inches(layup.thickness)} thick and ${inches(layup.length)} long: ${parts}. `
-      + `Glue them edge to edge in order into a panel ${inches(z)} wide.`
-    : 'Add at least one strip.';
-  return stage('panel', [{ pieces }], 'First glue-up', summary, {
-    stock, error: strips.length ? undefined : 'The layup has no strips.',
+  const planks = [...faced.values()].map(({ strip, count }) =>
+    `${count} ${names(strip.species)} plank${count > 1 ? 's' : ''} ${inches(thickness - 2 * strip.faces!.thickness)} thick and ${inches(strip.width)} wide, `
+    + `with a ${names(strip.faces!.species)} face ${inches(strip.faces!.thickness)} thick glued to both sides`);
+  const plain = stock.filter((l) => l.use.endsWith('runs the length of the panel'));
+  const parts = [
+    ...plain.map((l) => `${l.count} × ${names(l.species)} ${inches(l.width)} wide`),
+    ...[...faced.values()].map(({ strip, count }) => `${count} × faced plank ${inches(strip.width)} wide`),
+  ].join(', ');
+  const summary = (planks.length ? `First make ${planks.join(', and ')}, ${inches(length)} long; each then counts as one strip ${inches(thickness)} thick. ` : '')
+    + `Mill ${strips.length} strips ${inches(thickness)} thick and ${inches(length)} long: ${parts}. `
+    + `Glue them edge to edge in order into a panel ${inches(z)} wide.`;
+  return { pieces, stock, summary, width: z };
+}
+
+/** The first glue-up, from the design's strips. */
+export function buildLayup(layup: Layup, names: Names): Stage {
+  const strips = expandStrips(layup);
+  const built = buildPanel(strips, layup.length, layup.thickness, names, 'First glue-up');
+  return stage('panel', [{ pieces: built.pieces }], 'First glue-up', strips.length ? built.summary : 'Add at least one strip.', {
+    stock: built.stock, error: strips.length ? undefined : 'The layup has no strips.',
   });
+}
+
+/** Saw kerf and end trim allowed for when a second panel works out its own length. */
+const SECOND_KERF = 0.125, SECOND_TRIM = 0.25;
+
+/**
+ * Start another panel: the loose slices are set aside and a new panel is glued up from the
+ * step's strips. Left to size itself, it is made as wide as the set-aside slices are long, plus
+ * the step's extra, in whole repeats of its strips; and long enough to square both ends and
+ * cross cut one slice, as wide as the set-aside slices are tall, for each gap between them.
+ */
+function anotherPanel(prev: Stage, step: Extract<Step, { type: 'panel' }>, names: Names): Stage {
+  const title = STEP_TITLES.panel;
+  if (prev.aside) return failed(prev, title, 'There are already slices set aside. Interleave them before starting another panel.');
+  const pattern = step.strips.filter((st) => st.width > 0);
+  if (!pattern.length) return failed(prev, title, 'The panel needs at least one strip.');
+  if (!(step.thickness > 0)) return failed(prev, title, 'The panel needs a thickness greater than zero.');
+  const b = bbox(prev.slices.flatMap((sl) => sl.pieces));
+  const period = pattern.reduce((w, st) => w + st.width, 0);
+  const gaps = Math.max(1, prev.slices.length - 1);
+  const tall = b.max[1] - b.min[1];
+  const length = step.length ?? gaps * (tall + SECOND_KERF) + 2 * SECOND_TRIM;
+  const strips: StripSpec[] = [];
+  if (step.repeat !== undefined) {
+    for (let r = 0; r < Math.max(1, Math.floor(step.repeat)); r++) strips.push(...pattern);
+  } else {
+    // Sizing itself: add strips in order, starting the pattern again as needed, and stop at the
+    // first one that makes the panel wide enough. The last repeat need not be a whole one.
+    const wanted = b.max[2] - b.min[2] + Math.max(0, step.extra);
+    for (let n = 0, z = 0; z < wanted - 1e-9 && n < MAX_SLICES * 4; n++) {
+      strips.push(pattern[n % pattern.length]);
+      z += pattern[n % pattern.length].width;
+    }
+  }
+  if (strips.length > MAX_SLICES * 4 || period <= 0) return failed(prev, title, 'That is too many strips.');
+  const built = buildPanel(strips, length, step.thickness, names, 'Second panel');
+  return stage('panel', [{ pieces: built.pieces }], title,
+    `Set the ${prev.slices.length} slices aside, in order. Now a second panel: ${built.summary.charAt(0).toLowerCase()}${built.summary.slice(1)}`,
+    { stock: built.stock, aside: prev.slices.map((sl) => ({ pieces: sl.pieces })) });
+}
+
+/**
+ * Interleave: bring back the slices set aside and put one of the new slices after each of them
+ * but the last, so the two kinds alternate with a set-aside slice at each end. Every slice keeps
+ * its place along its length, the new ones moved as a set so that their edge A ends line up with
+ * the others'. New slices beyond the number of gaps are left over.
+ */
+function combine(prev: Stage): Stage {
+  const title = STEP_TITLES.combine;
+  const aside = prev.aside;
+  if (!aside?.length) return failed(prev, title, 'No slices are set aside. Add "Start another panel" before this.');
+  const gaps = aside.length - 1;
+  if (prev.slices.length < gaps) {
+    return failed(prev, title, `${aside.length} slices set aside have ${gaps} gaps between them, and there are only ${prev.slices.length} new slices. Make the second panel longer.`);
+  }
+  const shift = bbox(aside.flatMap((sl) => sl.pieces)).min[2] - bbox(prev.slices.flatMap((sl) => sl.pieces)).min[2];
+  const slices: Slice[] = [];
+  aside.forEach((sl, i) => {
+    slices.push({ pieces: sl.pieces });
+    if (i < gaps) slices.push({ pieces: translate(prev.slices[i].pieces, [0, 0, shift]) });
+  });
+  const st = stage('slices', slices, title,
+    `Bring back the ${aside.length} slices set aside and stand one of the new slices after each of the first ${gaps}, so the two kinds alternate and the row starts and ends with a set-aside slice. `
+    + 'Line up all their ends at edge A.');
+  if (prev.slices.length > gaps) st.warning = `${prev.slices.length - gaps} of the new slices ${prev.slices.length - gaps > 1 ? 'are' : 'is'} left over. Shorten the second panel to save the wood.`;
+  return st;
 }
 
 /** Cut a panel into slices of a set width, losing a kerf between each. At an angle the panel is first rotated so the blade is square to X, which leaves every slice a straight slab with flat glue faces. */
@@ -215,7 +313,230 @@ function endGrainUp(pieces: Piece[]): boolean {
   return total > 0 && up > total / 2;
 }
 
-const NEEDS_PANEL: Step['type'][] = ['crosscut', 'trim', 'flatten', 'rotate'];
+/** Saw kerf allowed between slices when a patterned strip's own panel, or a border's, is cross cut. */
+const PANEL_KERF = 0.125;
+/** A layer thinner than this cannot be milled or glued at its thickness: it goes on thicker and is planed down. */
+const TOO_THIN = 0.375;
+/** What a too-thin layer is left over its finished thickness when it is glued on. */
+const PLANE_OFF = 0.0625;
+
+/**
+ * Insert accent strips: put the step's stack of strips between the slices (and outside the end
+ * ones, with `ends`). Each gap's stack is one slice, so later steps count it as one.
+ *
+ * A plain strip is one piece of one wood running the length of the slices. A patterned strip is
+ * a slice of another glue-up: it is drawn as that panel's strips side by side along the gap,
+ * starting `offset` in from edge A and, in every other gap, `stagger` further along. A strip of
+ * that panel with `faces` is a plank with another wood on both faces, drawn as its three layers.
+ * A patterned strip's wood is given the same grain direction as the slices it lies between,
+ * because it is cut and turned the way they were.
+ */
+function insert(prev: Stage, step: Extract<Step, { type: 'insert' }>, names: Names): Stage {
+  const title = STEP_TITLES.insert;
+  const accents = accentStrips(step);
+  if (accents.some((a) => !(a.thickness > 0))) return failed(prev, title, 'Accent strip thickness must be greater than zero.');
+  if (accents.some((a) => a.pattern && !(a.pattern.every((s) => s.width > 0)))) return failed(prev, title, 'Every strip in a patterned strip needs a width greater than zero.');
+  if (accents.some((a) => a.pattern?.some((s) => s.faces && !(s.faces.thickness > 0 && 2 * s.faces.thickness < a.thickness)))) {
+    return failed(prev, title, 'The two faces of a plank must be thinner, together, than the strip they are in.');
+  }
+  const every = Math.max(1, Math.floor(step.every));
+  const b = bbox(prev.slices.flatMap((s) => s.pieces));
+  const grain = prev.slices[0]?.pieces[0]?.grain ?? [0, 0, 1];
+  const stagger = step.stagger ?? 0;
+  const slices: Slice[] = [];
+  let count = 0;
+  /** One more stack of the step's strips, as a slice of its own. */
+  const stack = (): Slice => {
+    let x = 0;
+    const pieces: Piece[] = [];
+    accents.forEach((a, k) => {
+      if (!a.pattern) {
+        pieces.push(box([x, 0, b.min[2]], [x + a.thickness, b.max[1], b.max[2]], a.species, [0, 0, 1], tone(1000 + count + 37 * k)));
+      } else {
+        // Lay the pattern along the gap from a whole repeat at or before edge A, and keep what
+        // falls within the slices' length.
+        const period = patternPeriod(a);
+        const phase = ((((a.offset ?? 0) + (count % 2 ? stagger : 0)) % period) + period) % period;
+        let z = b.min[2] + phase - (phase > 1e-9 ? period : 0);
+        for (let n = 0; z < b.max[2] - 1e-9; n++) {
+          const strip = a.pattern[n % a.pattern.length];
+          const lo = Math.max(z, b.min[2]), hi = Math.min(z + strip.width, b.max[2]);
+          if (hi - lo > 1e-9) {
+            const shade = tone(2000 + n + 37 * k + 101 * count);
+            const f = strip.faces;
+            if (f) {
+              pieces.push(box([x, 0, lo], [x + f.thickness, b.max[1], hi], f.species, grain, tone(3000 + n + 101 * count)));
+              pieces.push(box([x + f.thickness, 0, lo], [x + a.thickness - f.thickness, b.max[1], hi], strip.species, grain, shade));
+              pieces.push(box([x + a.thickness - f.thickness, 0, lo], [x + a.thickness, b.max[1], hi], f.species, grain, tone(4000 + n + 101 * count)));
+            } else pieces.push(box([x, 0, lo], [x + a.thickness, b.max[1], hi], strip.species, grain, shade));
+          }
+          z += strip.width;
+        }
+      }
+      x += a.thickness;
+    });
+    count++;
+    return { pieces };
+  };
+  // With `ends` on, a stack also goes outside the first slice and outside the last.
+  if (step.ends) slices.push(stack());
+  prev.slices.forEach((s, i) => {
+    slices.push({ pieces: s.pieces });
+    if (i < prev.slices.length - 1 && (i + 1) % every === 0) slices.push(stack());
+  });
+  if (step.ends) slices.push(stack());
+  if (slices.length > MAX_SLICES * 2) return failed(prev, title, 'Too many slices.');
+  const width = b.max[1] - b.min[1], length = b.max[2] - b.min[2];
+  const where = `after every ${every > 1 ? ordinal(every) + ' ' : ''}slice${step.ends ? ', and on the outside of the first and last slice' : ''}`;
+  const plain = accents.filter((a) => !a.pattern);
+  // Strips of the same wood and thickness are one line of stock, however many are in a gap.
+  const stock: StockLine[] = [];
+  if (count) {
+    for (const a of plain) {
+      const same = stock.find((l) => l.species === a.species && Math.abs(l.thickness - a.thickness) < 1e-9 && l.width === width);
+      if (same) same.count += count;
+      else stock.push({ species: a.species, count, thickness: a.thickness, width, length, use: 'Second glue-up: between the cross-cut slices' });
+    }
+  }
+  if (plain.length === accents.length) {
+    const summary = accents.length === 1
+      ? `Mill ${count} ${names(step.species)} strips ${inches(step.thickness)} × ${inches(width)} × ${inches(length)} and place one ${where}.`
+      : `Mill strips ${inches(width)} × ${inches(length)}: ${stock.map((l) => `${l.count} ${names(l.species)} ${inches(l.thickness)} thick`).join(', ')}. `
+        + `Place a stack of ${accents.length} ${where}, in this order: ${accents.map((a) => `${names(a.species)} ${inches(a.thickness)}`).join(', ')}.`;
+    return stage('slices', slices, title, summary, { stock });
+  }
+
+  // Patterned strips. Each different one is a panel of its own: wide enough to cover the slices
+  // (and the slide of every other one), and long enough to cross cut one slice for every gap.
+  const panels: { strip: AccentStrip; uses: number; letter: string }[] = [];
+  const letters = accents.map((a) => {
+    if (!a.pattern) return '';
+    const key = JSON.stringify([a.thickness, a.pattern, a.offset ?? 0]);
+    let panel = panels.find((p) => JSON.stringify([p.strip.thickness, p.strip.pattern, p.strip.offset ?? 0]) === key);
+    if (!panel) panels.push(panel = { strip: a, uses: 0, letter: String.fromCharCode(65 + panels.length) });
+    panel.uses++;
+    return panel.letter;
+  });
+  const panelWidth = length + stagger;
+  const panelLength = count * (width + PANEL_KERF) + 0.5;
+  const single = panels.length === 1 && accents.length === 1;
+  /** Add to a stock line that matches, or start a new one. */
+  const need = (line: StockLine) => {
+    const same = stock.find((l) => l.use === line.use && l.species === line.species && Math.abs(l.width - line.width) < 1e-9 && Math.abs(l.thickness - line.thickness) < 1e-9);
+    if (same) same.count += line.count;
+    else stock.push(line);
+  };
+  const describe = panels.map(({ strip, uses, letter }) => {
+    const name = single ? 'the panel' : `panel ${letter}`;
+    const period = patternPeriod(strip);
+    const repeats = Math.ceil(panelWidth / period - 1e-9);
+    const n = repeats * uses;
+    // A panel too thin to glue up is made thicker and planed once it is glued to its neighbour.
+    const thin = strip.thickness < TOO_THIN && !single;
+    const milled = thin ? 0.75 : strip.thickness;
+    const use = `${single ? 'Panel' : `Panel ${letter}`} for the strips between the slices${uses > 1 ? ` (${uses} panels)` : ''}`;
+    const planks: string[] = [];
+    for (const st of strip.pattern!) {
+      if (!st.faces) {
+        need({ species: st.species, count: n, thickness: milled, width: st.width, length: panelLength, use: thin ? `${use}; planed to ${inches(strip.thickness)} after it is glued on` : use });
+        continue;
+      }
+      const f = st.faces, core = strip.thickness - 2 * f.thickness;
+      const glued = f.thickness < TOO_THIN ? f.thickness + PLANE_OFF : f.thickness;
+      need({ species: st.species, count: n, thickness: core, width: st.width, length: panelLength, use: `${use}: the planks` });
+      need({
+        species: f.species, count: 2 * n, thickness: glued, width: st.width, length: panelLength,
+        use: `${use}: a face on each side of a plank${glued > f.thickness ? `, planed to ${inches(f.thickness)} once glued on` : ''}`,
+      });
+      planks.push(`${n} ${names(st.species)} planks ${inches(core)} × ${inches(st.width)} × ${inches(panelLength)}, each with a ${names(f.species)} face `
+        + `${inches(glued)} thick glued to both sides${glued > f.thickness ? `; when the glue has set, plane each face down to ${inches(f.thickness)}` : ''}, `
+        + `which leaves the plank ${inches(strip.thickness)} thick`);
+    }
+    const start = (((strip.offset ?? 0) % period) + period) % period;
+    const order = strip.pattern!.map((st) => `${st.faces ? 'a faced plank' : names(st.species)} ${inches(st.width)}`).join(', ');
+    return (planks.length ? `For ${name}, first make ${planks.join('; and ')}. Then glue up ${name}` : `Glue up ${name}`)
+      + `${uses > 1 ? ` (make ${uses})` : ''}, ${inches(milled)} thick`
+      + `${thin ? ` (it finishes ${inches(strip.thickness)}, but cannot be glued up that thin)` : ''}, edge to edge in this order: ${order}, repeated ${repeats} times, `
+      + `to about ${inches(panelWidth)} wide. Measured from edge A of the slices, its first strip starts ${start > 1e-9 ? `${inches(start)} in` : 'at the edge'}`;
+  });
+  const order = accents.map((a, k) => letters[k] ? `panel ${letters[k]}` : `${names(a.species)} ${inches(a.thickness)}`).join(', ');
+  const anyThin = panels.some((p) => p.strip.thickness < TOO_THIN) && !single;
+  const summary = `The strips between the slices are cut from ${panels.length === 1 ? 'one more glue-up' : `${panels.length} more glue-ups`}, `
+    + `made like the first with strips ${inches(panelLength)} long. ${describe.join('. ')}. `
+    + (single
+      ? `Flatten it, square one end, and cross cut it into ${count} slices ${inches(width)} wide (kerf ${inches(PANEL_KERF)}). `
+      : `Glue the panels face to face in this order: ${order}, with each one's first strip where its measurement puts it. `
+        + (anyThin ? 'Plane each thin panel down to its finished thickness once the glue has set. ' : '')
+        + `Flatten the stack, square one end, and cross cut it into ${count} slices ${inches(width)} wide (kerf ${inches(PANEL_KERF)}). `)
+    + `Stand each one the same way up as the slices already cut and place one ${where}`
+    + (stagger ? `, sliding every other one ${inches(stagger)} along towards edge B so the pattern alternates. Let the ends overhang; they are trimmed after the glue-up.` : '.');
+  return stage('slices', slices, title, summary, { stock });
+}
+
+/**
+ * Add a border: glue a frame round the panel, with an optional thin line between the panel and
+ * the frame. The two ends go on first, as wide as the panel; the two long sides then cover the
+ * ends of those as well. The frame is drawn as blocks about `block` long. On an end-grain panel
+ * the frame is end grain too, so it moves with the board: each side is a slice cross cut from a
+ * panel of its own and stood on end. On a face-grain panel each side is one strip, grain along it.
+ */
+function frame(prev: Stage, step: Extract<Step, { type: 'frame' }>, names: Names): Stage {
+  const title = STEP_TITLES.frame;
+  if (!(step.width > 0)) return failed(prev, title, 'The border needs a width greater than zero.');
+  const [sx, sy, sz] = prev.size;
+  const w = step.width, lt = Math.max(0, step.line);
+  const end = endGrainUp(prev.slices[0].pieces);
+  const pieces: Piece[] = [...prev.slices[0].pieces];
+  const x0 = -lt - w, x1 = sx + lt + w;
+  /** How many blocks make up a side this long, and how long each is. */
+  const blocks = (span: number) => {
+    const n = end ? Math.max(1, Math.round(span / Math.max(step.block, 0.5))) : 1;
+    return { n, each: span / n };
+  };
+  const ends = blocks(sz), sides = blocks(x1 - x0);
+  let shade = 5000;
+  for (const [lineAt, frameAt] of [[-lt, -lt - w], [sx, sx + lt]]) {
+    if (lt) pieces.push(box([lineAt, 0, 0], [lineAt + lt, sy, sz], step.lineSpecies, [0, 0, 1], tone(shade++)));
+    for (let i = 0; i < ends.n; i++) {
+      pieces.push(box([frameAt, 0, i * ends.each], [frameAt + w, sy, (i + 1) * ends.each], step.species, end ? [0, 1, 0] : [0, 0, 1], tone(shade++)));
+    }
+  }
+  for (const [lineAt, frameAt] of [[-lt, -lt - w], [sz, sz + lt]]) {
+    if (lt) pieces.push(box([x0, 0, lineAt], [x1, sy, lineAt + lt], step.lineSpecies, [1, 0, 0], tone(shade++)));
+    for (let i = 0; i < sides.n; i++) {
+      pieces.push(box([x0 + i * sides.each, 0, frameAt], [x0 + (i + 1) * sides.each, sy, frameAt + w], step.species, end ? [0, 1, 0] : [1, 0, 0], tone(shade++)));
+    }
+  }
+  const stock: StockLine[] = [];
+  const long = x1 - x0;
+  let how: string;
+  if (end) {
+    // Two slices, one for each end or side, cross cut from a panel as thick as the border is wide.
+    const length = 2 * (sy + PANEL_KERF) + 0.5;
+    stock.push({ species: step.species, count: ends.n, thickness: w, width: ends.each, length, use: 'Border: the panel the two end pieces are cut from' });
+    stock.push({ species: step.species, count: sides.n, thickness: w, width: sides.each, length, use: 'Border: the panel the two side pieces are cut from' });
+    how = `The border is end grain like the board, so it moves with it. Glue up two ${names(step.species)} panels ${inches(w)} thick and ${inches(length)} long: `
+      + `one ${inches(sz)} wide from ${ends.n} strips ${inches(ends.each)} wide, and one ${inches(long)} wide from ${sides.n} strips ${inches(sides.each)} wide. `
+      + `Cross cut two slices ${inches(sy)} wide from each (kerf ${inches(PANEL_KERF)}) and stand them end grain up: those are the two end pieces and the two side pieces. `;
+  } else {
+    stock.push({ species: step.species, count: 2, thickness: sy, width: w, length: sz, use: 'Border: the two end pieces' });
+    stock.push({ species: step.species, count: 2, thickness: sy, width: w, length: long, use: 'Border: the two side pieces' });
+    how = `Mill four ${names(step.species)} border pieces ${inches(sy)} thick and ${inches(w)} wide: two ${inches(sz)} long for the ends and two ${inches(long)} long for the sides. `;
+  }
+  if (lt) {
+    stock.push({ species: step.lineSpecies, count: 2, thickness: lt, width: sy, length: sz, use: 'Border: the line at each end' });
+    stock.push({ species: step.lineSpecies, count: 2, thickness: lt, width: sy, length: long, use: 'Border: the line along each side' });
+    how += `Mill four ${names(step.lineSpecies)} lines ${inches(lt)} × ${inches(sy)}: two ${inches(sz)} long and two ${inches(long)} long. `;
+  }
+  const each = lt ? 'a line and then a border piece' : 'a border piece';
+  return stage('panel', [{ pieces: toOrigin(pieces) }], title,
+    `${how}Glue ${each} to each end of the board, flush with its long edges. When that has set, glue ${each} along each long edge, covering the ends of the first two. `
+    + 'Leave the border a hair proud of both faces; the next flattening brings it level.',
+    { stock });
+}
+
+const NEEDS_PANEL: Step['type'][] = ['crosscut', 'trim', 'flatten', 'rotate', 'frame'];
+// 'panel' and 'combine' work on loose slices, like the rest.
 
 /** Whether a step type works on a glued panel or on loose slices. */
 export function stepNeeds(type: Step['type']): Stage['kind'] {
@@ -232,10 +553,24 @@ export const STEP_TITLES: Record<Step['type'], string> = {
   trim: 'Trim',
   flatten: 'Flatten',
   rotate: 'Quarter-turn panel',
+  frame: 'Add a border',
+  panel: 'Start another panel',
+  combine: 'Interleave the slices',
 };
 
-/** Run one step on the previous stage and return the new stage. Never throws: a step that cannot run returns a stage with an error. */
+/**
+ * Run one step on the previous stage and return the new stage. Never throws: a step that cannot
+ * run returns a stage with an error. Slices set aside are carried through every step untouched,
+ * until "Interleave the slices" uses them up.
+ */
 export function applyStep(prev: Stage, step: Step, names: Names): Stage {
+  const out = applyOne(prev, step, names);
+  if (prev.aside && !out.aside && (step.type !== 'combine' || out.error)) out.aside = prev.aside;
+  return out;
+}
+
+/** The step itself, without the carrying of set-aside slices that applyStep adds. */
+function applyOne(prev: Stage, step: Step, names: Names): Stage {
   const title = STEP_TITLES[step.type];
   if (prev.error && !prev.slices.some((s) => s.pieces.length)) return failed(prev, title, 'Fix the earlier step first.');
   const needs = stepNeeds(step.type);
@@ -262,35 +597,18 @@ export function applyStep(prev: Stage, step: Step, names: Names): Stage {
             : { pieces: rotateZ(pieces, Math.PI, c), motion: { axis: 'z', angle: Math.PI, shift: 0 } };
         });
     case 'shift':
-      return arrange(prev, step.sel, title, `Slide ${inches(step.amount)} along its length:`, (pieces) => ({
+      return arrange(prev, step.sel, title, step.amount < 0 ? `Slide ${inches(-step.amount)} along its length, towards edge A:` : `Slide ${inches(step.amount)} along its length:`, (pieces) => ({
         pieces: translate(pieces, [0, 0, step.amount]),
         motion: { axis: null, angle: 0, shift: step.amount },
       }));
-    case 'insert': {
-      if (!(step.thickness > 0)) return failed(prev, title, 'Accent strip thickness must be greater than zero.');
-      const every = Math.max(1, Math.floor(step.every));
-      const b = bbox(prev.slices.flatMap((s) => s.pieces));
-      const slices: Slice[] = [];
-      let count = 0;
-      prev.slices.forEach((s, i) => {
-        slices.push({ pieces: s.pieces });
-        if (i < prev.slices.length - 1 && (i + 1) % every === 0) {
-          slices.push({
-            pieces: [box([0, 0, b.min[2]], [step.thickness, b.max[1], b.max[2]], step.species, [0, 0, 1], tone(1000 + count))],
-          });
-          count++;
-        }
-      });
-      if (slices.length > MAX_SLICES * 2) return failed(prev, title, 'Too many slices.');
-      const stock: StockLine[] = count ? [{
-        species: step.species, count, thickness: step.thickness, width: b.max[1] - b.min[1],
-        length: b.max[2] - b.min[2], use: 'Second glue-up: between the cross-cut slices',
-      }] : [];
-      return stage('slices', slices, title,
-        `Mill ${count} ${names(step.species)} strips ${inches(step.thickness)} × ${inches(b.max[1] - b.min[1])} × `
-        + `${inches(b.max[2] - b.min[2])} and place one after every ${every > 1 ? ordinal(every) + ' ' : ''}slice.`,
-        { stock });
-    }
+    case 'insert':
+      return insert(prev, step, names);
+    case 'frame':
+      return frame(prev, step, names);
+    case 'panel':
+      return anotherPanel(prev, step, names);
+    case 'combine':
+      return combine(prev);
     case 'glue': {
       const laid = layout(prev.slices);
       const heights = laid.map((s) => boxSize(bbox(s.pieces))[1]);
@@ -379,7 +697,8 @@ function warnUnflattened(design: Design, stages: Stage[]) {
     const stage = stages[i + 1];
     if (stage.error) return;
     if (step.type === 'flatten') flat = true;
-    else if (step.type === 'glue') flat = false;
+    // A border is a glue-up too: it never goes on perfectly level with the faces.
+    else if (step.type === 'glue' || step.type === 'frame' || step.type === 'panel') flat = false;
     else if (step.type === 'crosscut' && !flat && !stage.warning) {
       stage.warning = 'This panel is cut straight from the glue-up. Add a Flatten step before it and mill the strips thicker to allow for it.';
     }

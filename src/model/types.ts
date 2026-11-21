@@ -62,12 +62,29 @@ export interface Stage {
   /** Z range fully covered by every slice at the last glue-up; drives auto trim. */
   trimHint?: { zLo: number; zHi: number };
   stock?: StockLine[];
+  /**
+   * Slices set aside while another panel is made: "Start another panel" puts the slices there,
+   * every step after it carries them along untouched, and "Interleave the slices" brings them
+   * back. They are drawn beside the work.
+   */
+  aside?: Slice[];
 }
 
 export interface StripSpec {
   id: string;
   species: string;
   width: number;
+  /**
+   * True for a strip that only holds a place: a later cut saws it out, so none of it is in the
+   * finished board and any cheap wood will do. It is milled and glued like the rest, but its
+   * wood is left out of the board's name.
+   */
+  spacer?: boolean;
+  /**
+   * A layer of another wood glued to both faces of this strip before it goes into the panel, each
+   * `thickness` thick as glued on. The strip and its two faces together are as thick as the panel.
+   */
+  faces?: { species: string; thickness: number };
 }
 
 export interface Layup {
@@ -84,16 +101,61 @@ export type Selector =
   | { mode: 'every'; n: number; offset: number }
   | { mode: 'pick'; indices: number[] };
 
+/**
+ * One strip of the stack an "Insert accent strips" step puts between slices. With the step's
+ * `ends` on, the same stack also goes on the outside of the first and last slice.
+ *
+ * A strip is one wood, `species`, unless it has a `pattern`. Then it is a slice cut from another
+ * glue-up: a panel whose strips, `pattern`, repeat across its width the way the first glue-up's
+ * do, and it lies between the slices with those strips showing along its length. `offset` is how
+ * far in from the board's edge A the pattern starts. `species` is then its main wood, for naming.
+ */
+export interface AccentStrip {
+  species: string;
+  thickness: number;
+  pattern?: PatternStrip[];
+  offset?: number;
+}
+
+/**
+ * One strip of a patterned accent strip's panel. With `faces` it is a plank that has a layer of
+ * another wood glued to both faces before it goes into the panel: the plank and its two faces
+ * together are as thick as the panel, and `faces.thickness` is one face.
+ */
+export interface PatternStrip {
+  species: string;
+  width: number;
+  faces?: { species: string; thickness: number };
+}
+
+// On an insert step, `pattern` and `offset` belong to its first strip (see AccentStrip), and
+// `stagger` slides the patterned strips of every other gap that far along, so two rows of a
+// pattern can alternate.
 export type Step =
   | { id: string; type: 'crosscut'; width: number; kerf: number; angle: number }
   | { id: string; type: 'turn'; sel: Selector }
   | { id: string; type: 'flip'; sel: Selector; how: 'end' | 'face' }
   | { id: string; type: 'shift'; sel: Selector; amount: number }
-  | { id: string; type: 'insert'; species: string; thickness: number; every: number }
+  | { id: string; type: 'insert'; species: string; thickness: number; every: number; more?: AccentStrip[]; ends?: boolean; pattern?: AccentStrip['pattern']; offset?: number; stagger?: number }
   | { id: string; type: 'glue' }
   | { id: string; type: 'trim'; auto: boolean; x0: number; x1: number; z0: number; z1: number }
   | { id: string; type: 'flatten'; top: number; bottom: number }
-  | { id: string; type: 'rotate' };
+  | { id: string; type: 'rotate' }
+  /**
+   * Set the loose slices aside and start another panel, glued up from `strips` like the first.
+   * Unless `repeat` and `length` are given it sizes itself to the slices set aside: as wide as
+   * they are long plus `extra` (room to slide slices along later), and long enough to cross cut
+   * one slice for each gap between them.
+   */
+  | { id: string; type: 'panel'; strips: StripSpec[]; thickness: number; extra: number; repeat?: number; length?: number }
+  /** Bring back the slices set aside and put one of the new slices after each, ends lined up at edge A. */
+  | { id: string; type: 'combine' }
+  /**
+   * A border glued round the panel: an optional thin line of `lineSpecies`, `line` thick, then
+   * `species`, `width` wide, made up of blocks about `block` long. The two ends go on first and
+   * the two long sides cover them.
+   */
+  | { id: string; type: 'frame'; species: string; width: number; lineSpecies: string; line: number; block: number };
 
 export type StepType = Step['type'];
 

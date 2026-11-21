@@ -35,25 +35,34 @@ button:disabled { opacity: 0.4; cursor: default; }
   height: 100%;
 }
 
+/* The toolbar, laid out like an Office ribbon: groups of buttons with an icon over a label and
+   the group's name underneath. */
 .top {
   grid-area: top;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--panel);
+  align-items: stretch;
+  padding: 4px 10px 0;
+  background: linear-gradient(#fdfbf7, var(--panel));
   border-bottom: 1px solid var(--line);
 }
-.top h1 { font-size: 16px; margin: 0 8px 0 0; }
-.top .name {
-  width: 280px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  padding: 4px 8px;
-  background: transparent;
-  font-weight: 600;
+.group { display: flex; flex-direction: column; padding: 0 6px; border-right: 1px solid var(--line); }
+.group:last-child { border-right: none; }
+.group > div { display: flex; flex: 1; gap: 2px; align-items: stretch; }
+.group > small { text-align: center; font-size: 10.5px; color: var(--dim); padding: 1px 0 3px; letter-spacing: 0.03em; }
+/* A toolbar button: icon over label. */
+.rb {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-width: 56px; height: 100%; padding: 5px 8px 4px;
+  border: 1px solid transparent; border-radius: 6px; background: transparent;
+  font-size: 12px; line-height: 1.2; white-space: nowrap;
 }
-.top .name:hover, .top .name:focus { border-color: var(--line); background: var(--card); }
+.rb:hover:not(:disabled), .rb.open { background: var(--accent-soft); border-color: var(--accent); }
+.rb:active:not(:disabled) { background: #cfe0f5; }
+.rb.side-toggle[aria-pressed="true"] { background: rgba(0, 0, 0, 0.05); }
+.rb.drop span::after { content: ' ▾'; font-size: 10px; color: var(--dim); }
+.icon { width: 26px; height: 26px; flex: none; }
+.icon .accent { stroke: var(--accent); }
+.rb:disabled .icon .accent { stroke: currentColor; }
 .spacer { flex: 1; }
 
 .menu { position: relative; }
@@ -99,6 +108,18 @@ button:disabled { opacity: 0.4; cursor: default; }
   border-radius: 8px;
   padding: 10px;
 }
+/* The target board stays at the top of the side panel while the stock and steps scroll under it,
+   so the finished size is always in view. `top: 0` is measured inside the panel's padding, so it
+   rests 10px down; the strip before it fills that gap so nothing shows through, and the shadow
+   lifts it off what is scrolling beneath. */
+.card.target {
+  position: sticky; top: 0; z-index: 3; flex-shrink: 0;
+  box-shadow: 0 6px 8px -6px rgba(0, 0, 0, 0.25);
+}
+.card.target::before {
+  content: ''; position: absolute; left: -1px; right: -1px; top: -11px; height: 10px;
+  background: var(--panel);
+}
 h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--dim); }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-top: 8px; }
 .row:first-of-type { margin-top: 0; }
@@ -122,6 +143,9 @@ h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing
 }
 .int { width: 64px; }
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); }
+/* The Finish card: each option on a line of its own, with what it asks for indented under it. */
+.params.finish { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.params.finish > .row, .params.finish > .check.sub { margin: 0 0 4px 22px; }
 
 .species-select { display: inline-flex; align-items: center; gap: 6px; }
 .species-select b, .swatch, .chip b { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(0, 0, 0, 0.25); display: inline-block; flex: none; }
@@ -130,6 +154,18 @@ h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing
 
 .strips { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .strip-row { display: flex; align-items: center; gap: 8px; }
+/* An accent strip that is a slice of another glue-up: its strips listed in place of a wood picker. */
+.patterned { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.3; color: var(--dim); text-align: left; background: transparent; border-color: transparent; padding: 2px 4px; }
+.patterned b { color: var(--ink); font-weight: 600; margin-right: 4px; white-space: nowrap; }
+/* The strips of a patterned strip's own panel, opened under it for editing. */
+.panel-editor { margin: 6px 0 4px; padding: 8px; border: 1px dashed var(--line); border-radius: 6px; background: var(--panel); }
+.panel-editor .note { margin: 0 0 6px; }
+.panel-strip { padding: 4px 0; border-top: 1px solid var(--line); }
+.strips > .panel-strip { padding: 2px 0 6px; }
+.panel-strip:first-of-type { border-top: none; }
+.strip-row.faced { margin-top: 4px; padding-left: 4px; font-size: 13px; }
+/* Marks a strip that is sawn out later and is not in the finished board. */
+.spacer-tag { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; border: 1px dashed var(--line); border-radius: 4px; padding: 1px 5px; }
 .icons { margin-left: auto; display: inline-flex; gap: 2px; }
 .icons button { padding: 2px 6px; border-color: transparent; background: transparent; color: var(--dim); }
 .icons button:hover:not(:disabled) { color: var(--ink); background: var(--accent-soft); }
@@ -143,6 +179,10 @@ h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing
 .step { cursor: pointer; }
 .step.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 .step.broken { border-color: var(--bad); }
+/* Step 1, the strips: only its heading selects it, so the rest of the card is not a click target. */
+.step.first { cursor: default; }
+.step.first header { cursor: pointer; margin-bottom: 10px; }
+.strips.accents { margin-top: 0; }
 .step header { display: flex; align-items: center; gap: 8px; }
 .step header em {
   font-style: normal; font-size: 12px; width: 20px; height: 20px; border-radius: 50%;
@@ -200,6 +240,8 @@ h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing
 .cutlist th, .cutlist td { text-align: left; padding: 4px 5px; border-bottom: 1px solid var(--line); font-size: 13px; vertical-align: top; }
 .cutlist thead th { font-size: 12px; color: var(--dim); font-weight: 600; }
 .cutlist h3 { margin-top: 14px; }
+.cutlist .units { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 13px; }
+.cutlist .units > span { color: var(--dim); font-weight: 600; }
 .cutlist .dim { color: var(--dim); }
 .cutlist ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.4; }
 
@@ -259,6 +301,10 @@ h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing
   background: var(--panel); border-radius: 12px; border: 1px solid var(--line);
   box-shadow: 0 20px 60px rgba(40, 25, 10, 0.35); padding: 16px 20px 20px;
 }
+/* The Save as box: one field for the new name. */
+.modal.save-as { width: min(440px, calc(100vw - 24px)); }
+.modal.save-as input { font-size: 15px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; width: 100%; box-sizing: border-box; }
+.modal.save-as .field { margin-top: 12px; }
 .modal header { display: flex; align-items: center; gap: 16px; }
 .modal h2 { margin: 0; font-size: 18px; }
 .modal footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
@@ -268,7 +314,7 @@ h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing
 .crumbs li.on { background: var(--ink); color: #fff; }
 .wizard-sizes, .wizard-types, .wizard-examples { display: grid; gap: 10px; margin-top: 14px; }
 .wizard-sizes { grid-template-columns: repeat(4, 1fr); }
-.wizard-types { grid-template-columns: repeat(3, 1fr); }
+.wizard-types { grid-template-columns: repeat(2, 1fr); }
 .wizard-examples { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
 .wizard-sizes button, .wizard-types button, .wizard-examples button {
   display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px; white-space: normal;
@@ -313,3 +359,66 @@ h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing
 
 /* The chess board's own choices: two woods, the square, the thickness. */
 .wizard-chess { align-items: flex-end; gap: 14px; margin-top: 10px; }
+
+/* The side panel can be hidden so the board has the whole window: for showing it on a phone. */
+.app.side-hidden .side, .app.side-hidden .splitter { display: none; }
+.side-toggle { white-space: nowrap; }
+.side-handle {
+  position: fixed; z-index: 15; top: 50%; transform: translateY(-50%);
+  width: 52px; height: 96px; padding: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  border: 2px solid #fff; border-left: none; border-radius: 0 14px 14px 0;
+  background: var(--accent); color: #fff;
+  box-shadow: 0 4px 16px rgba(20, 60, 120, 0.45);
+  touch-action: manipulation;
+}
+.side-handle b { font-size: 28px; line-height: 1; font-weight: 700; }
+.side-handle small { font-size: 12px; font-weight: 600; letter-spacing: 0.02em; }
+.side-handle:hover:not(:disabled) { border-color: #fff; filter: brightness(1.1); }
+.side-handle:active { filter: brightness(0.9); }
+
+/* A phone. The header wraps instead of running off the screen, and a shown side panel takes the
+   whole width (the board is one tap away on the toggle) rather than squeezing the 3D view. */
+@media (max-width: 700px) {
+  /* The buttons shrink to fit one row, without the group names. */
+  .top { flex-wrap: wrap; padding: 4px 2px 2px; }
+  .group { padding: 0 1px; }
+  .group > small { display: none; }
+  .rb { min-width: 0; padding: 4px 2px; font-size: 10px; }
+  .icon { width: 22px; height: 22px; }
+  .rb.drop span::after { content: ''; }
+  .dropdown { max-width: calc(100vw - 16px); }
+  .app:not(.side-hidden) { grid-template-columns: 1fr 0 0 !important; }
+  .app:not(.side-hidden) .splitter, .app:not(.side-hidden) .stage { display: none; }
+  .overlay.info { max-width: calc(100% - 24px); }
+  /* Stacked up from the bottom: the play bar, the step's instruction, then the view tools. The
+     step dots are dropped; the arrows still step through. */
+  .overlay.stepper { left: 8px; right: 8px; bottom: 8px; transform: none; justify-content: center; }
+  .overlay.stepper .dots { display: none; }
+  .overlay.caption { left: 8px; right: 8px; bottom: 60px; transform: none; max-width: none; }
+  .overlay.tools { top: auto; bottom: 116px; left: 8px; right: 8px; flex-wrap: wrap; justify-content: center; }
+}
+@media (max-width: 700px) {
+  .side-handle { width: 60px; height: 108px; }
+  .side-handle b { font-size: 34px; }
+  .side-handle small { font-size: 13px; }
+  /* With the panel across the whole screen, the tab becomes a bar along the bottom. On the right
+     edge it sat on top of each step's move and remove buttons. */
+  .app:not(.side-hidden) .side-handle {
+    left: 0 !important; right: 0; top: auto; bottom: 0; transform: none; width: auto; height: 52px;
+    flex-direction: row; border: none; border-top: 2px solid #fff; border-radius: 0;
+    font-size: 17px; font-weight: 600;
+  }
+  .app:not(.side-hidden) .side { padding-bottom: 62px; }
+  /* A phone is too short to keep the target board and "Add a step" pinned as well: between them
+     they would leave a strip a few lines high to scroll the steps through. */
+  .card.target, .add-step { position: static; }
+  .card.target::before { display: none; }
+}
+
+.side-handle .narrow { display: none; }
+@media (max-width: 700px) {
+  .app:not(.side-hidden) .side-handle .wide { display: none; }
+  .app:not(.side-hidden) .side-handle .narrow { display: inline; }
+}
+@media print { .side-handle { display: none !important; } }

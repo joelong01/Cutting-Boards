@@ -98,7 +98,7 @@ describe('presets', () => {
     expect(vol(last)).toBeCloseTo(last.size[0] * last.size[1] * last.size[2], 5);
   });
 
-  it('basket weave is solid and alternates bar direction', () => {
+  it('basket weave is solid', () => {
     const last = run(preset('basket-weave')).at(-1)!;
     expect(vol(last)).toBeCloseTo(last.size[0] * last.size[1] * last.size[2], 5);
   });
@@ -641,7 +641,7 @@ describe('designs name themselves from their woods', () => {
       'maple-purpleheart': 'Hard maple and purpleheart grid',
       checkerboard: 'Black walnut and hard maple checkerboard',
       brick: 'Teak brick',
-      'basket-weave': 'Hard maple and wenge basket weave',
+      'basket-weave': 'Black walnut, hard maple and cherry basket weave',
       chevron: 'Four-wood chevron',
     });
   });

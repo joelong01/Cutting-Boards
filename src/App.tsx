@@ -12,6 +12,8 @@ import {
 import type { Design, Selector, Stage, Step } from './model/types';
 import { BoardWizard } from './ui/BoardWizard';
 import { CutListPanel } from './ui/CutListPanel';
+import { IMPERIAL, sensible, showSize, showText, type Units } from './model/units';
+import { Icon } from './ui/icons';
 import { LayupEditor } from './ui/LayupEditor';
 import { StepList } from './ui/StepList';
 import { Len, toggle } from './ui/inputs';
@@ -48,6 +50,33 @@ function savedSideWidth(): number {
   }
 }
 
+const HIDDEN_KEY = 'cutting-boards.side-hidden.v1';
+/** Below this window width (a phone) the side panel starts hidden unless it was shown last time. */
+const NARROW = 700;
+
+/** Whether the side panel starts hidden: as it was left last time, else hidden only on a narrow screen. */
+function savedSideHidden(): boolean {
+  try {
+    const v = localStorage.getItem(HIDDEN_KEY);
+    if (v === '1' || v === '0') return v === '1';
+  } catch {
+    // No storage; fall through to the screen width.
+  }
+  return window.innerWidth < NARROW;
+}
+
+const UNITS_KEY = 'cutting-boards.units.v1';
+
+/** The units the cut list was last shown in; inches when nothing sensible is saved. */
+function savedUnits(): Units {
+  try {
+    const v = JSON.parse(localStorage.getItem(UNITS_KEY) ?? 'null');
+    return v ? sensible({ imperial: v.imperial === true, metric: v.metric === true }) : IMPERIAL;
+  } catch {
+    return IMPERIAL;
+  }
+}
+
 interface History {
   past: Design[];
   now: Design;
@@ -58,6 +87,11 @@ interface History {
 export function App() {
   const [history, setHistory] = useState<History>(() => ({ past: [], now: initialDesign(), future: [] }));
   const design = history.now;
+  // The open design under a second name, for functions whose own `design` parameter hides it.
+  const current = design;
+  // The open design's name, for the keyboard handler, which is set up once and would otherwise see an old one.
+  const nameRef = useRef(design.name);
+  nameRef.current = design.name;
   /** Replace the design, pushing the old one onto the undo stack and clearing redo. */
   const setDesign = useCallback((next: Design) => {
     setHistory((h) => {
@@ -93,6 +127,16 @@ export function App() {
   const [menu, setMenu] = useState<'new' | 'open' | 'export' | null>(null);
   const wizardParam = params.get('wizard');
   const [wizard, setWizard] = useState(wizardParam !== null);
+  const [units, setUnits] = useState(savedUnits);
+  /** Show the cut list and instructions in these units, and remember the choice for next time. */
+  const chooseUnits = (u: Units) => {
+    setUnits(u);
+    try {
+      localStorage.setItem(UNITS_KEY, JSON.stringify(u));
+    } catch {
+      // No storage: the choice lasts until the window closes.
+    }
+  };
   const [message, setMessage] = useState<string | null>(null);
   const [sheet, setSheet] = useState<string[]>([]);
   const [preview, setPreview] = useState(params.get('preview') !== null);
@@ -111,6 +155,19 @@ export function App() {
       // Not remembered this time; the panel still resizes.
     }
   };
+  // The name being typed in the Save as box, or null while the box is closed.
+  const [saveAs, setSaveAs] = useState<string | null>(null);
+  const [sideHidden, setSideHidden] = useState(savedSideHidden);
+  /** Hide or show the side panel, so the board can have the whole window, and remember which. */
+  const toggleSide = () =>
+    setSideHidden((hidden) => {
+      try {
+        localStorage.setItem(HIDDEN_KEY, hidden ? '0' : '1');
+      } catch {
+        // Not remembered this time; the panel still hides.
+      }
+      return !hidden;
+    });
   const viewport = useRef<ViewportHandle>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -139,7 +196,7 @@ export function App() {
   }, [playing, index, stages.length]);
 
   useEffect(() => {
-    /** Keyboard shortcuts: undo, redo, save, and (outside form fields) arrows to step and Space to play. */
+    /** Keyboard shortcuts: undo, redo, save, save as, hide the side panel, and (outside form fields) arrows to step and Space to play. */
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;
       const typing = el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA';
@@ -149,12 +206,17 @@ export function App() {
         else undo();
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        void saveRef.current();
+        if (e.shiftKey) setSaveAs(nameRef.current);
+        else void saveRef.current();
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
         e.preventDefault();
         redo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        toggleSide();
       } else if (e.key === 'Escape') {
         setPreview(false);
+        setSaveAs(null);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
         // The browser's own Ctrl+P would print the hidden sheet unseen; show it first.
         e.preventDefault();
@@ -199,8 +261,11 @@ export function App() {
     setPlaying(false);
   };
 
-  /** Save the design under its name, asking before replacing a different saved design of the same name. */
-  const save = async () => {
+  /**
+   * Save a design, the open one unless another is given, under its name, asking before replacing
+   * a different saved design of the same name.
+   */
+  const save = async (design = current) => {
     try {
       // Saving under a name that is already on disk replaces that file, so ask first unless
       // it is the design that was opened or saved in this session.
@@ -218,6 +283,24 @@ export function App() {
   };
   const saveRef = useRef(save);
   saveRef.current = save;
+
+  /**
+   * Give the design the name typed in the Save as box and save it under that name. The name is
+   * the user's from then on: it no longer follows the woods.
+   */
+  const confirmSaveAs = () => {
+    const name = (saveAs ?? '').trim();
+    if (!name) return;
+    const renamed = { ...current, name, autoName: false };
+    setSaveAs(null);
+    setDesign(renamed);
+    void save(renamed);
+  };
+
+  // The design's name is shown in the window's title bar (the browser tab, on the web).
+  useEffect(() => {
+    document.title = `${current.name} - Cutting Boards`;
+  }, [current.name]);
 
   /** Draw a picture of every stage for the print sheet, as the design is now. */
   const drawSheet = () => {
@@ -279,12 +362,17 @@ export function App() {
   const errors = stages.filter((s) => s.error).length;
 
   return (
-    <div className="app" style={{ gridTemplateColumns: `${Math.min(sideWidth, clampSide(sideWidth))}px 7px 1fr` }}>
+    <div
+      className={sideHidden ? 'app side-hidden' : 'app'}
+      style={{ gridTemplateColumns: sideHidden ? '0 0 1fr' : `${Math.min(sideWidth, clampSide(sideWidth))}px 7px 1fr` }}
+    >
       <header className="top">
-        <h1>Cutting Boards</h1>
-        <input className="name" value={design.name} onChange={(e) => setDesign({ ...design, name: e.target.value, autoName: false })} title="Design name. It follows the woods until you type your own or save." />
+        {/* The toolbar: groups of buttons with an icon over a label, each group named underneath,
+            the way an Office ribbon is laid out. The design's name is in the window's title bar. */}
+        <div className="group">
+        <div>
         <div className="menu">
-          <button onClick={() => setMenu(menu === 'new' ? null : 'new')}>New ▾</button>
+          <button className={`rb drop${menu === 'new' ? ' open' : ''}`} onClick={() => setMenu(menu === 'new' ? null : 'new')} title="Start a new board"><Icon name="new" /><span>New</span></button>
           {menu === 'new' && (
             <div className="dropdown">
               <button
@@ -292,7 +380,7 @@ export function App() {
                   setMenu(null);
                   setWizard(true);
                 }}
-              ><strong>Board wizard…</strong><small>Choose a size and a grain type, then pick from common designs.</small></button>
+              ><strong>Board wizard…</strong><small>Choose a size and end or edge grain, then pick from the designs.</small></button>
               <hr />
               {PRESETS.map((p) => (
                 <button key={p.key} onClick={() => load(p.make())}>
@@ -302,9 +390,8 @@ export function App() {
             </div>
           )}
         </div>
-        <button onClick={() => void save()} title={desktop ? 'Save as a file in the designs folder (Ctrl+S)' : 'Save under this name in this browser (Ctrl+S)'}>Save</button>
         <div className="menu">
-          <button onClick={() => setMenu(menu === 'open' ? null : 'open')}>Open ▾</button>
+          <button className={`rb drop${menu === 'open' ? ' open' : ''}`} onClick={() => setMenu(menu === 'open' ? null : 'open')} title="Open a saved design"><Icon name="open" /><span>Open</span></button>
           {menu === 'open' && (
             <div className="dropdown">
               {library.length === 0 && <p>No saved designs yet.</p>}
@@ -328,8 +415,22 @@ export function App() {
             </div>
           )}
         </div>
+        <button className="rb" onClick={() => void save()} title={desktop ? 'Save as a file in the designs folder (Ctrl+S)' : 'Save under this name in this browser (Ctrl+S)'}><Icon name="save" /><span>Save</span></button>
+        <button className="rb" onClick={() => setSaveAs(design.name)} title="Save under a new name (Ctrl+Shift+S)"><Icon name="saveas" /><span>Save as</span></button>
+        </div>
+        <small>File</small>
+        </div>
+        <div className="group">
+        <div>
+        <button className="rb" onClick={undo} disabled={!history.past.length} title="Undo (Ctrl+Z)"><Icon name="undo" /><span>Undo</span></button>
+        <button className="rb" onClick={redo} disabled={!history.future.length} title="Redo (Ctrl+Y)"><Icon name="redo" /><span>Redo</span></button>
+        </div>
+        <small>Edit</small>
+        </div>
+        <div className="group">
+        <div>
         <div className="menu">
-          <button onClick={() => setMenu(menu === 'export' ? null : 'export')}>Export ▾</button>
+          <button className={`rb drop${menu === 'export' ? ' open' : ''}`} onClick={() => setMenu(menu === 'export' ? null : 'export')} title="Export a PDF or the design file"><Icon name="export" /><span>Export</span></button>
           {menu === 'export' && (
             <div className="dropdown export-menu">
               <button onClick={() => exportPdf(false)}>
@@ -364,11 +465,22 @@ export function App() {
             }
           }}
         />
-        <span className="spacer" />
-        <button onClick={undo} disabled={!history.past.length} title="Undo (Ctrl+Z)">↶</button>
-        <button onClick={redo} disabled={!history.future.length} title="Redo (Ctrl+Y)">↷</button>
-        <button onClick={() => download(`${fileSafe(design.name)}-step-${index + 1}.png`, viewport.current?.capture() ?? '')} title="Save the current view as a picture">PNG</button>
-        <button onClick={openPreview} title="Preview and print the cut list and order of operations, or save them as a PDF">Print…</button>
+        <button className="rb" onClick={openPreview} title="Preview and print the cut list and order of operations, or save them as a PDF (Ctrl+P)"><Icon name="print" /><span>Print</span></button>
+        <button className="rb" onClick={() => download(`${fileSafe(design.name)}-step-${index + 1}.png`, viewport.current?.capture() ?? '')} title="Save the current 3D view as a PNG picture"><Icon name="picture" /><span>Picture</span></button>
+        </div>
+        <small>Share</small>
+        </div>
+        <div className="group">
+        <div>
+        <button
+          className="rb side-toggle"
+          onClick={toggleSide}
+          aria-pressed={!sideHidden}
+          title={sideHidden ? 'Show the side panel (Ctrl+B)' : 'Hide the side panel so the board has the whole window (Ctrl+B)'}
+        ><Icon name="panel" /><span>{sideHidden ? 'Show panel' : 'Hide panel'}</span></button>
+        </div>
+        <small>View</small>
+        </div>
       </header>
 
       <aside className="side">
@@ -378,7 +490,7 @@ export function App() {
         </nav>
         {tab === 'design' ? (
           <>
-            <section className="card">
+            <section className="card target">
               <h3>Target board</h3>
               <div className="row">
                 <Len label="Length" value={design.target.length} min={1} onChange={(length) => setDesign({ ...design, target: { ...design.target, length } })} />
@@ -404,11 +516,11 @@ export function App() {
                 </p>
               </div>
             </section>
-            <LayupEditor design={design} species={species} onChange={setDesign} onNotice={setMessage} />
+            <LayupEditor design={design} species={species} onChange={setDesign} onNotice={setMessage} selected={index === 0} onSelect={() => setSelected(0)} />
             <StepList design={design} stages={stages} species={species} selected={index} onSelect={setSelected} onChange={setDesign} />
           </>
         ) : (
-          <CutListPanel design={design} cutList={cutList} species={species} onChange={setDesign} />
+          <CutListPanel design={design} cutList={cutList} species={species} onChange={setDesign} units={units} onUnits={chooseUnits} />
         )}
       </aside>
 
@@ -439,6 +551,23 @@ export function App() {
           }
         }}
       />
+
+      {/* A tab on the screen's edge, big enough for a thumb, that hides or shows the side panel. It sits
+          outside the 3D view so it stays on screen when a phone shows the panel across the whole width;
+          there it becomes a bar along the bottom, where it covers none of the panel's controls. */}
+      <button
+        className="side-handle"
+        style={{ left: sideHidden ? 0 : Math.min(sideWidth, clampSide(sideWidth)) + 7 }}
+        onClick={toggleSide}
+        aria-label={sideHidden ? 'Show the side panel' : 'Hide the side panel'}
+        title={sideHidden ? 'Show the side panel (Ctrl+B)' : 'Hide the side panel (Ctrl+B)'}
+      >
+        {sideHidden ? (
+          <><b>☰</b><small>Edit</small></>
+        ) : (
+          <><b className="wide">‹</b><small className="wide">Board</small><span className="narrow">Show the board ›</span></>
+        )}
+      </button>
 
       <main className="stage">
         <Viewport ref={viewport} stage={stage} from={from} species={species} gap={gap} lines={lines} highlights={highlights} onPick={onPick}
@@ -493,10 +622,34 @@ export function App() {
         {message && <div className="overlay toast">{message}</div>}
       </main>
 
+      {saveAs !== null && (
+        <div className="modal-back" onClick={() => setSaveAs(null)}>
+          <form
+            className="modal save-as"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault();
+              confirmSaveAs();
+            }}
+          >
+            <header><h2>Save as</h2></header>
+            <label className="field">
+              <span>Name for this design</span>
+              <input autoFocus value={saveAs} onChange={(e) => setSaveAs(e.target.value)} onFocus={(e) => e.target.select()} />
+            </label>
+            <p className="note">{desktop ? 'Saved as a file of this name in the designs folder.' : 'Saved under this name in this browser.'} The name is shown in the title bar.</p>
+            <footer>
+              <button type="button" onClick={() => setSaveAs(null)}>Cancel</button>
+              <button type="submit" className="primary" disabled={!saveAs.trim()}>Save</button>
+            </footer>
+          </form>
+        </div>
+      )}
+
       {wizard && (
         <BoardWizard
           initial={design.target}
-          startType={wizardParam === 'end' || wizardParam === 'edge' || wizardParam === 'chess' ? wizardParam : undefined}
+          startType={wizardParam === 'end' || wizardParam === 'edge' ? wizardParam : undefined}
           snapshot={(s) => viewport.current?.snapshot(s, [560, 340]) ?? ''}
           onClose={() => setWizard(false)}
           onCreate={(d) => {
@@ -520,7 +673,7 @@ export function App() {
         </div>
         <div className="print-sheet" onClick={(e) => e.stopPropagation()}>
           <h1>{design.name}</h1>
-          <CutListPanel design={design} cutList={cutList} species={species} steps={!withPictures} />
+          <CutListPanel design={design} cutList={cutList} species={species} steps={!withPictures} units={units} />
           {withPictures && (
             <div className="print-steps">
               <h3>Order of operations</h3>
@@ -529,9 +682,9 @@ export function App() {
                   {sheet[i] ? <img src={sheet[i]} alt="" /> : <div className="no-picture" />}
                   <figcaption>
                     <strong>{i + 1}. {s.title}</strong>
-                    <span className="dim">{inches(s.size[0])} × {inches(s.size[2])} × {inches(s.size[1])} thick{s.kind === 'slices' ? `, ${s.slices.length} slices` : ''}</span>
-                    <p>{s.summary}</p>
-                    {(s.error ?? s.warning) && <p className="warning">Check: {s.error ?? s.warning}</p>}
+                    <span className="dim">{showSize([s.size[0], s.size[2], s.size[1]], units)} thick{s.kind === 'slices' ? `, ${s.slices.length} slices` : ''}</span>
+                    <p>{showText(s.summary, units)}</p>
+                    {(s.error ?? s.warning) && <p className="warning">Check: {showText(s.error ?? s.warning ?? '', units)}</p>}
                   </figcaption>
                 </figure>
               ))}
