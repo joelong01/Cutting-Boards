@@ -1,21 +1,24 @@
 #!/usr/bin/env node
 /**
- * Build the web version of Cutting Boards and publish it to the Azure App Service `cuttingboard`
- * (resource group `rg-cutting-boards`), https://cuttingboard.azurewebsites.net, then check that the
- * live site serves exactly the files just built, by hash.
+ * Run every check, and only if they all pass, publish the web version of Cutting Boards to the
+ * Azure App Service `cuttingboard` (resource group `rg-cutting-boards`),
+ * https://cuttingboard.azurewebsites.net, then check that the live site serves exactly the files
+ * just built, by hash. A failing test or window check stops it before anything is uploaded.
  *
- *   node scripts/deploy-azure.mjs          build, deploy, verify
+ *   node scripts/deploy-azure.mjs          test, build, deploy, verify
  *   node scripts/deploy-azure.mjs --plan   say what it would do, change nothing
  *
- * Needs the Azure CLI signed in (`az login`). The site gets a zip of `dist/` with the old files
- * cleaned out, and serves them with `pm2 serve`.
+ * Needs the Azure CLI signed in (`az login`). The site gets a zip of `dist/` plus
+ * `scripts/azure-server.cjs` as `server.cjs`, with the old files cleaned out, and the App Service
+ * is set to start that server. It tells phones to re-check the page on every visit (`pm2 serve`
+ * sent no caching header, so phones kept showing an old page after a deploy).
  *
  * The web version keeps designs in the browser's storage, not in files: it is for showing a
  * board (on a phone, say), not for keeping designs.
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +26,8 @@ import { fileURLToPath } from 'node:url';
 const GROUP = 'rg-cutting-boards';
 const APP = 'cuttingboard';
 const SITE = `https://${APP}.azurewebsites.net`;
+/** How the App Service starts the site: the zero-dependency server shipped beside the page. */
+const STARTUP = 'node /home/site/wwwroot/server.cjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dist = join(root, 'dist');
 const plan = process.argv.includes('--plan');
@@ -76,27 +81,46 @@ async function verify() {
         bad.push(`${f} (${err.message})`);
       }
     }
-    if (!bad.length) return console.log(`  all ${local.length} files match the build`);
+    // The page must be re-checked on every visit, or a phone keeps showing an old one.
+    if (!bad.length) {
+      const cache = (await fetch(`${SITE}/?v=${Date.now()}`, { cache: 'no-store' })).headers.get('cache-control') ?? '';
+      if (cache.includes('no-cache')) return console.log(`  all ${local.length} files match the build; the page is served no-cache`);
+      bad.push(`the page is served with Cache-Control "${cache}", not no-cache`);
+    }
     if (attempt === 12) throw new Error(`${SITE} does not match the build: ${bad.join(', ')}`);
     await new Promise((r) => setTimeout(r, 5000));
   }
 }
 
-/** Build, zip, deploy and verify, printing a timing report at the end. */
+/** Test and build, then zip, deploy and verify, printing a timing report at the end. */
 async function main() {
   console.log(`Target: App Service ${APP} in ${GROUP}, ${SITE}`);
   if (plan) {
-    console.log('Plan: npm run build; zip dist/; az webapp deploy --type zip --clean true; compare every file with the live site by SHA-256.');
+    console.log('Plan: npm run check (model tests, then build and window checks), stopping on any failure; zip dist/ with server.cjs; set the startup command if it differs; az webapp deploy --type zip --clean true; compare every file with the live site by SHA-256.');
     return;
   }
-  await phase('build', () => run('npm', ['run', 'build']));
+  // `check` runs the model tests, then builds dist/ and checks the real window against it, so
+  // what is uploaded is exactly what was tested. Any failure throws here, before the upload.
+  await phase('test and build', () => run('npm', ['run', 'check']));
   const dir = mkdtempSync(join(tmpdir(), 'cutting-boards-'));
   const zip = join(dir, 'dist.zip');
+  const site = join(dir, 'site');
   try {
+    cpSync(dist, site, { recursive: true });
+    copyFileSync(join(root, 'scripts', 'azure-server.cjs'), join(site, 'server.cjs'));
     // Windows' own tar (bsdtar) writes a zip with -a. Named by full path: Git's GNU tar is often
     // first on the PATH and cannot write zips.
     const tar = process.platform === 'win32' ? `"${join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe')}"` : 'bsdtar';
-    await phase('zip', () => run(tar, ['-a', '-c', '-f', `"${zip}"`, '*'], { cwd: dist }));
+    await phase('zip', () => run(tar, ['-a', '-c', '-f', `"${zip}"`, '*'], { cwd: site }));
+    // Point the App Service at the server once; later deploys find it already set.
+    await phase('startup', () => {
+      const now = run('az', ['webapp', 'config', 'show', '-n', APP, '-g', GROUP, '--query', 'appCommandLine', '-o', 'tsv'], { capture: true });
+      if (now === STARTUP) return;
+      run('az', ['webapp', 'config', 'set', '-n', APP, '-g', GROUP, '--startup-file', `"${STARTUP}"`, '-o', 'none']);
+      const after = run('az', ['webapp', 'config', 'show', '-n', APP, '-g', GROUP, '--query', 'appCommandLine', '-o', 'tsv'], { capture: true });
+      if (after !== STARTUP) throw new Error(`startup command is "${after}", not "${STARTUP}"`);
+      console.log(`  startup command was "${now}", now "${STARTUP}"`);
+    });
     await phase('deploy', () =>
       run('az', ['webapp', 'deploy', '-n', APP, '-g', GROUP, '--src-path', `"${zip}"`, '--type', 'zip', '--clean', 'true', '--restart', 'true']));
   } finally {

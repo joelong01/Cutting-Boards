@@ -137,6 +137,18 @@ const checks = [
     // The board is held at its size, so the extra strip changes the count of slices and pieces.
     if (r.before.rows !== 1 || r.rows !== 2 || !/these 2 strips together/.test(r.note) || r.broken || r.heading === r.before.heading) throw new Error(JSON.stringify(r));
   }],
+  ['what is added can be removed: a strip with its ✕, and a custom wood with the ✕ on its chip', async () => {
+    const r = await probe('preset=maple-purpleheart', later(
+      `const rows = () => document.querySelector('.strips').querySelectorAll(':scope > .strip-row').length; const before = rows(); document.querySelector('.strips').querySelectorAll(':scope > .strip-row')[1].querySelector('button[title="Remove"]').click(); const custom = () => document.querySelectorAll('.chips .chip').length; [...document.querySelectorAll('button')].find((b) => b.textContent === '+ Custom wood').click()`,
+      `(async () => { const afterStrip = rows(); const name = document.querySelector('.row.custom input[placeholder="Name"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(name, 'Zebrawood'); name.dispatchEvent(new Event('input', { bubbles: true })); await new Promise((r) => setTimeout(r, 100)); [...document.querySelectorAll('.row.custom button')].find((b) => b.textContent === 'Add').click(); await new Promise((r) => setTimeout(r, 200)); const added = custom(); document.querySelector('.chips .chip button[title="Remove this wood"]').click(); await new Promise((r) => setTimeout(r, 200)); return { before, afterStrip, added, removed: custom() }; })()`));
+    if (r.before !== 2 || r.afterStrip !== 1 || r.added !== 1 || r.removed !== 0) throw new Error(JSON.stringify(r));
+  }],
+  ['the grain switch turns the open end-grain grid to edge grain: the turn step goes and Edge grain is on', async () => {
+    const r = await probe('preset=maple-purpleheart', later(
+      `const titles = () => [...document.querySelectorAll('.steps .step header strong')].map((t) => t.textContent); const before = titles(); [...document.querySelectorAll('.grain-switch button')].find((b) => b.textContent === 'Edge grain').click()`,
+      `({ before, after: titles(), on: document.querySelector('.grain-switch button.on')?.textContent, broken: !!document.querySelector('.step.broken') })`, 1500));
+    if (!r.before.includes('Turn to end grain') || r.after.includes('Turn to end grain') || r.on !== 'Edge grain' || r.broken) throw new Error(JSON.stringify(r));
+  }],
   ['the panel toggle hides the side panel so the board has the whole width, and the tab on the edge of the board shows it again', async () => {
     const r = await probe('preset=brick', later(
       `localStorage.removeItem('cutting-boards.side-hidden.v1'); document.querySelector('.side-toggle').click()`,

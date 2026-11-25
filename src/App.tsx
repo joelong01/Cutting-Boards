@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildCutList } from './model/cutlist';
 import { fitToTarget, withAutoFit } from './model/fit';
 import { inches } from './model/fractions';
+import { convertGrain, grainOf, withGrain, type Grain } from './model/grain';
 import { withAutoName } from './model/naming';
 import { matches, pieceCount, run } from './model/pipeline';
 import { PRESETS, defaultDesign } from './model/presets';
@@ -496,6 +497,31 @@ export function App() {
                 <Len label="Length" value={design.target.length} min={1} onChange={(length) => setDesign({ ...design, target: { ...design.target, length } })} />
                 <Len label="Width" value={design.target.width} min={1} onChange={(width) => setDesign({ ...design, target: { ...design.target, width } })} />
                 <Len label="Thickness" value={design.target.thickness} min={0.125} onChange={(thickness) => setDesign({ ...design, target: { ...design.target, thickness } })} />
+              </div>
+              <div className="grain-switch" role="group" aria-label="Grain on top">
+                {(['end', 'edge'] as Grain[]).map((g) => {
+                  // Only whether it can be turned round, which is cheap; the refit runs on the click.
+                  const can = convertGrain(design, g) !== null;
+                  return (
+                    <button
+                      key={g}
+                      className={grainOf(design) === g ? 'on' : ''}
+                      aria-pressed={grainOf(design) === g}
+                      disabled={!can}
+                      title={!can
+                        ? 'This recipe cannot be turned round: it is built from several panels or cut at an angle.'
+                        : g === 'end'
+                          ? 'End grain on top: the slices are cut and stood on end. Kinder to knives.'
+                          : 'Edge grain on top: the slices lie flat and the stock is thinner. Block ends are glued to each other, so the joints are weaker and the board can crack as it moves.'}
+                      onClick={() => {
+                        const turned = withGrain(design, g);
+                        if (!turned || turned === design) return;
+                        setDesign(turned);
+                        setMessage(g === 'end' ? 'Now end grain: the slices are turned up on end.' : 'Now edge grain: the slices lie flat and the stock is milled thinner.');
+                      }}
+                    >{g === 'end' ? 'End grain' : 'Edge grain'}</button>
+                  );
+                })}
               </div>
               <label className="check" title="When on, changing strip sizes or steps changes how many strips and how much stock you need, not how big the board is.">
                 <input type="checkbox" checked={design.autoFit !== false} onChange={(e) => setDesign({ ...design, autoFit: e.target.checked })} />

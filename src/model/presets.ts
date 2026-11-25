@@ -100,6 +100,32 @@ const STARTERS: Preset[] = [
     }),
   },
   {
+    key: 'edge-grain-border',
+    style: 'stripes with a border',
+    type: 'edge',
+    label: 'Edge grain with a border',
+    blurb: 'Long grain. 1″ maple strips with 1/8″ purpleheart lines, trimmed square, then a 1″ purpleheart border glued round it. The ends of the border cross the grain of the strips, so keep the board dry and oiled.',
+    make: () => ({
+      version: 1,
+      name: 'Edge grain with a border',
+      target: { length: 16, width: 12, thickness: 1.125 },
+      layup: {
+        // 8 repeats of 1 1/8 plus the closing maple strip is 10″ wide; 14 1/2 stock trims to 14.
+        // The 1″ border on every side makes it 16 × 12.
+        length: 14.5, thickness: 1.25, repeat: 8, closeWithFirst: true,
+        strips: [strip('maple', 1), strip('purpleheart', 0.125)],
+      },
+      steps: steps(
+        // The border needs square ends and flat faces to glue to, so true the panel first.
+        { type: 'trim', auto: false, x0: 0.25, x1: 0.25, z0: 0, z1: 0 },
+        { type: 'flatten', top: 0.03125, bottom: 0.03125 },
+        { type: 'frame', species: 'purpleheart', width: 1, lineSpecies: 'maple', line: 0, block: 3 },
+        { type: 'flatten', top: 0.03125, bottom: 0.03125 },
+      ),
+      customSpecies: [],
+    }),
+  },
+  {
     key: 'maple-purpleheart',
     style: 'grid',
     type: 'end',

@@ -422,3 +422,24 @@ h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing
   .app:not(.side-hidden) .side-handle .narrow { display: inline; }
 }
 @media print { .side-handle { display: none !important; } }
+
+/* Finger-sized controls on a touch screen. The row buttons (move, duplicate, remove) were 25 px
+   and jammed against the right edge of a phone, so a tap on ✕ often missed. Here each is at
+   least 40 px, the remove buttons are red so they are easy to find, and a strip row lets its
+   buttons wrap onto their own line under the wood and width when the screen is narrow. */
+@media (pointer: coarse) {
+  .icons { gap: 4px; }
+  .icons button { min-width: 40px; min-height: 40px; font-size: 18px; border-color: var(--line); background: var(--card); }
+  .icons button[title^="Remove"], .chip button { color: var(--bad); font-weight: 700; }
+  .icons button[title^="Remove"]:disabled { color: var(--dim); font-weight: 400; }
+  .chip { padding: 2px 2px 2px 10px; font-size: 14px; border-radius: 18px; }
+  .chip button { min-width: 36px; min-height: 34px; font-size: 18px; }
+  .strip-row { flex-wrap: wrap; row-gap: 4px; }
+}
+
+/* End grain or edge grain on top: two buttons that act as one switch, in the Target board card. */
+.grain-switch { display: inline-flex; margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.grain-switch button { border: 0; border-radius: 0; padding: 6px 14px; background: var(--card); }
+.grain-switch button + button { border-left: 1px solid var(--line); }
+.grain-switch button.on { background: var(--ink); color: #fff; }
+@media (pointer: coarse) { .grain-switch button { min-height: 40px; padding: 8px 18px; } }

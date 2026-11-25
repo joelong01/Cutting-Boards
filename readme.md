@@ -19,7 +19,7 @@ npm test             # geometry and recipe tests
 npm run smoke        # build, then check the real app window feature by feature
 npm run check        # both of the above: about 15 seconds
 npm run web          # the same page in a browser (designs save to browser storage instead of files)
-npm run deploy       # build the web page, publish it to cuttingboard.azurewebsites.net, check it by hash
+npm run deploy       # run every check; only if all pass, publish to cuttingboard.azurewebsites.net and check it by hash
 ```
 
 On Windows the app adds itself to the Start Menu as **Cutting Boards** the first time it starts,
@@ -34,9 +34,9 @@ If `npm install` reports that Electron's install script was skipped, run
 ## On a phone
 
 The web version is published to the Azure App Service `cuttingboard` (resource group
-`rg-cutting-boards`, Linux, Node 22, Free plan `plan-cutting-boards`, served by `pm2 serve`) at
-<https://cuttingboard.azurewebsites.net>. `npm run deploy` rebuilds, publishes, and checks every live
-file against the build by hash. It needs `az login` and prints a timing report; `--plan` says what
+`rg-cutting-boards`, Linux, Node 22, Free plan `plan-cutting-boards`, served by `scripts/azure-server.cjs`, which the deploy installs as `server.cjs` so phones always re-check the page) at
+<https://cuttingboard.azurewebsites.net>. `npm run deploy` runs `npm run check` first and stops if any
+test or window check fails; otherwise it publishes and checks every live file against the build by hash. It needs `az login` and prints a timing report; `--plan` says what
 it would do without deploying. The site is public and keeps designs in the phone's browser
 storage, so it is for showing a board, not keeping designs. Open a starter design with
 `?preset=brick` (or any key under **New**).
@@ -56,6 +56,10 @@ blue **Show the board ›** bar along the bottom goes back to the board.
   tab then becomes a **Show the board ›** bar along the bottom, clear of the panel's controls, so
   there is always something on screen to tap. On a phone the target board and "Add a step" scroll
   with the list instead of staying pinned, to leave room for the steps.
+- **Grain switch.** **End grain / Edge grain** in the Target board card turns the open board
+  round, keeping its woods, pattern and size: end to edge takes out the turn step and mills the
+  stock to the board's thickness; edge to end cuts and stands the slices up. Greyed out for
+  basket weave and chevron, which cannot be turned round.
 - **Target board.** The size to build, and the size the recipe finishes at. It stays at the top
   of the side panel while the steps scroll under it.
 - **Strips.** Step 1, "Mill strips for first glue-up": species, width, order, a repeat count, and
@@ -131,13 +135,23 @@ usual two, the panel is turned, sawn through each spacer strip of the first glue
 as wide as the strip, and the third wood is glued into the kerfs. An "Insert accent strips" step
 can also put its strips on the outside of the first and last slice, which this board uses to
 close the pattern at the edges.
+Every pattern is offered in both grains. A pattern's grain comes only from whether its slices
+are turned up on end, so `src/model/grain.ts` turns a recipe round: end to edge takes the turns
+out and swaps the stock thickness with the cross-cut width (what stood up becomes the board's
+thickness, and the blocks stay square); edge to end puts a turn in after the first cross cut, or
+adds a cross cut, turn and glue-up to a board that has none. So the maple and purpleheart grid,
+the checkerboard and the brick are offered edge grain too, with a warning that their block ends
+are glued to each other and their cross strips run across the grain, and the stripes and the
+bordered board are offered end grain. Basket weave (two panels) and chevron (angled cuts) are
+not turned round, and the single-wood boards are not offered the other way up, since each is
+then the other.
 Picking a design opens it for
-editing. The same eight starting designs are listed under **New** at their default sizes:
+editing. The same nine starting designs are listed under **New** at their default sizes:
 
 | Type | Designs |
 | --- | --- |
 | End grain | Single wood, maple blocks with a purpleheart grid, checkerboard, brick, basket weave |
-| Edge grain | Single wood, stripes, chevron |
+| Edge grain | Single wood, stripes, stripes with a border, chevron |
 
 ## How it models wood
 
@@ -173,8 +187,8 @@ so there is no stored geometry to go stale. A design file holds only the strips 
 ## Checks
 
 ```powershell
-npm test                                   # 211 tests of the model: geometry, every step, presets, resizing, cut list, design files, finish, naming, units
-npm run smoke                              # builds, then 30 checks of the real window: 3D view, wizard, print preview, edge tags, add step, accent strips, pinned target size, hiding the panel, save and open
+npm test                                   # 256 tests of the model: geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
+npm run smoke                              # builds, then 32 checks of the real window: the grain switch, 3D view, wizard, print preview, edge tags, add step, accent strips, removing strips and woods, pinned target size, hiding the panel, save and open
 node scripts/run.mjs --selftest            # save, list, read and delete a design through the app
 node scripts/run.mjs --screenshot=out.png --query=preset=brick   # render one frame and exit
 ```

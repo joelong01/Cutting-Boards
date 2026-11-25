@@ -52,14 +52,16 @@ export function fitToTarget(design: Design, orientation: Design = design): Desig
       return !!s && s[lengthAxis] >= lengthTarget - 1e-9;
     };
     // Finished size steps up with stock length, so search for the shortest stock that reaches it.
-    let lo = 1, hi = 144;
-    if (!reaches(hi)) return d;
-    for (let i = 0; i < 12; i++) {
-      const mid = (lo + hi) / 2;
-      if (reaches(mid)) hi = mid;
-      else lo = mid;
+    // The search runs over whole quarter inches, so it lands on the shortest quarter exactly; a
+    // search over real lengths rounded up afterwards could overshoot by a quarter.
+    let lo = 4, hi = 576; // quarters of an inch: 1″ to 144″
+    if (!reaches(hi / 4)) return d;
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (reaches(mid / 4)) hi = mid;
+      else lo = mid + 1;
     }
-    return { ...d, layup: { ...d.layup, length: Math.ceil(hi * 4) / 4 } };
+    return { ...d, layup: { ...d.layup, length: hi / 4 } };
   };
 
   let best = design;

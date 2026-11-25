@@ -68,6 +68,30 @@ describe('presets', () => {
     expect(pieceCount(last)).toBe(14 * 21 + 13);
   });
 
+  it('edge grain with a border finishes 16 × 12 × 1 1/8 with one purpleheart border, long grain all round', () => {
+    const d = preset('edge-grain-border');
+    const stages = run(d);
+    const last = stages[stages.length - 1];
+    expect(last.size[0]).toBeCloseTo(16, 9);
+    expect(last.size[1]).toBeCloseTo(1.125, 9);
+    expect(last.size[2]).toBeCloseTo(12, 9);
+    // Four border pieces and no line: the panel's 17 strips plus 4.
+    const border = titled(stages, 'Add a border');
+    expect(pieceCount(border) - pieceCount(titled(stages, 'Flatten'))).toBe(4);
+    const pieces = border.slices[0].pieces.filter((p) => p.species === 'purpleheart');
+    // Long grain on the face: no piece has its fibres standing up.
+    for (const p of pieces) expect(Math.abs(p.grain[1])).toBeLessThan(1e-9);
+    expect(d.name).toBe('Hard maple and purpleheart stripes with a border');
+  });
+
+  it('fitting to the target picks the shortest quarter-inch stock, not one a quarter longer', () => {
+    // 14 1/2 stock trims to 14, and the border makes it exactly 16. A coarse search used to land
+    // a hair above 14 1/2 and round up to 14 3/4, finishing at 16 1/4.
+    const fitted = fitToTarget({ ...preset('edge-grain-border'), autoFit: true });
+    expect(fitted.layup.length).toBe(14.5);
+    expect(run(fitted).at(-1)!.size[0]).toBeCloseTo(16, 9);
+  });
+
   it('turning to end grain makes the fibres vertical', () => {
     const stages = run(preset('checkerboard'));
     const g = titled(stages, 'Turn to end grain').slices[0].pieces[0].grain;
@@ -638,6 +662,7 @@ describe('designs name themselves from their woods', () => {
       'single-end-grain': 'Hard maple end grain',
       'single-edge-grain': 'Black walnut edge grain',
       'edge-grain-stripes': 'Hard maple, cherry and black walnut stripes',
+      'edge-grain-border': 'Hard maple and purpleheart stripes with a border',
       'maple-purpleheart': 'Hard maple and purpleheart grid',
       checkerboard: 'Black walnut and hard maple checkerboard',
       brick: 'Teak brick',

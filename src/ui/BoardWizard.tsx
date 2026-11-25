@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fitThickness, fitToTarget } from '../model/fit';
+import { convertGrain } from '../model/grain';
 import { inches } from '../model/fractions';
 import { run } from '../model/pipeline';
-import { CHESS_SQUARES, PRESETS, chessBoard, doubleBorder, doubleBorderCount, type BoardType, type Preset } from '../model/presets';
+import { CHESS_SQUARES, PRESETS, chessBoard, doubleBorder, doubleBorderCount, type BoardType } from '../model/presets';
 import type { Design, Stage } from '../model/types';
 import { Len } from './inputs';
 
@@ -51,10 +52,33 @@ interface Example extends Candidate {
   image: string;
 }
 
-/** A starter design resized to the wanted board: length and width by stock, then thickness. */
-function sized(preset: Preset, target: Design['target']): Design {
-  const base = preset.make();
+/** A design resized to the wanted board: length and width by stock, then thickness. */
+function sized(base: Design, target: Design['target']): Design {
   return fitThickness(fitToTarget({ ...base, target }));
+}
+
+/** What changes when a starter design is built the other way up, said on its card. */
+const OTHER_WAY: Record<BoardType, string> = {
+  edge: 'The same pattern with the slices left lying flat, so the top is long grain and the stock is thinner. The ends of the blocks are glued to each other and any cross strips run across the grain: weaker joints, and the board can crack as it moves with the seasons. Keep it dry and oiled.',
+  end: 'The same pattern cut into slices and stood on end, so the top is end grain: kinder to knives, and it hides cut marks.',
+};
+
+/**
+ * Every starter pattern built with `grain` up: the ones made that way as they are, and the others
+ * turned round by `convertGrain`. The single-wood designs are left out the other way up, since each
+ * is then just the other one; so are the recipes `convertGrain` cannot turn round.
+ */
+function starters(grain: BoardType, target: Design['target']): Candidate[] {
+  return PRESETS.flatMap((p): Candidate[] => {
+    if (p.type === grain) return [{ key: p.key, label: p.label, blurb: p.blurb, make: () => sized(p.make(), target) }];
+    if (p.key.startsWith('single-') || !convertGrain(p.make(), grain)) return [];
+    return [{
+      key: `${p.key}-${grain}`,
+      label: `${p.label}, ${grain} grain`,
+      blurb: OTHER_WAY[grain],
+      make: () => sized(convertGrain(p.make(), grain)!, target),
+    }];
+  });
 }
 
 /** Whether two board sizes are the same, so the matching common-size button can be highlighted. */
@@ -94,7 +118,7 @@ export function BoardWizard({ initial, startType, snapshot, onCreate, onClose }:
       across: doubleBorderCount(target.width, DOUBLE.block, DOUBLE.line),
     };
     return [
-      ...PRESETS.filter((p) => p.type === grain).map((p) => ({ key: p.key, label: p.label, blurb: p.blurb, make: () => sized(p, target) })),
+      ...starters(grain, target),
       {
         key: `chess-${way}`,
         label: way === 'end' ? 'End-grain chess board' : 'Face-grain chess board',
