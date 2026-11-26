@@ -19,7 +19,7 @@ npm test             # geometry and recipe tests
 npm run smoke        # build, then check the real app window feature by feature
 npm run check        # both of the above: about 15 seconds
 npm run web          # the same page in a browser (designs save to browser storage instead of files)
-npm run deploy       # run every check; only if all pass, publish to cuttingboard.azurewebsites.net and check it by hash
+npm run deploy       # run every check; only if all pass, publish the web version to Azure and check it by hash
 ```
 
 On Windows the app adds itself to the Start Menu as **Cutting Boards** the first time it starts,
@@ -33,11 +33,16 @@ If `npm install` reports that Electron's install script was skipped, run
 
 ## On a phone
 
-The web version is published to the Azure App Service `cuttingboard` (resource group
-`rg-cutting-boards`, Linux, Node 22, Free plan `plan-cutting-boards`, served by `scripts/azure-server.cjs`, which the deploy installs as `server.cjs` so phones always re-check the page) at
-<https://cuttingboard.azurewebsites.net>. `npm run deploy` runs `npm run check` first and stops if any
-test or window check fails; otherwise it publishes and checks every live file against the build by hash. It needs `az login` and prints a timing report; `--plan` says what
-it would do without deploying. The site is public and keeps designs in the phone's browser
+The web version is published to the Azure Static Web App `cuttingboard` (resource group
+`rg-cutting-boards`, Free plan) at <https://boards.longshotsw.com>. That name is a CNAME record,
+kept at Cloudflare, for the address Azure gave the site,
+`agreeable-sand-0852a761e.4.azurestaticapps.net`, which also works and is the one the deploy
+checks. It is only files: no server of ours runs. `public/staticwebapp.config.json` tells the host to make phones
+re-check the page on every visit and to keep the hashed files under `assets/` for a year.
+`npm run deploy` runs `npm run check` first and stops if any test or window check fails; otherwise
+it uploads `dist/` and checks every live file against the build by hash. It needs `az login` and
+prints a timing report; `--plan` says what it would do without deploying, and `--bump=patch`,
+`--bump=minor` or `--bump=major` moves the version on first. The site is public and keeps designs in the phone's browser
 storage, so it is for showing a board, not keeping designs. Open a starter design with
 `?preset=brick` (or any key under **New**).
 

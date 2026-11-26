@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * Run every check, and only if they all pass, publish the web version of Cutting Boards to the
- * Azure App Service `cuttingboard` (resource group `rg-cutting-boards`),
- * https://cuttingboard.azurewebsites.net, then check that the live site serves exactly the files
- * just built, by hash. A failing test or window check stops it before anything is uploaded.
+ * Azure Static Web App `cuttingboard` (resource group `rg-cutting-boards`, Free plan), then check
+ * that the live site serves exactly the files just built, by hash. A failing test or window
+ * check stops it before anything is uploaded.
  *
  *   node scripts/deploy-azure.mjs                 test, build, deploy, verify
  *   node scripts/deploy-azure.mjs --bump=patch    the same, moving the version on first
@@ -20,26 +20,28 @@
  * The bump is made before the checks, so the page that is tested and built carries the new
  * number; it is an edit to package.json and package-lock.json, to commit with the change.
  *
- * Needs the Azure CLI signed in (`az login`). The site gets a zip of `dist/` plus
- * `scripts/azure-server.cjs` as `server.cjs`, with the old files cleaned out, and the App Service
- * is set to start that server. It tells phones to re-check the page on every visit (`pm2 serve`
- * sent no caching header, so phones kept showing an old page after a deploy).
+ * Needs the Azure CLI signed in (`az login`). The site is only files: `dist/` as built, uploaded
+ * with Microsoft's Static Web Apps tool (`swa`, a development dependency). No server of ours
+ * runs. `public/staticwebapp.config.json`, which the build copies into `dist/`, tells the host to
+ * make phones re-check the page on every visit and to keep the hashed files under `assets/` for
+ * a year; without the first, a phone keeps showing an old page after a deploy.
+ *
+ * The deployment token is read from Azure at deploy time, handed to the upload in its
+ * environment, and never printed or written anywhere.
  *
  * The web version keeps designs in the browser's storage, not in files: it is for showing a
  * board (on a phone, say), not for keeping designs.
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const GROUP = 'rg-cutting-boards';
 const APP = 'cuttingboard';
-const SITE = `https://${APP}.azurewebsites.net`;
-/** How the App Service starts the site: the zero-dependency server shipped beside the page. */
-const STARTUP = 'node /home/site/wwwroot/server.cjs';
+/** The host's own settings file. It is uploaded with the site and acted on, not served. */
+const HOST_CONFIG = 'staticwebapp.config.json';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dist = join(root, 'dist');
 const plan = process.argv.includes('--plan');
@@ -66,9 +68,13 @@ async function phase(name, fn) {
   }
 }
 
-/** Run a command, inheriting the console unless `capture`; throw if it exits non-zero. */
-function run(cmd, args, { capture = false, cwd = root } = {}) {
-  const r = spawnSync(cmd, args, { cwd, shell: process.platform === 'win32', encoding: 'utf8', stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit' });
+/**
+ * Run a command, inheriting the console unless `capture`; throw if it exits non-zero. `env` adds
+ * to the environment the command sees. An error names the command and its first argument only,
+ * so nothing passed to it (a token, say) can end up in a message.
+ */
+function run(cmd, args, { capture = false, cwd = root, env = {} } = {}) {
+  const r = spawnSync(cmd, args, { cwd, shell: process.platform === 'win32', encoding: 'utf8', stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit', env: { ...process.env, ...env } });
   if (r.status !== 0) throw new Error(`${cmd} ${args[0]} exited with ${r.status}${capture ? `: ${(r.stderr || '').trim().slice(-400)}` : ''}`);
   return capture ? r.stdout.trim() : '';
 }
@@ -84,17 +90,25 @@ function files(dir) {
 /** SHA-256 of some bytes, in hex. */
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
+/** The site's address, asked of Azure: a Static Web App's host name is given to it, not chosen. */
+function siteUrl() {
+  const host = run('az', ['staticwebapp', 'show', '-n', APP, '-g', GROUP, '--query', 'defaultHostname', '-o', 'tsv'], { capture: true });
+  if (!host) throw new Error(`the Static Web App ${APP} in ${GROUP} has no host name: does it exist?`);
+  return `https://${host}`;
+}
+
 /**
- * Check that the site serves every file in `dist/` byte for byte. A deploy can report success and
- * still serve the old files while the App Service restarts, so retry for about a minute.
+ * Check that the site serves every file in `dist/` byte for byte, but for the host's settings
+ * file, which it keeps to itself. A deploy can report success a little before the new files are
+ * the ones served, so retry for about a minute.
  */
-async function verify() {
-  const local = files(dist).map((f) => [f, sha(readFileSync(join(dist, ...f.split('/'))))]);
+async function verify(site) {
+  const local = files(dist).filter((f) => f !== HOST_CONFIG).map((f) => [f, sha(readFileSync(join(dist, ...f.split('/'))))]);
   for (let attempt = 1; ; attempt++) {
     const bad = [];
     for (const [f, hash] of local) {
       try {
-        const res = await fetch(`${SITE}/${f}?v=${Date.now()}`, { cache: 'no-store' });
+        const res = await fetch(`${site}/${f}?v=${Date.now()}`, { cache: 'no-store' });
         const got = res.ok ? sha(Buffer.from(await res.arrayBuffer())) : `HTTP ${res.status}`;
         if (got !== hash) bad.push(`${f} (${got.startsWith('HTTP') ? got : 'different bytes'})`);
       } catch (err) {
@@ -103,21 +117,22 @@ async function verify() {
     }
     // The page must be re-checked on every visit, or a phone keeps showing an old one.
     if (!bad.length) {
-      const cache = (await fetch(`${SITE}/?v=${Date.now()}`, { cache: 'no-store' })).headers.get('cache-control') ?? '';
+      const cache = (await fetch(`${site}/?v=${Date.now()}`, { cache: 'no-store' })).headers.get('cache-control') ?? '';
       if (cache.includes('no-cache')) return console.log(`  all ${local.length} files match the build; the page is served no-cache`);
       bad.push(`the page is served with Cache-Control "${cache}", not no-cache`);
     }
-    if (attempt === 12) throw new Error(`${SITE} does not match the build: ${bad.join(', ')}`);
+    if (attempt === 12) throw new Error(`${site} does not match the build: ${bad.join(', ')}`);
     await new Promise((r) => setTimeout(r, 5000));
   }
 }
 
-/** Test and build, then zip, deploy and verify, printing a timing report at the end. */
+/** Test and build, then upload and verify, printing a timing report at the end. */
 async function main() {
-  console.log(`Target: App Service ${APP} in ${GROUP}, ${SITE}`);
+  const site = siteUrl();
+  console.log(`Target: Static Web App ${APP} in ${GROUP}, ${site}`);
   console.log(bump ? `Version: ${version()}, to be moved on by a ${bump} bump` : `Version: ${version()}, unchanged (no --bump)`);
   if (plan) {
-    console.log('Plan: npm run check (model tests, then build and window checks), stopping on any failure; zip dist/ with server.cjs; set the startup command if it differs; az webapp deploy --type zip --clean true; compare every file with the live site by SHA-256.');
+    console.log('Plan: npm run check (model tests, then build and window checks), stopping on any failure; upload dist/ with swa deploy to the production environment; then fetch every file from the site and compare it with the build by SHA-256.');
     return;
   }
   // The version moves on first, so the page that is tested, built and uploaded carries the new
@@ -129,32 +144,14 @@ async function main() {
   // `check` runs the model tests, then builds dist/ and checks the real window against it, so
   // what is uploaded is exactly what was tested. Any failure throws here, before the upload.
   await phase('test and build', () => run('npm', ['run', 'check']));
-  const dir = mkdtempSync(join(tmpdir(), 'cutting-boards-'));
-  const zip = join(dir, 'dist.zip');
-  const site = join(dir, 'site');
-  try {
-    cpSync(dist, site, { recursive: true });
-    copyFileSync(join(root, 'scripts', 'azure-server.cjs'), join(site, 'server.cjs'));
-    // Windows' own tar (bsdtar) writes a zip with -a. Named by full path: Git's GNU tar is often
-    // first on the PATH and cannot write zips.
-    const tar = process.platform === 'win32' ? `"${join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe')}"` : 'bsdtar';
-    await phase('zip', () => run(tar, ['-a', '-c', '-f', `"${zip}"`, '*'], { cwd: site }));
-    // Point the App Service at the server once; later deploys find it already set.
-    await phase('startup', () => {
-      const now = run('az', ['webapp', 'config', 'show', '-n', APP, '-g', GROUP, '--query', 'appCommandLine', '-o', 'tsv'], { capture: true });
-      if (now === STARTUP) return;
-      run('az', ['webapp', 'config', 'set', '-n', APP, '-g', GROUP, '--startup-file', `"${STARTUP}"`, '-o', 'none']);
-      const after = run('az', ['webapp', 'config', 'show', '-n', APP, '-g', GROUP, '--query', 'appCommandLine', '-o', 'tsv'], { capture: true });
-      if (after !== STARTUP) throw new Error(`startup command is "${after}", not "${STARTUP}"`);
-      console.log(`  startup command was "${now}", now "${STARTUP}"`);
-    });
-    await phase('deploy', () =>
-      run('az', ['webapp', 'deploy', '-n', APP, '-g', GROUP, '--src-path', `"${zip}"`, '--type', 'zip', '--clean', 'true', '--restart', 'true']));
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-  await phase('verify', verify);
-  console.log(`Deployed: ${SITE} (version ${version()})`);
+  await phase('deploy', () => {
+    // The token goes to the upload in its environment: not on its command line, not in any output.
+    const token = run('az', ['staticwebapp', 'secrets', 'list', '-n', APP, '-g', GROUP, '--query', 'properties.apiKey', '-o', 'tsv'], { capture: true });
+    if (!token) throw new Error('Azure gave no deployment token for the Static Web App.');
+    run('npx', ['swa', 'deploy', '"./dist"', '--env', 'production', '--no-use-keychain'], { env: { SWA_CLI_DEPLOYMENT_TOKEN: token } });
+  });
+  await phase('verify', () => verify(site));
+  console.log(`Deployed: ${site} (version ${version()})`);
 }
 
 main()
