@@ -54,15 +54,16 @@ blue **Show the board ›** bar along the bottom goes back to the board.
   or Ctrl+B gives the 3D view the whole window; **Show panel** or the blue **☰ Edit** tab brings the side panel back. On a phone-width screen the panel starts hidden and,
   when shown, takes the whole width, so the toggle switches between editing and the board; the
   tab then becomes a **Show the board ›** bar along the bottom, clear of the panel's controls, so
-  there is always something on screen to tap. On a phone the target board and "Add a step" scroll
-  with the list instead of staying pinned, to leave room for the steps.
+  there is always something on screen to tap. On a phone the Dimensions tile scrolls with the
+  list instead of staying pinned, to leave room for the steps.
 - **Grain switch.** **End grain / Edge grain** in the Target board card turns the open board
   round, keeping its woods, pattern and size: end to edge takes out the turn step and mills the
   stock to the board's thickness; edge to end cuts and stands the slices up. Greyed out for
   basket weave and chevron, which cannot be turned round. On the 3D board it swaps the whole
   recipe for the other one.
 - **Target board.** The first tile: which design the board is, in a dropdown of every design on
-  offer, and the grain switch. Picking another design changes the open board to it at the same
+  offer, and the grain switch. The designs are listed easiest first, under Beginner, Intermediate
+  and Advanced, here, in the board wizard and under New. Picking another design changes the open board to it at the same
   size (Ctrl+Z brings the old one back).
 - **Dimensions.** The second tile, which stays at the top of the side panel while the steps
   scroll under it: the size to build and the size the recipe finishes at, plus three settings
@@ -106,8 +107,10 @@ blue **Show the board ›** bar along the bottom goes back to the board.
   cherry face glued to each side. They are interleaved and every other bar row is slid over by
   one bar. Change a wood in step 1 and the second panel and border follow; change the bar width
   and the second panel's widths and the slide have to be changed to match, by hand.
-- **Steps.** Click a step to select it; "Add a step" puts the new one straight after it, so steps
-  can be added in the middle of a recipe. Each step shows the size it leaves. Steps that do not fit the current state (a cross
+- **Steps.** Click a step to select it. **Add step** in the toolbar opens a menu of the steps
+  there are, says which step the new one will follow, and puts it straight after the selected
+  one, so steps can be added in the middle of a recipe. Steps that do not fit there (a flip with
+  nothing cut yet) are greyed out and say what they need. Each step shows the size it leaves. Steps that do not fit the current state (a cross
   cut with no glued panel) say so instead of failing silently.
 - **3D view.** Drag to orbit, wheel to zoom. Hover a block for its species, size and grain
   direction. With a Turn, Flip or Offset step selected, click slices to choose which ones it
@@ -183,17 +186,23 @@ in the grain it is usually made in, and the switch on the board changes it.
 as stacked cubes. No row of straight cuts through a striped panel makes that, so its strips are
 not square (`src/model/blocks.ts`). Its steps are the ordinary ones:
 
-1. **Rip the strips**: one square board of each wood, 24 1/2″ long for a 16 × 12 board.
-2. **Bevel rip**: each board ripped with the blade tilted 30° into three strips, every one a
+1. **Mill the boards**: one square board of each wood, 10 1/4″ wide and 14″ long for a 16 × 12 board.
+2. **Bevel rip**: each board ripped with the blade tilted 30° into six strips, every one a
    diamond in cross-section.
 3. **Glue up**: one strip of each wood into each hexagonal log.
-4. **Cross cut** the logs into pieces as long as the board is thick, plus the flattening.
-5. **Turn to end grain**: stand the pieces up.
-6. **Glue up** the pieces into a block, packed like honeycomb. Its top is the pattern.
-7. **Trim** the board out of the ragged block, and **Flatten**.
+4. **Glue up**: the six logs side by side, flat to flat, into one row.
+5. **Cross cut** the row into slices as long as the board is thick, plus the flattening. Each
+   slice is a whole row of the pattern in one piece.
+6. **Turn to end grain**: stand the slices up.
+7. **Offset**: slide every other slice half a log along, so the points of one fit the hollows
+   of the next.
+8. **Glue up** the slices. The top is the pattern.
+9. **Trim** the board out of the ragged block, and **Flatten**.
+
+Nothing smaller than a slice is handled: eight slices for that board, not loose pieces.
 
 The thickness of the boards the strips are ripped from sets the size of the blocks. Holding the
-board's size counts the pieces again and sets how many strips there are and how long.
+board's size counts the logs and the rows again and sets how many strips there are and how long.
 
 That is the end-grain recipe. The grain switch changes it to the other one: the same design with
 face grain on top, made entirely from strips (`src/model/blocksFlat.ts`). Nothing smaller than a
@@ -213,6 +222,43 @@ running the recipe: the slices from the two ends of the angled cut are short and
 Its sizes are not rounded, since they follow from the 60° of the diamonds.
 
 In either recipe each step is one operation at the bench, with its own picture and instruction.
+
+## About and the version
+
+**About**, at the end of the toolbar, says who designed the app, that its code was written by
+Claude, and its version. The version is the one in `package.json`, put into the page when it is
+built. A deploy moves it on by how big the change is: `npm run deploy -- --bump=patch` for a
+fix, `--bump=minor` for something new, `--bump=major` when saved designs would open differently.
+Without `--bump` the version stays as it is.
+
+## Custom boards
+
+**New → Custom** starts a board with nothing but the strips and their glue-up: no pattern, no
+finishing, no feet. The rest is built by adding steps from **Add step** in the toolbar and
+filling in their cards. `custom.test.ts` rebuilds every design on offer that way, and the 3D
+board in both grains, step by step with only what the cards can set, and checks each comes out
+identical to the original. What makes that possible:
+
+- Every step after the first can be moved or removed, and a step can be added straight after the
+  first, before the strips are glued.
+- **Rip the panel** has a blade tilt. A rip with the blade tilted, straight after the first
+  step, is the bevel rip of an end-grain 3D board: the first step then makes three boards, not
+  strips, without anyone saying so (`madeFromSteps` in `src/model/blocksFlat.ts`). The
+  edge-grain 3D board is recognised the same way, by its strips and its cut-and-flip steps. A
+  3D board's sizes follow from its diamonds, so the fit sets them.
+- A strip's row has an **S** button to mark it a spacer, and a **Cross cut** can say it saws
+  spacers out and how wide they are. A spacer is never milled thinner than the saw kerf; one
+  wider than the blade is sawn out in two passes.
+- Every step's card takes a note, added to its instruction.
+
+## Feet
+
+**Add the feet**, the last card under Finishing, is off until ticked. Ticked, it is the last step
+of all, after the sanding: a round foot screwed under each corner, drawn beneath the board. Its
+sizes start at those of the common brass-and-rubber screw-on feet (0.82″ across, 0.35″ tall) with
+each foot's centre 1″ in from both edges, and all three can be changed. Feet are not part of the
+board's size, its wood or its yield. Feet that would stick out past the edges or meet in the
+middle are left off, with the reason.
 
 ## One operation, one stage
 
@@ -303,8 +349,8 @@ grains, a line per stage. A change to how the recipe is run must leave every lin
 ## Checks
 
 ```powershell
-npm test                                   # 461 tests of the model: one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
-npm run smoke                              # builds, then 45 checks of the real window: the Target board and Dimensions tiles, the grain switch, 3D view, wizard, print preview, edge tags, add step, accent strips, removing strips and woods, pinned target size, hiding the panel, save and open
+npm test                                   # 511 tests of the model: what each pattern must look like, building every design from Custom, feet, one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
+npm run smoke                              # builds, then 50 checks of the real window: About, Custom, feet, the wizard list, the Target board and Dimensions tiles, the grain switch, 3D view, wizard, print preview, edge tags, add step, accent strips, removing strips and woods, pinned target size, hiding the panel, save and open
 node scripts/run.mjs --selftest            # save, list, read and delete a design through the app
 node scripts/run.mjs --screenshot=out.png --query=preset=brick   # render one frame and exit
 ```

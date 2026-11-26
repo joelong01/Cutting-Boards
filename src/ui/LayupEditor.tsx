@@ -25,8 +25,8 @@ interface Props {
 
 /**
  * Step 1 of the recipe, milling the strips for the first glue-up: stock size, the strip pattern,
- * custom woods, and a preview of the panel's width. Clicking its heading shows the glued panel in
- * the 3D view; editing the strips leaves the view where it is.
+ * custom woods, and a preview of the panel's width. A click anywhere in the card shows its step
+ * in the 3D view: on its heading, a label, or a field, which takes the focus as well.
  *
  * A 3D board has a different card here, since its strips are ripped to a diamond section and are
  * all one size: the thickness of the boards they are ripped from, which sets the size of the
@@ -80,8 +80,8 @@ export function LayupEditor({ design, species, onChange, onNotice, selected, onS
 
   if (layup.blocks) {
     return (
-      <section className={`step first${selected ? ' selected' : ''}`}>
-        <header onClick={onSelect} title={layup.blocks.flat ? 'Show the strips, ripped and ready to glue' : 'Show the three boards, milled'}><em>1</em><strong>{layup.blocks.flat ? 'Rip the strips' : 'Mill the boards'}</strong></header>
+      <section className={`step first${selected ? ' selected' : ''}`} onClick={onSelect}>
+        <header title={layup.blocks.flat ? 'Show the strips, ripped and ready to glue' : 'Show the three boards, milled'}><em>1</em><strong>{layup.blocks.flat ? 'Rip the strips' : 'Mill the boards'}</strong></header>
         <div className="row">
           {layup.blocks.flat ? (
             <Len
@@ -148,8 +148,8 @@ export function LayupEditor({ design, species, onChange, onNotice, selected, onS
   }
 
   return (
-    <section className={`step first${selected ? ' selected' : ''}`}>
-      <header onClick={onSelect} title="Show the strips, ripped and ready to glue"><em>1</em><strong>Rip the strips</strong></header>
+    <section className={`step first${selected ? ' selected' : ''}`} onClick={onSelect}>
+      <header title="Show the strips, ripped and ready to glue"><em>1</em><strong>Rip the strips</strong></header>
       <div className="row">
         <Len
           label="Stock length"
@@ -177,6 +177,13 @@ export function LayupEditor({ design, species, onChange, onNotice, selected, onS
             />
             {s.spacer && <small className="spacer-tag" title="This strip only holds a place: a later cross cut saws it out, so none of it is in the finished board. Use any cheap wood.">spacer</small>}
             <span className="icons">
+              <button
+                className={s.spacer ? 'on' : ''}
+                aria-pressed={!!s.spacer}
+                aria-label="Spacer"
+                title="Spacer: a strip that only holds a place, because a later cut saws it out. Any cheap wood will do, it is never milled thinner than the saw kerf under Dimensions (a wider one is sawn out in two passes), and it is left out of the board's name."
+                onClick={() => set({ strips: layup.strips.map((x) => (x.id === s.id ? { ...x, spacer: x.spacer ? undefined : true } : x)) })}
+              >S</button>
               <button title="Move up" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
               <button title="Move down" disabled={i === layup.strips.length - 1} onClick={() => move(i, 1)}>↓</button>
               <button title="Duplicate" onClick={() => set({ strips: [...layup.strips.slice(0, i + 1), { ...s, id: newId() }, ...layup.strips.slice(i + 1)] })}>⧉</button>

@@ -2,7 +2,8 @@ import {
   bbox, box, boxCenter, boxSize, clipAxis, rotateY, rotateZ, toOrigin, translate, volume,
 } from './geometry';
 import { accentStrips, patternPeriod } from './accent';
-import { blockBoards, blockLogs, blockRows, blockSide, blockStrips, boardWidth } from './blocks';
+import { blockBoards, blockLogs, blockRow, blockSide, blockStrips, boardWidth, post } from './blocks';
+import { FEET } from './species';
 import { NO_FINISH, finishPanel } from './finish';
 import { inches } from './fractions';
 import type { AccentStrip, Finish, FinishPart, Layup, Piece, Selector, Slice, Stage, Step, StockLine, StripSpec, Vec3 } from './types';
@@ -44,8 +45,12 @@ export type Action =
   | { type: 'setAside' }
   /** Bring back the slices set aside and put one of the slices on the bench after each. */
   | { type: 'interleave' }
-  /** Saw a panel across into slices `width` wide, the blade `angle` degrees off square. */
-  | { type: 'crosscut'; width: number; kerf: number; angle: number }
+  /**
+   * Saw a panel across into slices `width` wide, the blade `angle` degrees off square, losing
+   * `kerf` between them. With `blade`, the blade is thinner than that: each cut is sawing out a
+   * spacer `kerf` wide and takes more than one pass.
+   */
+  | { type: 'crosscut'; width: number; kerf: number; angle: number; blade?: number }
   /**
    * Turn wood by `angle` degrees. With `sel`, each chosen slice turns about its own middle: about
    * `z`, its length (90° rolls it onto its side, 180° lays it face down), or about `y`, the
@@ -89,6 +94,8 @@ export type Action =
   | { type: 'grooveTemplate'; stripWidth: number; thickness: number; groove: Omit<Finish['groove'], 'on'> }
   /** Rout a juice groove round the top. See `Finish.groove` for what each number is. */
   | { type: 'groove'; inset: number; width: number; depth: number; cornerRadius: number; align: boolean }
+  /** Screw a round foot under each corner: `diameter` across, `height` tall, its centre `inset` in from both edges. Nothing is cut. */
+  | { type: 'addFeet'; diameter: number; height: number; inset: number }
   /** Sand and oil the board. Nothing is cut. */
   | { type: 'sand' };
 
@@ -97,6 +104,7 @@ export type ActionType = Action['type'];
 /** What each action is called when it is run on its own. A step gives its stage its own title. */
 const TITLES: Record<ActionType, string> = {
   rip: 'Rip the strips',
+  addFeet: 'Add the feet',
   glueFaces: 'Glue the faces on',
   setAside: 'Set the slices aside',
   interleave: 'Interleave the slices',
@@ -443,6 +451,8 @@ function crosscut(prev: Stage, step: Extract<Action, { type: 'crosscut' }>): Sta
     return [pb.min[0], pb.max[0]] as const;
   });
   let slices: Slice[] = [];
+  // Where along the turned panel each slice was cut from: the middle of its width.
+  const middles: number[] = [];
   let offcut = 0;
   for (let start = b.min[0]; start < b.max[0] - 1e-6; start += step.width + kerf) {
     const end = start + step.width;
@@ -456,29 +466,55 @@ function crosscut(prev: Stage, step: Extract<Action, { type: 'crosscut' }>): Sta
       const c = clipAxis(p, 0, start, end);
       if (c && volume(c) > 1e-9) cut.push(c);
     });
-    if (cut.length) slices.push({ pieces: cut });
+    if (cut.length) {
+      slices.push({ pieces: cut });
+      middles.push(start + step.width / 2);
+    }
   }
   let dropped = 0;
   if (angle) {
-    // The corners of an angled cut are triangles too short to use; keep the full-length slices
+    // The two ends of an angled cut give corners and short slices; keep the full-length slices
     // and line them up, as you would on the bench.
     const vols = slices.map((s) => s.pieces.reduce((v, p) => v + volume(p), 0));
-    const most = Math.max(0, ...vols);
-    const kept = slices.filter((_, i) => vols[i] >= 0.6 * most);
-    dropped = slices.length - kept.length;
-    slices = kept.map((s) => {
-      const c = boxCenter(bbox(s.pieces));
-      return { pieces: translate(s.pieces, [0, 0, -c[2]]) };
-    });
+    // A full slice runs from one long edge of the panel to the other. The measure is that, not
+    // the biggest slice there happens to be: a panel too short for its width has no full slice at
+    // all, only corners, and must not pass for a board.
+    const whole = boxSize(bbox(prev.slices[0].pieces));
+    const most = (step.width * whole[1] * whole[2]) / Math.cos(angle);
+    // Only whole slices are used. One from near an end of the panel is sawn short at one end: it
+    // could be lined up and used, but then the board is only as wide as the shortest of them, and
+    // it takes more wood, not less, than cutting a longer panel into slices that are all alike.
+    const keep = slices.map((_, i) => vols[i] >= 0.999 * most);
+    dropped = keep.filter((k) => !k).length;
+    if (dropped === slices.length) {
+      return failed(prev, title, `The panel is too short to cut at ${step.angle}°: no slice reaches from one long edge to the other. Make the stock longer.`);
+    }
+    // Lined up means the stripes of one slice in line with the next one's, and what fixes a
+    // stripe's place along a slice is the panel's long edges, which run with the stripes: so each
+    // slice is centred on the point midway between where those two edges cross it. A full slice's
+    // own middle is that point. A slice from near an end of the panel has one end sawn short, and
+    // centring it on its own middle would slide its stripes out of line with its neighbours'.
+    const edges = bbox(prev.slices[0].pieces);
+    // The ends of the two long edges, turned the way the panel was, give the line each edge lies on.
+    const corners: Vec3[] = [[edges.min[0], 0, edges.min[2]], [edges.max[0], 0, edges.min[2]], [edges.min[0], 0, edges.max[2]], [edges.max[0], 0, edges.max[2]]];
+    const [a0, a1, b0, b1] = rotateY([{ species: '', grain: [1, 0, 0], tone: 0, faces: [corners] }], angle, [0, 0, 0])[0].faces[0];
+    /** Where the line through two points is, along Z, at this X. */
+    const on = (p: Vec3, q: Vec3, x: number) => p[2] + ((q[2] - p[2]) * (x - p[0])) / (q[0] - p[0]);
+    const midway = (x: number) => (on(a0, a1, x) + on(b0, b1, x)) / 2;
+    slices = slices
+      .map((s, i) => ({ pieces: translate(s.pieces, [0, 0, -midway(middles[i])]) }))
+      .filter((_, i) => keep[i]);
   }
   if (!slices.length) return failed(prev, title, 'The panel is shorter than one slice.');
-  // The logs of a 3D board lie side by side and are cut one at a time, each into this many pieces.
-  const logs = prev.block ? Math.round(prev.slices[0].pieces.length / 3) : 0;
-  let summary = logs
-    ? `Cross cut each log into ${slices.length} pieces ${inches(step.width)} long, ${logs * slices.length} in all (kerf ${inches(kerf)}). Use a stop block so they are all the same length.`
+  // The row of logs of a 3D board: each slice is a whole row of the pattern.
+  let summary = prev.block
+    ? `Cross cut the row of logs into ${slices.length} slices ${inches(step.width)} long (kerf ${inches(kerf)}). Use a stop block so they are all the same length.`
     : `Cross cut the panel into ${slices.length} slices, each ${inches(step.width)} wide`
       + (step.angle ? `, with the blade at ${step.angle}° to square` : '')
-      + ` (kerf ${inches(kerf)}).`;
+      // A spacer wider than the blade comes out in more than one pass.
+      + (step.blade && kerf > step.blade + 1e-9
+        ? `, sawing out the ${inches(kerf)} spacer between each pair in ${Math.ceil(kerf / step.blade - 1e-9)} passes of the blade (kerf ${inches(step.blade)}).`
+        : ` (kerf ${inches(kerf)}).`);
   if (offcut > 1e-6) summary += ` The last ${inches(offcut)} is an offcut.`;
   if (dropped) summary += ` ${dropped} short corner piece${dropped > 1 ? 's are' : ' is'} waste.`;
   return stage('slices', slices, title, summary);
@@ -891,9 +927,9 @@ function rotate(prev: Stage, a: Extract<Action, { type: 'rotate' }>): Stage {
       motion: { axis: a.axis, angle, shift: 0 },
     };
   });
-  // The pieces of a 3D board are short lengths of log, not slices: say what is done to them.
+  // The slices of a 3D board are rows of hexagons: say what standing them up shows.
   if (prev.block && !out.error && a.axis === 'z' && a.angle === 90 && a.sel.mode === 'all') {
-    out.summary = 'Stand every piece on end, so its hexagon of three woods is on top.';
+    out.summary = 'Stand every slice on end, so its row of hexagons is on top.';
   }
   return out;
 }
@@ -916,12 +952,22 @@ function glue(prev: Stage): Stage {
     if (prev.block && !prev.block.ripped) {
       return failed(prev, TITLES.glue, 'The boards are ripped into strips first. Add "Rip the panel" with the blade tilted before this.');
     }
-    if (prev.block) {
-      // The strips of a 3D board: three, one of each wood, make each hexagonal log.
+    if (prev.block && !prev.block.logs) {
+      // The strips of a 3D board: three, one of each wood, make each hexagonal log. The logs are loose, to be glued again.
       const logs = Math.max(1, Math.round(prev.slices.length / 3));
-      return stage('panel', [{ pieces: blockLogs(prev.block.woods, prev.block.thickness, prev.size[0], logs, tone) }], TITLES.glue,
+      const made = blockLogs(prev.block.woods, prev.block.thickness, prev.size[0], logs, tone);
+      return stage('strips', Array.from({ length: logs }, (_, i) => ({ pieces: made.slice(3 * i, 3 * i + 3) })), TITLES.glue,
         `Glue one strip of each wood into a hexagonal log, ${logs} log${logs > 1 ? 's' : ''}, with the woods in the same order round every one. `
-        + 'Bind each with tape or a band clamp while the glue sets. The logs are not glued to each other.');
+        + 'Bind each with tape or a band clamp while the glue sets.',
+        { block: { ...prev.block, logs: true } });
+    }
+    if (prev.block) {
+      // The logs, side by side: one row of the pattern, as long as the logs.
+      const logs = prev.slices.length;
+      const row = blockRow(prev.block.woods, prev.block.thickness, prev.size[0], logs, tone);
+      return stage('panel', [{ pieces: row }], TITLES.glue,
+        `Glue the ${logs} logs side by side into one row, flat face to flat face, every log the same way round. `
+        + `Clamp across the flats. The row is ${inches(boxSize(bbox(row))[2])} wide, with a zigzag top and bottom.`);
     }
     return stage('panel', [{ pieces }], TITLES.glue,
       `Glue them edge to edge in order into a panel ${inches(boxSize(bbox(pieces))[2])} wide.`);
@@ -942,25 +988,28 @@ function glue(prev: Stage): Stage {
 }
 
 /**
- * Glue the pieces of a 3D board, standing on end, into its block: `along` in each of `across`
- * rows, every other row moved over half a piece, which is honeycomb. The pieces on the bench are
- * the cut-up logs; the block is drawn from the pieces it needs, and any more are spares.
+ * Glue the slices of a 3D board, standing on end, into its block. Each slice is a row of
+ * hexagons with a zigzag on both sides, and every other one has been slid half a log along, so
+ * the points of one fit the hollows of the next: the rows close up to three quarters of a slice
+ * apart and the pattern appears. Slices that have not been slid cannot nest, and it says so.
  */
 function glueBlock(prev: Stage): Stage {
-  const { woods, thickness, along, across } = prev.block!;
-  const need = along * across;
-  // Every piece of a log is three diamonds.
-  const have = Math.floor(prev.slices.reduce((n, sl) => n + sl.pieces.length, 0) / 3);
-  if (have < need) {
-    return failed(prev, TITLES.glue, `The block needs ${need} pieces and there are only ${have}. Make the strips longer or rip more of them.`);
+  const s = blockSide(prev.block!.thickness), half = prev.block!.thickness;
+  const boxes = prev.slices.map((sl) => bbox(sl.pieces));
+  // Neighbours must sit half a log apart along their length, give or take whole logs.
+  const nests = boxes.every((b, k) => {
+    if (!k) return true;
+    const off = (((b.min[2] - boxes[k - 1].min[2] - half) % (2 * half)) + 2 * half) % (2 * half);
+    return Math.min(off, 2 * half - off) < 1e-6;
+  });
+  if (!nests) {
+    return failed(prev, TITLES.glue, `The slices will not fit together as they lie. Slide every other one ${inches(half)} along its length first, half a log, so the points of one row fit the hollows of the next: add an Offset step before this.`);
   }
-  const height = boxSize(bbox(prev.slices[0].pieces))[1];
-  const pieces = blockRows(woods, thickness, height, along, across, tone).flat();
+  const pieces = toOrigin(prev.slices.flatMap((sl, k) => translate(sl.pieces, [k * 1.5 * s - boxes[k].min[0], -boxes[k].min[1], 0])));
   const size = boxSize(bbox(pieces));
   return stage('panel', [{ pieces }], TITLES.glue,
-    `Glue the pieces standing on end into a block, ${across} rows of ${along}: every piece the same way round, and every other row moved over half a piece so the points of one row fit the hollows of the next. `
-    + `Glue up a row at a time, then the rows. The block is about ${inches(Math.round(size[0] * 8) / 8)} × ${inches(Math.round(size[2] * 8) / 8)} with ragged edges, and its top is the pattern.`
-    + (have > need ? ` The ${have - need} piece${have - need > 1 ? 's' : ''} left over ${have - need > 1 ? 'are spares' : 'is a spare'}.` : ''),
+    `Glue the ${prev.slices.length} slices together standing on end, in this order, the points of each fitted into the hollows of the next. `
+    + `The block is about ${inches(Math.round(size[0] * 8) / 8)} × ${inches(Math.round(size[2] * 8) / 8)} with ragged edges, and its top is the pattern.`,
     { block: undefined });
 }
 
@@ -1093,8 +1142,33 @@ function sand(prev: Stage): Stage {
   };
 }
 
+/**
+ * Screw a foot under each corner of the finished board. The board is not changed: the feet are
+ * drawn beneath it, and the stage keeps the board's own size, since feet are not part of its
+ * thickness. Feet too big to sit inside the corners, or set so far in that they meet, are left off
+ * with the reason.
+ */
+function addFeet(prev: Stage, a: Extract<Action, { type: 'addFeet' }>): Stage {
+  const title = TITLES.addFeet;
+  const [x, , z] = prev.size;
+  const r = a.diameter / 2;
+  const base = { kind: 'panel' as const, size: prev.size, title, finish: 'feet' as const, finishing: prev.finishing };
+  /** The board as it is, with why there are no feet under it. */
+  const without = (warning: string): Stage => ({ ...base, slices: prev.slices, summary: '', warning });
+  if (!(a.diameter > 0) || !(a.height > 0)) return without('No feet: they need a diameter and a height greater than zero.');
+  if (a.inset < r - 1e-9) return without(`No feet: set ${inches(a.inset)} in from the edges, feet ${inches(a.diameter)} across would stick out past them. Set them at least ${inches(r)} in.`);
+  if (2 * a.inset + a.diameter > Math.min(x, z) + 1e-9) return without(`No feet: set ${inches(a.inset)} in from the edges, they would meet in the middle of a board ${inches(Math.min(x, z))} wide.`);
+  const feet = [[a.inset, a.inset], [x - a.inset, a.inset], [a.inset, z - a.inset], [x - a.inset, z - a.inset]]
+    .map(([cx, cz], i) => post(cx, cz, r, -a.height, a.height, FEET, 0.5 + 0.05 * i));
+  return {
+    ...base, slices: [{ pieces: [...prev.slices[0].pieces, ...feet] }],
+    summary: `Turn the board over and screw a foot inside each of the four corners, its centre ${inches(a.inset)} in from both edges. `
+      + `The feet are ${inches(a.diameter)} across and ${inches(a.height)} tall. Drill a pilot hole for each screw, and check the screws are shorter than the board is thick.`,
+  };
+}
+
 /** The actions that finish a board. Once one is done, only these can follow. */
-const FINISHING: ActionType[] = ['roundCorners', 'chamfer', 'roundOver', 'grooveTemplate', 'groove', 'sand'];
+const FINISHING: ActionType[] = ['roundCorners', 'chamfer', 'roundOver', 'grooveTemplate', 'groove', 'sand', 'addFeet'];
 
 /** A clear bench with nothing on it and nothing set aside: where a design starts. */
 export const EMPTY: Stage = { kind: 'slices', slices: [], size: [0, 0, 0], title: '', summary: '' };
@@ -1130,6 +1204,7 @@ export const ACTIONS: { [K in ActionType]: Apply<K> } = {
   grooveTemplate,
   groove: (prev, a) => touch(prev, 'groove', { inset: a.inset, width: a.width, depth: a.depth, cornerRadius: a.cornerRadius, align: a.align }),
   sand,
+  addFeet,
 };
 
 /**

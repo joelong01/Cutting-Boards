@@ -461,3 +461,32 @@ h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing
 .field { display: inline-flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--dim); }
 .field select { font-size: 14px; padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--ink); }
 .card.board-pick .field { display: flex; }
+
+/* The lists of designs are grouped by how hard each is to make, under a heading for each level. */
+.wizard-level + .wizard-level { margin-top: 14px; }
+.wizard-level h3 { margin: 0 0 6px; }
+.menu-level h4 { margin: 8px 10px 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--dim); }
+
+/* The wizard's designs are a list: the picked one is outlined, and the footer that starts it stays in view. */
+.wizard-examples button.on { outline: 3px solid var(--accent, #1f6fd0); outline-offset: -1px; }
+.wizard-pick { position: sticky; bottom: 0; display: flex; align-items: center; gap: 12px; padding: 10px 0 2px; background: var(--card); }
+.wizard-pick .note { flex: 1; margin: 0; }
+
+/* The toolbar's Add step menu: where the step will go, then each step that can be added. */
+.add-menu { min-width: 340px; max-height: 70vh; overflow-y: auto; }
+.add-menu .where { margin: 6px 10px; font-size: 12px; color: var(--dim); }
+.add-menu .where:first-child { color: var(--ink); font-weight: 600; }
+.add-menu button:disabled strong { color: var(--dim); }
+
+/* A strip marked as a spacer has its S button lit. */
+.strip-row .icons button.on { background: var(--ink); color: #fff; }
+
+/* A step's own note. */
+.step-note { width: 100%; margin-top: 6px; padding: 4px 6px; font-size: 12px; border: 1px dashed var(--line); border-radius: 6px; background: transparent; color: var(--ink); }
+.step-note:placeholder-shown { opacity: 0.65; }
+
+/* The About box. */
+.modal.about { width: min(460px, calc(100vw - 24px)); }
+.modal.about header { justify-content: space-between; }
+.modal.about p { margin: 10px 0 0; line-height: 1.45; }
+.modal.about .version { color: var(--dim); margin-top: 2px; }

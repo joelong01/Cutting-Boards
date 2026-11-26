@@ -66,7 +66,8 @@ export function buildCutList(stages: Stage[], design?: Pick<Design, 'allowance'>
     stockVolume += v;
     bySpecies.set(l.species, (bySpecies.get(l.species) ?? 0) + v / 144);
   }
-  const last = stages[stages.length - 1];
+  // Feet, when the board has them, are drawn under it: they are not its wood or its size.
+  const last = [...stages].reverse().find((s) => s.finish !== 'feet') ?? stages[stages.length - 1];
   const finishedVolume = last.slices.reduce((v, s) => v + s.pieces.reduce((a, p) => a + volume(p), 0), 0);
   return {
     lines,

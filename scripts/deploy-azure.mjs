@@ -5,8 +5,20 @@
  * https://cuttingboard.azurewebsites.net, then check that the live site serves exactly the files
  * just built, by hash. A failing test or window check stops it before anything is uploaded.
  *
- *   node scripts/deploy-azure.mjs          test, build, deploy, verify
- *   node scripts/deploy-azure.mjs --plan   say what it would do, change nothing
+ *   node scripts/deploy-azure.mjs                 test, build, deploy, verify
+ *   node scripts/deploy-azure.mjs --bump=patch    the same, moving the version on first
+ *   node scripts/deploy-azure.mjs --plan          say what it would do, change nothing
+ *
+ * The version is the one in package.json, which the About box shows. A deploy that changes what
+ * people get moves it on, by how big the change is:
+ *
+ *   --bump=patch   a fix: something that was wrong now works (0.9 to 0.9.1)
+ *   --bump=minor   something new: a design, a step, a setting, a tile (0.9 to 0.10)
+ *   --bump=major   a break: saved designs open differently or not at all (0.9 to 1.0)
+ *
+ * Without --bump the version stays as it is, which is right for putting the same thing up again.
+ * The bump is made before the checks, so the page that is tested and built carries the new
+ * number; it is an edit to package.json and package-lock.json, to commit with the change.
  *
  * Needs the Azure CLI signed in (`az login`). The site gets a zip of `dist/` plus
  * `scripts/azure-server.cjs` as `server.cjs`, with the old files cleaned out, and the App Service
@@ -31,6 +43,14 @@ const STARTUP = 'node /home/site/wwwroot/server.cjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dist = join(root, 'dist');
 const plan = process.argv.includes('--plan');
+/** How far to move the version on before deploying: patch, minor or major, or nothing. */
+const bump = process.argv.find((a) => a.startsWith('--bump='))?.slice('--bump='.length) ?? '';
+if (bump && !['patch', 'minor', 'major'].includes(bump)) {
+  console.error(`--bump takes patch, minor or major, not "${bump}".`);
+  process.exit(2);
+}
+/** The version in package.json as it stands. */
+const version = () => JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
 const timings = [];
 const started = performance.now();
 
@@ -95,9 +115,16 @@ async function verify() {
 /** Test and build, then zip, deploy and verify, printing a timing report at the end. */
 async function main() {
   console.log(`Target: App Service ${APP} in ${GROUP}, ${SITE}`);
+  console.log(bump ? `Version: ${version()}, to be moved on by a ${bump} bump` : `Version: ${version()}, unchanged (no --bump)`);
   if (plan) {
     console.log('Plan: npm run check (model tests, then build and window checks), stopping on any failure; zip dist/ with server.cjs; set the startup command if it differs; az webapp deploy --type zip --clean true; compare every file with the live site by SHA-256.');
     return;
+  }
+  // The version moves on first, so the page that is tested, built and uploaded carries the new
+  // number in its About box. npm writes it to package.json and package-lock.json and makes no commit.
+  if (bump) {
+    await phase('version', () => run('npm', ['version', bump, '--no-git-tag-version'], { capture: true }));
+    console.log(`Version: now ${version()}`);
   }
   // `check` runs the model tests, then builds dist/ and checks the real window against it, so
   // what is uploaded is exactly what was tested. Any failure throws here, before the upload.
@@ -127,7 +154,7 @@ async function main() {
     rmSync(dir, { recursive: true, force: true });
   }
   await phase('verify', verify);
-  console.log(`Deployed: ${SITE}`);
+  console.log(`Deployed: ${SITE} (version ${version()})`);
 }
 
 main()

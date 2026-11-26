@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { run } from '../model/pipeline';
-import { catalog, type Offer } from '../model/presets';
+import { LEVELS, catalog, type Offer } from '../model/presets';
 import type { Design, Stage } from '../model/types';
 import { Len } from './inputs';
 import { useShow } from './show';
@@ -36,7 +36,8 @@ const sameSize = (a: Design['target'], b: Design['target']) =>
 
 /**
  * Two-page dialog for starting a board. The first page asks for its size; the second offers every
- * design once, built to that size, named and described without a word about grain. Picking one opens it for editing, where its woods, its sizes
+ * design once, built to that size, drawn full face, named and described without a word about grain. The designs are a
+ * list to pick from: a click picks one, and OK, Enter or a double click starts it. Picking one opens it for editing, where its woods, its sizes
  * and which grain is on top are changed like any other board's: end grain or edge grain is not a
  * kind of board here, only whether the recipe stands the slices up. The chess board is eight
  * squares each way, as wide as the board asked for; the double border board is a whole number of
@@ -46,6 +47,9 @@ export function BoardWizard({ initial, startAtDesigns, snapshot, onCreate, onClo
   const [target, setTarget] = useState(initial);
   const [page, setPage] = useState<1 | 2>(startAtDesigns ? 2 : 1);
   const [examples, setExamples] = useState<Example[]>([]);
+  // The design picked in the list, by key: one click picks it, and OK or a double click starts it.
+  const [picked, setPicked] = useState<string | null>(null);
+  const chosen = examples.find((ex) => ex.key === picked && !ex.final.error);
 
   const { len: inches } = useShow();
   /** A finished stage's size as length x width x thickness, longer side first. */
@@ -58,6 +62,7 @@ export function BoardWizard({ initial, startAtDesigns, snapshot, onCreate, onClo
   useEffect(() => {
     if (page !== 2) return;
     setExamples([]);
+    setPicked(null);
     let timer = 0;
     /** Build example i, show it, and schedule the next one. */
     const next = (i: number) => {
@@ -77,13 +82,14 @@ export function BoardWizard({ initial, startAtDesigns, snapshot, onCreate, onClo
   }, [page, candidates]);
 
   useEffect(() => {
-    /** Close the wizard on Escape. */
+    /** Close the wizard on Escape, and start the picked design on Enter. */
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
+      else if (e.key === 'Enter' && page === 2 && chosen) onCreate(chosen.design);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, onCreate, page, chosen]);
 
   return (
     <div className="modal-back" onClick={onClose}>
@@ -128,22 +134,39 @@ export function BoardWizard({ initial, startAtDesigns, snapshot, onCreate, onClo
         {page === 2 && (
           <section>
             <p>
-              Pick a design. Each is drawn at{' '}
+              Pick a design and press OK, or double-click one. They run from the easiest to make to the hardest, and each is drawn at{' '}
               {inches(target.length)} × {inches(target.width)} × {inches(target.thickness)}, or as close as its pattern allows.
               End grain or edge grain is chosen afterwards, on the board, along with its woods and sizes.
             </p>
             {examples.length < candidates.length && <p className="note">Drawing examples… {examples.length} of {candidates.length}</p>}
-            <div className="wizard-examples">
-              {examples.map((ex) => (
-                <button key={ex.key} disabled={!!ex.final.error} onClick={() => onCreate(ex.design)}>
-                  {ex.image && <img src={ex.image} alt="" />}
-                  <strong>{ex.label}</strong>
-                  <span>{ex.blurb}</span>
-                  <small>{ex.final.error ? ex.final.error : `Finishes at ${sizeText(ex.final)}`}</small>
-                </button>
-              ))}
-            </div>
-            <footer><button onClick={() => setPage(1)}>◀ Size</button></footer>
+            {LEVELS.filter((l) => examples.some((ex) => ex.level === l.level)).map((l) => (
+              <div key={l.level} className="wizard-level">
+                <h3>{l.label}</h3>
+                <div className="wizard-examples" role="listbox" aria-label={`${l.label} designs`}>
+                  {examples.filter((ex) => ex.level === l.level).map((ex) => (
+                    <button
+                      key={ex.key}
+                      role="option"
+                      aria-selected={picked === ex.key}
+                      className={picked === ex.key ? 'on' : ''}
+                      disabled={!!ex.final.error}
+                      onClick={() => setPicked(ex.key)}
+                      onDoubleClick={() => onCreate(ex.design)}
+                    >
+                      {ex.image && <img src={ex.image} alt="" />}
+                      <strong>{ex.label}</strong>
+                      <span>{ex.blurb}</span>
+                      <small>{ex.final.error ? ex.final.error : `Finishes at ${sizeText(ex.final)}`}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <footer className="wizard-pick">
+              <button onClick={() => setPage(1)}>◀ Size</button>
+              <span className="note">{chosen ? chosen.label : 'Click a design to pick it, or double-click to start it.'}</span>
+              <button className="primary" disabled={!chosen} onClick={() => chosen && onCreate(chosen.design)}>OK</button>
+            </footer>
           </section>
         )}
       </div>

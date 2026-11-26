@@ -27,18 +27,37 @@ interface StepDef<K extends Step['type']> {
 
 const EVERY_OTHER = { mode: 'every', n: 2, offset: 1 } as const;
 
+/**
+ * Strips with each spacer no thinner than the saw kerf, when the design sets one. A spacer is
+ * glued in to hold a place and is sawn out whole by a later cut. It can be wider than the blade,
+ * which then takes it out in two passes (a thin-kerf blade and a 1/8 inch spacer, say, which is
+ * easier to mill than a very thin strip); it cannot be narrower, or the cut would take wood from
+ * its neighbours.
+ */
+const sawnOut = (strips: StripSpec[], kerf: number | undefined): StripSpec[] =>
+  (kerf === undefined || !strips.some((s) => s.spacer && s.width < kerf) ? strips : strips.map((s) => (s.spacer ? { ...s, width: Math.max(s.width, kerf) } : s)));
+
 /** Every step a design can have. To add one, add it to the `Step` type and describe it here. */
 const STEPS: { [K in Step['type']]: StepDef<K> } = {
   strips: {
     title: 'Rip the strips', needs: 'nothing',
-    actions: (s, z) => [{ type: 'rip', strips: milledStrips(s, z.grid), thickness: z.alongOn === 'thickness' ? withAlong(s.thickness, z) : s.thickness, length: s.length, repeat: s.repeat, closeWithFirst: s.closeWithFirst,
+    actions: (s, z) => [{ type: 'rip', strips: sawnOut(milledStrips(s, z.grid), z.kerf), thickness: z.alongOn === 'thickness' ? withAlong(s.thickness, z) : s.thickness, length: s.length, repeat: s.repeat, closeWithFirst: s.closeWithFirst,
       // The face-grain 3D board starts from ordinary strips; only the end-grain one's first step is its own.
       blocks: s.blocks?.flat ? undefined : s.blocks,
       kerf: z.kerf,
     }],
     start: () => ({ strips: [{ id: newId(), species: 'maple', width: 1.5 }], thickness: 1.25, length: 18, repeat: 8, closeWithFirst: false }),
   },
-  crosscut: { title: 'Cross cut', needs: 'panel', actions: (s, z) => [{ type: 'crosscut', width: z.alongOn === 'crosscut' && Math.abs(s.width - z.cut) < 1e-9 ? withAlong(s.width, z) : s.width, kerf: z.kerf ?? s.kerf, angle: s.angle }], start: () => ({ width: 1.25, kerf: 0.125, angle: 0 }) },
+  crosscut: {
+    title: 'Cross cut', needs: 'panel',
+    actions: (s, z) => {
+      const blade = z.kerf ?? s.kerf;
+      // A cut that saws out a spacer takes the spacer's whole width, which is never less than the blade's.
+      const taken = s.spacer ? Math.max(s.spacer, blade) : blade;
+      return [{ type: 'crosscut', width: z.alongOn === 'crosscut' && Math.abs(s.width - z.cut) < 1e-9 ? withAlong(s.width, z) : s.width, kerf: taken, angle: s.angle, ...(taken > blade ? { blade } : {}) }];
+    },
+    start: () => ({ width: 1.25, kerf: 0.125, angle: 0 }),
+  },
   // Loose boards are ripped only on an end-grain 3D board, with the blade tilted; the action refuses any others.
   rip: { title: 'Rip the panel', needs: 'panel', orStrips: true, actions: (s, z) => [{ type: 'ripPanel', width: s.width, kerf: z.kerf ?? s.kerf, tilt: s.tilt }], start: () => ({ width: 1.25, kerf: 0.125 }) },
   // Standing the slices up is what makes a board end grain: a quarter turn about each one's length.
@@ -122,7 +141,8 @@ function rounded(a: Action, grid: number): Action {
   switch (a.type) {
     case 'rip':
       return { ...a, strips: a.strips.map(strip), thickness: r(a.thickness), ...(a.length !== undefined ? { length: r(a.length) } : {}), ...(a.extra !== undefined ? { extra: r(a.extra) } : {}) };
-    case 'crosscut': case 'ripPanel': return { ...a, width: r(a.width), kerf: r(a.kerf) };
+    case 'crosscut': return { ...a, width: r(a.width), kerf: r(a.kerf), ...(a.blade !== undefined ? { blade: r(a.blade) } : {}) };
+    case 'ripPanel': return { ...a, width: r(a.width), kerf: r(a.kerf) };
     case 'shift': return { ...a, amount: r(a.amount) };
     case 'flatten': return { ...a, top: r(a.top), bottom: r(a.bottom) };
     case 'millAccents': case 'addStrips':
@@ -130,6 +150,7 @@ function rounded(a: Action, grid: number): Action {
     case 'millBorder': return { ...a, spec: { ...a.spec, width: r(a.spec.width), line: r(a.spec.line), block: r(a.spec.block) } };
     case 'roundCorners': case 'roundOver': return { ...a, radius: r(a.radius) };
     case 'chamfer': return { ...a, size: r(a.size) };
+    case 'addFeet': return { ...a, diameter: r(a.diameter), height: r(a.height), inset: r(a.inset) };
     case 'groove': return { ...a, inset: r(a.inset), width: r(a.width), depth: r(a.depth), cornerRadius: r(a.cornerRadius) };
     case 'grooveTemplate':
       return { ...a, stripWidth: r(a.stripWidth), thickness: r(a.thickness), groove: { ...a.groove, inset: r(a.groove.inset), width: r(a.groove.width), depth: r(a.groove.depth), cornerRadius: r(a.groove.cornerRadius) } };
@@ -196,6 +217,13 @@ export const FINISH_STEPS: { part: FinishPart; title: string; action: (f: Requir
   { part: 'groove', title: 'Juice groove', action: (f) => ({ type: 'groove', inset: f.groove.inset, width: f.groove.width, depth: f.groove.depth, cornerRadius: f.groove.cornerRadius, align: f.groove.align }) },
 ];
 export const SAND_TITLE = 'Sand and oil';
+export const FEET_TITLE = 'Add the feet';
+
+/**
+ * The stage that shows the board itself finished: the last one, or the one before the feet go
+ * on, since feet are drawn under the board and are not part of its size or its wood.
+ */
+export const finishedBoard = (stages: Stage[]): Stage => [...stages].reverse().find((s) => s.finish !== 'feet') ?? stages[stages.length - 1];
 
 /**
  * Do `actions` as the step called `title`, a stage for each (see `performEach`), if the work is in a state to take it: an earlier step
@@ -280,6 +308,10 @@ function build(design: Design, names: Names): { parts: Stage[][]; steps: Stage[]
     const touches = FINISH_STEPS.filter((t) => finish[t.part].on && (t.part !== 'template' || finish.groove.on));
     for (const t of touches) finishing.push(perform(finishing[finishing.length - 1] ?? last, [rounded(t.action(finish), sizing.grid)], t.title, names));
     if (touches.length) finishing.push(perform(finishing[finishing.length - 1], [{ type: 'sand' }], SAND_TITLE, names));
+    // Feet go on last of all, once the board is sanded and oiled, and with or without any other touch.
+    if (finish.feet.on) {
+      finishing.push(perform(finishing[finishing.length - 1] ?? last, [rounded({ type: 'addFeet', diameter: finish.feet.diameter, height: finish.feet.height, inset: finish.feet.inset }, sizing.grid)], FEET_TITLE, names));
+    }
   }
   return { parts, steps, finishing };
 }

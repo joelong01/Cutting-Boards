@@ -31,10 +31,11 @@ describe('3D board (tumbling blocks)', () => {
     expect(isBlocks(board())).toBe(true);
   });
 
-  it('is these steps, in order, with no error or warning, and finishes at exactly its target size', () => {
+  it('is these steps, in order, one operation each, with no error or warning, and finishes at exactly its target size', () => {
     const stages = run(board());
-    expect(stages.slice(0, 8).map((s) => `${s.title} (${s.kind})`)).toEqual([
-      'Mill the boards (strips)', 'Bevel rip (strips)', 'Glue up (panel)', 'Cross cut (slices)', 'Turn to end grain (slices)', 'Glue up (panel)', 'Trim (panel)', 'Flatten (panel)',
+    expect(stages.slice(0, 10).map((s) => `${s.title} (${s.kind})`)).toEqual([
+      'Mill the boards (strips)', 'Bevel rip (strips)', 'Glue up (strips)', 'Glue up (panel)', 'Cross cut (slices)',
+      'Turn to end grain (slices)', 'Offset (slices)', 'Glue up (panel)', 'Trim (panel)', 'Flatten (panel)',
     ]);
     expect(stages.filter((s) => s.error || s.warning).map((s) => `${s.title}: ${s.error ?? s.warning}`)).toEqual([]);
     const size = stages.at(-1)!.size;
@@ -47,19 +48,21 @@ describe('3D board (tumbling blocks)', () => {
     const d = board();
     const boards = run(d, (id) => id)[0];
     const layup = layupOf(d);
-    expect(layup.repeat).toBe(3);
-    expect(layup.length).toBe(24.5);
-    expect(boardWidth(blockSide(1.25), 3)).toBe(5.5);
+    // Six logs across a 12 inch board, eight rows along its 16: six strips from each board, 14 inches long.
+    expect(layup.blocks).toEqual({ along: 6, across: 8 });
+    expect(layup.repeat).toBe(6);
+    expect(layup.length).toBe(14);
+    expect(boardWidth(blockSide(1.25), 6)).toBe(10.25);
     expect(boards.slices.map((s) => s.pieces[0].species)).toEqual(['maple', 'walnut', 'cherry']);
     for (const s of boards.slices) {
       const size = boxSize(bbox(s.pieces));
-      expect(size[0]).toBeCloseTo(24.5, 9);
+      expect(size[0]).toBeCloseTo(14, 9);
       expect(size[1]).toBeCloseTo(1.25, 9);
-      expect(size[2]).toBeCloseTo(5.5, 9);
+      expect(size[2]).toBeCloseTo(10.25, 9);
     }
-    expect(boards.stock!.map((l) => [l.species, l.count, l.thickness, l.width, l.length])).toEqual([['maple', 1, 1.25, 5.5, 24.5], ['walnut', 1, 1.25, 5.5, 24.5], ['cherry', 1, 1.25, 5.5, 24.5]]);
+    expect(boards.stock!.map((l) => [l.species, l.count, l.thickness, l.width, l.length])).toEqual([['maple', 1, 1.25, 10.25, 14], ['walnut', 1, 1.25, 10.25, 14], ['cherry', 1, 1.25, 10.25, 14]]);
     // The instruction is only this operation: nothing about the cuts to come.
-    expect(boards.summary).toBe('Mill a board of each wood 1 1/4″ thick, 5 1/2″ wide and 24 1/2″ long: maple, walnut and cherry. '
+    expect(boards.summary).toBe('Mill a board of each wood 1 1/4″ thick, 10 1/4″ wide and 14″ long: maple, walnut and cherry. '
       + 'Plane all three to the same thickness in one session.');
     expect(boards.summary).not.toMatch(/30°|diamond|strip/);
     expect(boards.title).toBe('Mill the boards');
@@ -70,20 +73,20 @@ describe('3D board (tumbling blocks)', () => {
     const strips = run(d, (id) => id)[1];
     expect(d.steps[1]).toMatchObject({ type: 'rip', tilt: 30 });
     expect(strips.title).toBe('Bevel rip');
-    expect(strips.slices.map((s) => s.pieces[0].species)).toEqual(['maple', 'maple', 'maple', 'walnut', 'walnut', 'walnut', 'cherry', 'cherry', 'cherry']);
+    expect(strips.slices.map((s) => s.pieces[0].species)).toEqual([...Array(6).fill('maple'), ...Array(6).fill('walnut'), ...Array(6).fill('cherry')]);
     for (const s of strips.slices) {
       const [p] = s.pieces;
       const size = boxSize(bbox([p]));
       // As long as the boards, as thick as they were, and leaning over by half its width.
-      expect(size[0]).toBeCloseTo(24.5, 9);
+      expect(size[0]).toBeCloseTo(14, 9);
       expect(size[1]).toBeCloseTo(1.25, 9);
       expect(size[2]).toBeCloseTo(1.5 * blockSide(1.25), 9);
-      expect(volume(p)).toBeCloseTo(stripVolume(1.25, 24.5), 6);
+      expect(volume(p)).toBeCloseTo(stripVolume(1.25, 14), 6);
       expect(p.grain).toEqual([1, 0, 0]);
     }
     // The wood was counted when the boards were milled.
     expect(strips.stock).toBeUndefined();
-    expect(strips.summary).toBe('Tilt the table saw blade 30° and rip 3 strips from each board, every one a diamond in cross-section: the two sawn faces slope at 60° and are as wide as the top and bottom, about 1 7/16″. '
+    expect(strips.summary).toBe('Tilt the table saw blade 30° and rip 6 strips from each board, every one a diamond in cross-section: the two sawn faces slope at 60° and are as wide as the top and bottom, about 1 7/16″. '
       + 'Test the setup on scrap first: three strips must close into a hexagon with no gap.');
   });
 
@@ -124,37 +127,61 @@ describe('3D board (tumbling blocks)', () => {
     expect(run(skipped)[1].error).toBe('The boards are ripped into strips first. Add "Rip the panel" with the blade tilted before this.');
   });
 
-  it('glues three strips into each hexagonal log, then cuts the logs into the pieces of the block', () => {
+  it('glues three strips into each log and the logs into one row, then cuts the row into slices: nothing smaller is handled', () => {
     const d = board();
-    const [, , logs, cut, stood] = run(d);
-    // Three logs, each three diamonds as long as the strips, lying on a flat: twice the board's thickness tall.
-    expect(logs.slices[0].pieces).toHaveLength(9);
-    expect(logs.size[0]).toBeCloseTo(24.5, 9);
+    const [, , logs, row, cut, stood, slid] = run(d);
+    const side = blockSide(1.25);
+    // Six loose logs, each three diamonds as long as the strips, lying on a flat.
+    expect(logs.kind).toBe('strips');
+    expect(logs.slices.map((s) => s.pieces.length)).toEqual([3, 3, 3, 3, 3, 3]);
     expect(logs.size[1]).toBeCloseTo(2.5, 9);
-    for (const p of logs.slices[0].pieces) expect(volume(p)).toBeCloseTo(stripVolume(1.25, 24.5), 6);
-    expect(logs.summary).toMatch(/^Glue one strip of each wood into a hexagonal log, 3 logs,/);
-    // 14 cuts of 1 5/8 through three logs: the 42 pieces the block needs.
-    expect(cut.slices).toHaveLength(14);
-    expect(cut.slices.every((s) => s.pieces.length === 9)).toBe(true);
-    expect(cut.summary).toBe('Cross cut each log into 14 pieces 1 5/8″ long, 42 in all (kerf 1/8″). Use a stop block so they are all the same length.');
+    expect(logs.summary).toMatch(/^Glue one strip of each wood into a hexagonal log, 6 logs,/);
+    // The row: the six glued flat to flat, two diamond heights each, a point up and a point down.
+    expect(row.kind).toBe('panel');
+    expect(row.slices[0].pieces).toHaveLength(18);
+    expect(row.size[0]).toBeCloseTo(14, 9);
+    expect(row.size[1]).toBeCloseTo(2 * side, 9);
+    expect(row.size[2]).toBeCloseTo(6 * 2.5, 9);
+    for (const p of row.slices[0].pieces) expect(volume(p)).toBeCloseTo(stripVolume(1.25, 14), 6);
+    expect(row.summary).toBe('Glue the 6 logs side by side into one row, flat face to flat face, every log the same way round. Clamp across the flats. The row is 15″ wide, with a zigzag top and bottom.');
+    // Eight slices, each a whole row of the pattern in one piece: 8 things to handle, not 48.
+    expect(cut.slices).toHaveLength(8);
+    expect(cut.slices.every((s) => s.pieces.length === 18)).toBe(true);
+    expect(cut.summary).toBe('Cross cut the row of logs into 8 slices 1 5/8″ long (kerf 1/8″). Use a stop block so they are all the same length.');
     // Stood on end they are as tall as they were cut long, with the fibres upright.
     expect(Math.max(...stood.slices.map((s) => boxSize(bbox(s.pieces))[1]))).toBeCloseTo(1.625, 9);
     for (const p of stood.slices[0].pieces) expect(Math.abs(p.grain[1])).toBeCloseTo(1, 9);
-    expect(stood.summary).toBe('Stand every piece on end, so its hexagon of three woods is on top.');
+    expect(stood.summary).toBe('Stand every slice on end, so its row of hexagons is on top.');
+    // Every other one slid half a log, which is the thickness of the boards.
+    expect(slid.summary).toBe('Slide every 2nd slice, starting with slice 2, 1 1/4″ along its length (4 of the 8).');
   });
 
-  it('glues the pieces into a block of sound diamonds, all standing on end', () => {
+  it('glues the slices into a block with the points of each row in the hollows of the next: sound diamonds, no gap, no overlap', () => {
     const d = board();
-    const block = run(d)[5];
+    const stages = run(d);
+    const block = stages[7];
     const pieces = block.slices[0].pieces;
-    const { along, across } = layupOf(d).blocks!;
-    expect(pieces).toHaveLength(3 * along * across);
-    // Faces wound outward give every piece a positive volume: a diamond as tall as the pieces were cut.
+    expect(pieces).toHaveLength(3 * 6 * 8);
+    // Faces wound outward give every piece a positive volume: a diamond as tall as the slices were cut.
     for (const p of pieces) expect(volume(p)).toBeCloseTo(stripVolume(1.25, 1.625), 6);
-    for (const p of pieces) expect(p.grain).toEqual([0, 1, 0]);
+    for (const p of pieces) expect(Math.abs(p.grain[1])).toBeCloseTo(1, 9);
     for (const p of pieces) for (const f of p.faces) expect(Math.hypot(...faceNormal(f))).toBeGreaterThan(1e-9);
+    // Nested, the rows are three quarters of a hexagon apart: eight of them, and six and a half logs wide.
+    const side = blockSide(1.25);
+    expect(block.size[0]).toBeCloseTo(7 * 1.5 * side + 2 * side, 9);
+    expect(block.size[2]).toBeCloseTo(6 * 2.5 + 1.25, 9);
     expect(block.block).toBeUndefined();
-    expect(block.summary).toMatch(new RegExp(`^Glue the pieces standing on end into a block, ${across} rows of ${along}:`));
+    expect(block.summary).toMatch(/^Glue the 8 slices together standing on end, in this order, the points of each fitted into the hollows of the next\./);
+    // Trimmed, the top is wood all over: the area of the diamonds showing is the area of the board.
+    const tops = topFaces(stages[8]);
+    expect(tops.reduce((a, t) => a + area(t.face), 0)).toBeCloseTo(16 * 12, 6);
+  });
+
+  it('will not glue slices that have not been slid to nest, and says how far to slide them', () => {
+    const d = board();
+    const unslid = { ...d, autoFit: false, steps: d.steps.filter((s) => s.type !== 'shift') };
+    const glued = run(unslid).find((s, i, all) => s.title === 'Glue up' && all[i - 1]?.title === 'Turn to end grain')!;
+    expect(glued.error).toBe('The slices will not fit together as they lie. Slide every other one 1 1/4″ along its length first, half a log, so the points of one row fit the hollows of the next: add an Offset step before this.');
   });
 
   it('shows end grain, covers the whole top, and gives the three woods a third of it each', () => {
@@ -282,7 +309,7 @@ describe('3D board (tumbling blocks)', () => {
     });
   });
 
-  it('is fitted to another size by counting the pieces and the strips again, not by changing a size', () => {
+  it('is fitted to another size by counting the logs and the rows again, not by changing a size', () => {
     const d = fitThickness(fitToTarget({ ...board(), target: { length: 20, width: 16, thickness: 2 } }));
     const stages = run(d);
     const size = stages.at(-1)!.size;
@@ -290,14 +317,16 @@ describe('3D board (tumbling blocks)', () => {
     expect(size[1]).toBeCloseTo(2, 9);
     expect(size[2]).toBeCloseTo(16, 9);
     expect(stages.filter((s) => s.error || s.warning)).toEqual([]);
-    const lay = blockLayout(20, 16, 1.25);
+    // Logs run across the board and rows along it.
+    const lay = blockLayout(16, 20, 1.25);
     expect(layupOf(d).thickness).toBe(1.25);
     expect(layupOf(d).blocks).toEqual({ along: lay.along, across: lay.across });
-    expect(layupOf(d).length).toBeLessThanOrEqual(30);
-    // The cut is the board's thickness plus the flattening, and the logs give at least the pieces needed.
+    expect(layupOf(d).repeat).toBe(lay.along);
+    // The cut is the board's thickness plus the flattening, and the row gives a slice for every row.
     const cut = d.steps.find((s) => s.type === 'crosscut')!;
     expect(cut.type === 'crosscut' && cut.width).toBeCloseTo(2.125, 9);
-    expect(stages[3].slices.length * layupOf(d).repeat).toBeGreaterThanOrEqual(lay.along * lay.across);
+    expect(stages[4].slices).toHaveLength(lay.across);
+    expect(layupOf(d).length).toBeCloseTo(Math.ceil((lay.across * 2.25 - 0.125) * 4) / 4, 9);
   });
 
   it('keeps its size when the strips are ripped from thicker boards: bigger blocks, fewer pieces', () => {
@@ -308,12 +337,6 @@ describe('3D board (tumbling blocks)', () => {
     const n = (d: Design) => layupOf(d).blocks!.along * layupOf(d).blocks!.across;
     expect(n(after)).toBeLessThan(n(before));
     expect(layupOf(after).strips.every((s) => Math.abs(s.width - blockSide(1.75)) < 1e-9)).toBe(true);
-  });
-
-  it('says so when the logs are too short to give the pieces the block needs', () => {
-    const short = withLayup({ ...board(), autoFit: false }, { length: 12 });
-    const glued = run(short)[5];
-    expect(glued.error).toBe('The block needs 42 pieces and there are only 18. Make the strips longer or rip more of them.');
   });
 
   it('leaves a design that is not a 3D board alone, and refuses one with fewer than three woods', () => {

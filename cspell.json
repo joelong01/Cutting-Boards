@@ -1,0 +1,42 @@
+{
+  "version": "0.2",
+  "language": "en,en-GB",
+  "ignorePaths": [
+    "node_modules",
+    "dist",
+    "electron-dist",
+    "package-lock.json",
+    "src/model/__snapshots__",
+    "designs"
+  ],
+  "words": [
+    "addstep",
+    "bbox",
+    "bloodwood",
+    "crosscut",
+    "cutlist",
+    "endgrain",
+    "glueup",
+    "kerf",
+    "kerfs",
+    "layup",
+    "lengthways",
+    "padauk",
+    "purpleheart",
+    "rhombille",
+    "roundover",
+    "roundings",
+    "sapele",
+    "saveas",
+    "selftest",
+    "taskkill",
+    "tris",
+    "unfitted",
+    "unflattened",
+    "unflipped",
+    "unslid",
+    "vitest",
+    "wenge",
+    "yellowheart"
+  ]
+}

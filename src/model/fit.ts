@@ -1,5 +1,5 @@
 import { isBlocks, reblock } from './blocks';
-import { fitFlatBlocks } from './blocksFlat';
+import { fitFlatBlocks, inferBlocks } from './blocksFlat';
 import { dimensionsOf, isLocked, layupOf, sizingOf, unfitted, withLayup } from './design';
 import { NO_FINISH } from './finish';
 import { run } from './pipeline';
@@ -72,7 +72,9 @@ function axesOf(design: Design, base: readonly number[]): { repeatAxis: 0 | 2; l
  * A 3D board is fitted its own way (`reblock`): its board is sawn out of a block of logs, so the
  * fit counts the logs and sets the trim, and no size gives way.
  */
-export function fitToTarget(design: Design, orientation: Design = design): Design {
+export function fitToTarget(asGiven: Design, orientation: Design = asGiven): Design {
+  // Whether this is a 3D board, and which, follows from its steps.
+  const design = inferBlocks(asGiven);
   if (isBlocks(design)) return layupOf(design).blocks?.flat ? fitFlatBlocks(design) : reblock(design);
   const grid = dimensionsOf(design).rounding;
   if (!(grid > 0)) return exactly(fitCounts(unfitted(design), unfitted(orientation)));
@@ -230,7 +232,9 @@ export function fitThickness(design: Design): Design {
  * size of the wood changes how many strips and how much stock are needed and not how big the
  * board is. Edits that cannot change the size (the name, a custom wood) are passed through.
  */
-export function withAutoFit(prev: Design, next: Design): Design {
+export function withAutoFit(prev: Design, edited: Design): Design {
+  // What the first step makes follows from the steps, whether or not the size is held.
+  const next = inferBlocks(edited);
   if (next.autoFit === false) return next;
   // Which steps are the very same objects as before: all of them, or all but the strips.
   const alike = (from: number) => prev.steps.length === next.steps.length && prev.steps.every((s, i) => i < from || s === next.steps[i]);

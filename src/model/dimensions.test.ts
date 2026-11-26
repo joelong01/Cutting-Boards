@@ -4,7 +4,7 @@ import { fitToTarget, withAutoFit } from './fit';
 import { roundTo } from './fractions';
 import { bbox, boxSize } from './geometry';
 import { run } from './pipeline';
-import { PRESETS, catalog, offerOf } from './presets';
+import { LEVELS, PRESETS, catalog, designs, levelOf, offerOf } from './presets';
 import type { Design, Dimensions } from './types';
 import { ROUNDINGS, inchText, showLength, showSize, showText, unitsOf, usualRounding } from './units';
 
@@ -147,6 +147,27 @@ describe('dimensions: notation, rounding and the thinnest strip', () => {
     expect(withAutoFit(thin, { ...thin, dimensions: { ...thin.dimensions!, kerf: 3 / 16 } })).not.toBe(thin);
   });
 
+  it('a spacer strip is never thinner than the saw kerf, and the cut that removes it takes all of it, in two passes of a thin blade', () => {
+    const double = catalog({ length: 16, width: 12, thickness: 1.5 }).find((o) => o.key === 'double')!.make();
+    for (const kerf of [3 / 32, 1 / 8, 3 / 16]) {
+      const d = { ...double, dimensions: { ...DEFAULT_DIMENSIONS, rounding: 0, kerf } };
+      const stages = run(d, (id) => id);
+      expect(stages.filter((s) => s.error).map((s) => s.error)).toEqual([]);
+      // The spacers stay the 1/8 typed for them under a thinner blade, and grow to the kerf under a thicker one.
+      expect(stages[0].stock!.find((l) => l.species === 'poplar')!.width).toBeCloseTo(Math.max(1 / 8, kerf), 12);
+      // Sawn out, none of the spacer wood is left in the board, and none of the walnut beside it is lost.
+      const last = stages.at(-1)!.slices[0].pieces;
+      expect(last.some((p) => p.species === 'poplar')).toBe(false);
+      const walnut = (stage: typeof stages[number]) => stage.slices.flatMap((sl) => sl.pieces).filter((p) => p.species === 'walnut').length;
+      const cutAt = stages.map((s) => s.title).lastIndexOf('Cross cut');
+      expect(walnut(stages[cutAt])).toBeGreaterThan(0);
+      expect(stages[cutAt].slices.flatMap((sl) => sl.pieces).some((p) => p.species === 'poplar')).toBe(false);
+      // A blade thinner than the spacer says how many passes; otherwise it is an ordinary cut.
+      if (kerf < 1 / 8) expect(stages[cutAt].summary).toContain('sawing out the 1/8″ spacer between each pair in 2 passes of the blade (kerf 3/32″).');
+      else expect(stages[cutAt].summary).toContain(`(kerf ${kerf === 1 / 8 ? '1/8″' : '3/16″'}).`);
+    }
+  });
+
   it('the boards of a 3D board are milled wide enough for the kerf of every cut and the corner the bevel wastes', () => {
     const narrow = withDims(preset('tumbling-blocks'), { rounding: 0, kerf: 1 / 16 }), wide = withDims(preset('tumbling-blocks'), { rounding: 0, kerf: 1 / 4 });
     const width = (d: Design) => run(d)[0].stock![0].width;
@@ -159,13 +180,21 @@ describe('dimensions: notation, rounding and the thinnest strip', () => {
 
   it('lists every design once for the Target board tile and knows which one an open board is', () => {
     const offers = catalog({ length: 16, width: 12, thickness: 1.5 });
-    expect(offers.map((o) => o.key)).toEqual(['single-end-grain', 'edge-grain-stripes', 'edge-grain-border', 'maple-purpleheart', 'checkerboard', 'brick', 'basket-weave', 'chevron', 'tumbling-blocks', 'chess', 'double']);
+    // Easiest first, a level at a time.
+    expect(offers.map((o) => `${o.level}: ${o.label}`)).toEqual([
+      'beginner: Single wood', 'beginner: Stripes', 'beginner: Stripes in a border', 'beginner: Checkerboard', 'beginner: Chess board',
+      'intermediate: Brick (running bond)', 'intermediate: Grid', 'intermediate: Chevron',
+      'advanced: Double border', 'advanced: Basket weave', 'advanced: 3D Board',
+    ]);
+    expect(LEVELS.map((l) => l.label)).toEqual(['Beginner', 'Intermediate', 'Advanced']);
+    expect(designs().map((p) => p.key)).toEqual(['single-end-grain', 'edge-grain-stripes', 'edge-grain-border', 'checkerboard', 'brick', 'maple-purpleheart', 'chevron', 'basket-weave', 'tumbling-blocks']);
+    expect(levelOf('something new')).toBe('advanced');
     for (const o of offers) expect(offerOf(o.make())).toBe(o.key);
     // The same single-wood board in the other grain is still that design.
     expect(offerOf(preset('single-edge-grain'))).toBe('single-end-grain');
     expect(offerOf({ style: 'something of my own' })).toBeNull();
     expect(offerOf({})).toBeNull();
-    for (const o of offers.slice(0, 4)) {
+    for (const o of offers.filter((x) => ['single-end-grain', 'edge-grain-stripes', 'edge-grain-border', 'maple-purpleheart'].includes(x.key))) {
       const size = run(o.make()).at(-1)!.size;
       expect([Math.max(size[0], size[2]), Math.min(size[0], size[2])].map((v) => Math.round(v * 1e6) / 1e6)).toEqual([16, 12]);
     }

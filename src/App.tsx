@@ -4,20 +4,21 @@ import { fitToTarget, withAutoFit } from './model/fit';
 import { convertGrain, grainOf, withGrain, type Grain } from './model/grain';
 import { withAutoName } from './model/naming';
 import { DEFAULT_DIMENSIONS, dimensionsOf, layupOf } from './model/design';
-import { matches, pieceCount, run, wholeSteps } from './model/pipeline';
-import { PRESETS, catalog, defaultDesign, designs, offerOf } from './model/presets';
+import { STEP_TITLES, finishedBoard, matches, newStep, pieceCount, run, stepFits, stepNeeds, wholeSteps } from './model/pipeline';
+import { LEVELS, PRESETS, catalog, customDesign, defaultDesign, designs, insertStep, levelOf, offerOf } from './model/presets';
 import { allSpecies, speciesById } from './model/species';
 import {
   desktop, download, exportDesign, fileSafe, library as store, loadCurrent, saveCurrent, validateDesign, type LibraryEntry,
 } from './model/storage';
 import type { Design, Dimensions, Notation, Selector, Stage, Step } from './model/types';
+import { About } from './ui/About';
 import { BoardWizard } from './ui/BoardWizard';
 import { CutListPanel } from './ui/CutListPanel';
 import { ROUNDINGS, showLength, showSize, showText, unitsOf, usualRounding } from './model/units';
 import { UnitsContext } from './ui/show';
 import { Icon } from './ui/icons';
 import { LayupEditor } from './ui/LayupEditor';
-import { StepList } from './ui/StepList';
+import { ADDABLE, StepList } from './ui/StepList';
 import { Len, toggle } from './ui/inputs';
 import { Viewport, type ViewportHandle } from './view/Viewport';
 
@@ -123,9 +124,10 @@ export function App() {
   /** Reload the list of saved designs, reporting a failure in the message bar. */
   const refreshLibrary = useCallback(() => store.list().then(setLibrary, (e) => setMessage(`Could not list saved designs: ${String(e)}`)), []);
   useEffect(() => void refreshLibrary(), [refreshLibrary]);
-  const [menu, setMenu] = useState<'new' | 'open' | 'export' | null>(null);
+  const [menu, setMenu] = useState<'new' | 'open' | 'export' | 'add' | null>(null);
   const wizardParam = params.get('wizard');
   const [wizard, setWizard] = useState(wizardParam !== null);
+  const [about, setAbout] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [sheet, setSheet] = useState<string[]>([]);
   const [preview, setPreview] = useState(params.get('preview') !== null);
@@ -245,6 +247,11 @@ export function App() {
   // turned into a stage once the stages are those of the design as it now is, because picking a
   // card and changing the design (adding a step, say) can happen in one go.
   const [wantCard, setWantCard] = useState<number | null>(null);
+  // A new step goes straight after the step that is selected, so one can be put in the middle of
+  // the recipe: an accent strip between the cross cut and the glue-up, say. With a finishing step
+  // selected it goes at the end. With the first step selected it goes straight after the strips,
+  // before they are glued: where a 3D board's bevel rip goes. `addAt` is the step the new one follows.
+  const addAt = Math.max(0, Math.min(cards.cardOf(index), design.steps.length - 1));
   useEffect(() => {
     if (wantCard === null) return;
     setSelected(cards.stageOf(wantCard));
@@ -375,7 +382,7 @@ export function App() {
     }, 80);
   };
 
-  const final = stages[stages.length - 1];
+  const final = finishedBoard(stages);
   const errors = stages.filter((s) => s.error).length;
   // Every length in the window is written the way the design's Dimensions say.
   const units = unitsOf(design);
@@ -409,10 +416,19 @@ export function App() {
                 }}
               ><strong>Board wizard…</strong><small>Choose a size and end or edge grain, then pick from the designs.</small></button>
               <hr />
-              {designs().map((p) => (
-                <button key={p.key} onClick={() => load(p.make())}>
-                  <strong>{p.label}</strong><small>{p.blurb}</small>
-                </button>
+              <button onClick={() => load(customDesign(design.target))}>
+                <strong>Custom</strong><small>Start with the strips and their glue-up, and build the rest by adding steps.</small>
+              </button>
+              <hr />
+              {LEVELS.map((l) => (
+                <div key={l.level} className="menu-level">
+                  <h4>{l.label}</h4>
+                  {designs().filter((p) => levelOf(p.key) === l.level).map((p) => (
+                    <button key={p.key} onClick={() => load(p.make())}>
+                      <strong>{p.label}</strong><small>{p.blurb}</small>
+                    </button>
+                  ))}
+                </div>
               ))}
             </div>
           )}
@@ -453,6 +469,37 @@ export function App() {
         <button className="rb" onClick={redo} disabled={!history.future.length} title="Redo (Ctrl+Y)"><Icon name="redo" /><span>Redo</span></button>
         </div>
         <small>Edit</small>
+        </div>
+        <div className="group">
+        <div>
+        <div className="menu">
+          <button className={`rb drop${menu === 'add' ? ' open' : ''}`} onClick={() => setMenu(menu === 'add' ? null : 'add')} title="Add a step to the recipe, after the step that is selected"><Icon name="addstep" /><span>Add step</span></button>
+          {menu === 'add' && (
+            <div className="dropdown add-menu">
+              <p className="where">After {cards.numberOf(addAt)}. {cards.whole[addAt].title}</p>
+              {ADDABLE.map(({ type, hint }) => {
+                const fits = stepFits(type, cards.whole[addAt].kind);
+                return (
+                  <button
+                    key={type}
+                    disabled={!fits}
+                    onClick={() => {
+                      setDesign(insertStep(design, addAt + 1, newStep(type)));
+                      setWantCard(addAt + 1);
+                      setMenu(null);
+                    }}
+                  >
+                    <strong>{STEP_TITLES[type]}</strong>
+                    <small>{hint}.{fits ? '' : stepNeeds(type) === 'panel' ? ' Needs a glued panel: select a glue-up, trim or flatten step first.' : ' Needs loose slices: select a cross cut, turn, flip or offset step first.'}</small>
+                  </button>
+                );
+              })}
+              <p className="where">Select a step in the list to choose where the new one goes.</p>
+            </div>
+          )}
+        </div>
+        </div>
+        <small>Steps</small>
         </div>
         <div className="group">
         <div>
@@ -508,6 +555,12 @@ export function App() {
         </div>
         <small>View</small>
         </div>
+        <div className="group">
+        <div>
+        <button className="rb" onClick={() => setAbout(true)} title="About Cutting Boards: its version, and who made it"><Icon name="about" /><span>About</span></button>
+        </div>
+        <small>Help</small>
+        </div>
       </header>
 
       <aside className="side">
@@ -534,7 +587,11 @@ export function App() {
                   }}
                 >
                   {!offer && <option value="">Your own design</option>}
-                  {offers.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+                  {LEVELS.map((l) => (
+                    <optgroup key={l.level} label={l.label}>
+                      {offers.filter((o) => o.level === l.level).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+                    </optgroup>
+                  ))}
                 </select>
               </label>
               <div className="grain-switch" role="group" aria-label="Grain on top">
@@ -765,11 +822,12 @@ export function App() {
         </div>
       )}
 
+      {about && <About onClose={() => setAbout(false)} />}
       {wizard && (
         <BoardWizard
           initial={design.target}
           startAtDesigns={wizardParam === 'designs'}
-          snapshot={(s) => viewport.current?.snapshot(s, [560, 340]) ?? ''}
+          snapshot={(s) => viewport.current?.snapshot(s, [560, 340], 'top') ?? ''}
           onClose={() => setWizard(false)}
           onCreate={(d) => {
             load(d);

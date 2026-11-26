@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type IconName = 'new' | 'open' | 'save' | 'saveas' | 'export' | 'undo' | 'redo' | 'print' | 'picture' | 'panel';
+export type IconName = 'new' | 'open' | 'save' | 'saveas' | 'export' | 'undo' | 'redo' | 'print' | 'picture' | 'panel' | 'addstep' | 'about';
 
 /**
  * The drawing for each toolbar icon on a 24 × 24 grid. Outlines take the button's text colour;
@@ -8,6 +8,20 @@ export type IconName = 'new' | 'open' | 'save' | 'saveas' | 'export' | 'undo' | 
  * which is what tells the icons apart at a glance.
  */
 const DRAWINGS: Record<IconName, ReactNode> = {
+  // A circled i.
+  about: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path className="accent" d="M12 11v6M12 7.5v.5" />
+    </>
+  ),
+  // A list of steps with one more going in.
+  addstep: (
+    <>
+      <path d="M4 6h10M4 11h7M4 16h7" />
+      <path className="accent" d="M17 10.5v8M13 14.5h8" />
+    </>
+  ),
   new: (
     <>
       <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />

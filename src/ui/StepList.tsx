@@ -1,10 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import { accentStrips, patternPeriod, withAccentStrips } from '../model/accent';
-import { OPENING_STEPS, dimensionsOf, layupOf, withLayup } from '../model/design';
-import { FINISH_STEPS, SAND_TITLE, STEP_TITLES, stepFits, stepNeeds, stepTitle } from '../model/pipeline';
+import { dimensionsOf, layupOf, withLayup } from '../model/design';
+import { FEET_TITLE, FINISH_STEPS, SAND_TITLE, stepTitle } from '../model/pipeline';
 import { finishOf } from '../model/finish';
 import { speciesById } from '../model/species';
-import { insertStep, newStep } from '../model/presets';
 import { newId } from '../model/presets';
 import type { AccentStrip, Design, Finish, FinishPart, PatternStrip, Species, Stage, Step, StepType, StripSpec } from '../model/types';
 import { Int, Len, SelectorEditor, SpeciesSelect } from './inputs';
@@ -24,7 +23,8 @@ interface Props {
   numberOf?: (card: number) => string;
 }
 
-const ADDABLE: { type: StepType; hint: string }[] = [
+/** The steps that can be added to a recipe, in the order the toolbar's Add step menu lists them, each with what it does. */
+export const ADDABLE: { type: StepType; hint: string }[] = [
   { type: 'crosscut', hint: 'Cut the panel into slices, square or at an angle' },
   { type: 'rip', hint: 'Saw the panel lengthways into strips' },
   { type: 'turn', hint: 'Roll slices 90° so the end grain faces up' },
@@ -48,6 +48,13 @@ const ADDABLE: { type: StepType; hint: string }[] = [
  */
 export function StepList({ design, stages, species, selected, onSelect, onChange, numberOf = (card) => String(card + 1) }: Props) {
   const { len: inches, text } = useShow();
+  /** The blade's tilt for a rip: 0 is a square cut, and 30 rips the boards of a 3D board into diamond strips. */
+  const tiltField = (step: Extract<Step, { type: 'rip' }>) => (
+    <label className="field" title="How far the blade leans from upright. 0 is a square rip. 30° rips the boards of a 3D board into strips with a diamond cross-section.">
+      <span>Blade tilt °</span>
+      <input className="int" type="number" min={0} max={45} step={5} value={step.tilt ?? 0} onChange={(e) => setStep(step.id, { tilt: Number(e.target.value) || undefined })} />
+    </label>
+  );
   // With a saw kerf set under Dimensions every cut uses it, and the steps do not ask for their own.
   const ownKerf = dimensionsOf(design).kerf === undefined;
   // While the board size is held, counts are worked out, not typed.
@@ -60,8 +67,8 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
   /** Swap step i with its neighbour d places away and keep it selected. */
   const move = (i: number, d: number) => {
     const j = i + d;
-    // The strips stay first and the glue-up of them second.
-    if (j < OPENING_STEPS || j >= design.steps.length) return;
+    // The strips stay first: there is nothing to work on until they are made.
+    if (j < 1 || j >= design.steps.length) return;
     const steps = [...design.steps];
     [steps[i], steps[j]] = [steps[j], steps[i]];
     onChange({ ...design, steps });
@@ -104,21 +111,12 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
           </label>
           {st && <strong>{title}</strong>}
         </header>
-        {/* A click on a field or its label is for that field; one on the space around them selects the card. */}
-        {on && <div className="params" onClick={(e) => (e.target as HTMLElement).closest('input, select, button, label') && e.stopPropagation()} onFocus={() => st && selected < at && onSelect(at)}>{fields}</div>}
+        {/* A click anywhere in the card selects it: on a label, on the space round the fields, or on a field, which takes the focus as well. Tabbing into a field selects it too. */}
+        {on && <div className="params" onFocus={() => st && onSelect(at)}>{fields}</div>}
         {st?.warning && <p className="warning">{text(st.warning)}</p>}
       </div>
     );
   };
-  // A new step goes straight after the stage that is selected, so a step can be put in the middle
-  // of the recipe: an accent strip between the cross cut and the glue-up, say. With the Finish
-  // stage selected it goes at the end of the steps.
-  // Nothing goes between ripping the strips and gluing them up, so the earliest place is after
-  // the first glue-up. `addAt` is the number of the step the new one follows.
-  const addAt = Math.max(Math.min(OPENING_STEPS, design.steps.length) - 1, Math.min(selected, design.steps.length - 1));
-  const addKind = stages[addAt].kind;
-  const addAfter = stages[addAt].title;
-
   return (
     <section className="steps">
       {design.steps.map((step, i) => {
@@ -126,15 +124,15 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
         if (step.type === 'strips') return null;
         const st = stages[i];
         const before = stages[i - 1];
-        // The glue-up of the strips stays where it is; every step after it can be moved or removed.
-        const pinned = i < OPENING_STEPS;
+        // Every step after the first can be moved or removed.
+        const pinned = i < 1;
         return (
           <div key={step.id} className={`step${selected === i ? ' selected' : ''}${st.error ? ' broken' : ''}`} onClick={() => onSelect(i)}>
             <header>
               <em>{numberOf(i)}</em>
               <strong>{stepTitle(step)}</strong>
               <span className="icons" onClick={(e) => e.stopPropagation()} style={pinned ? { display: 'none' } : undefined}>
-                <button title="Move earlier" disabled={i <= OPENING_STEPS} onClick={() => move(i, -1)}>↑</button>
+                <button title="Move earlier" disabled={i <= 1} onClick={() => move(i, -1)}>↑</button>
                 <button title="Move later" disabled={i === design.steps.length - 1} onClick={() => move(i, 1)}>↓</button>
                 <button
                   title="Remove step"
@@ -145,16 +143,19 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
                 >✕</button>
               </span>
             </header>
-            <div className="params" onClick={(e) => e.stopPropagation()} onFocus={() => onSelect(i)}>
+            {/* Clicks are left to reach the card, which selects it; a field clicked takes the focus as well. */}
+            <div className="params" onFocus={() => onSelect(i)}>
               {step.type === 'rip' && !step.tilt && (
                 <div className="row">
                   <Len label="Strip width" value={step.width} min={0.125} onChange={(width) => setStep(step.id, { width })} />
                   {ownKerf && <Len label="Kerf" value={step.kerf} onChange={(kerf) => setStep(step.id, { kerf })} />}
+                  {tiltField(step)}
                 </div>
               )}
               {step.type === 'rip' && !!step.tilt && (
                 <>
                   <div className="row">
+                    {tiltField(step)}
                     <Int
                       label={held ? 'Strips from each board (from target)' : 'Strips from each board'}
                       value={layupOf(design).repeat} min={1} max={40} disabled={held}
@@ -168,6 +169,13 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
                 <div className="row">
                   <Len label="Slice width" value={step.width} min={0.0625} onChange={(width) => setStep(step.id, { width })} />
                   {ownKerf && <Len label="Kerf" value={step.kerf} onChange={(kerf) => setStep(step.id, { kerf })} />}
+                  <Len
+                    label="Spacer sawn out"
+                    value={step.spacer ?? 0}
+                    min={0}
+                    title="For a cut that saws out spacer strips: how wide they are. The cut takes that much between slices, in more than one pass if the blade is thinner. 0 for an ordinary cut."
+                    onChange={(spacer) => setStep(step.id, { spacer: spacer > 0 ? spacer : undefined })}
+                  />
                   <label className="field">
                     <span>Angle °</span>
                     <input className="int" type="number" min={-75} max={75} step={5} value={step.angle} onChange={(e) => setStep(step.id, { angle: Number(e.target.value) || 0 })} />
@@ -422,6 +430,14 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
                 </div>
               )}
             </div>
+            <input
+              className="step-note"
+              aria-label="Note"
+              placeholder="Add a note to this step's instruction"
+              title="Anything to add to this step's instruction that its sizes do not say: what to line a cut up with, say."
+              value={step.note ?? ''}
+              onChange={(e) => setStep(step.id, { note: e.target.value || undefined })}
+            />
             {st.error && <p className="error">{text(st.error)}</p>}
             {st.warning && <p className="warning">{text(st.warning)}</p>}
             {!st.error && (
@@ -481,32 +497,37 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
           <header><em>{numberOf(finishAt('sand'))}</em><strong>{SAND_TITLE}</strong></header>
         </div>
       )}
+      {(() => {
+        // Feet are optional and go on last, after the sanding. The card works like a finishing touch's.
+        const at = finishAt('feet'), st = at >= 0 ? stages[at] : undefined;
+        const feet = finish.feet;
+        return (
+          <div className={`step touch${st && selected === at ? ' selected' : ''}${feet.on ? '' : ' off'}`} onClick={() => st && onSelect(at)}>
+            <header>
+              {st && <em>{numberOf(at)}</em>}
+              <label className="check" onClick={(e) => e.stopPropagation()}>
+                <input type="checkbox" aria-label={FEET_TITLE} checked={feet.on} onChange={(e) => setFinish({ feet: { ...feet, on: e.target.checked } })} />
+                {!st && <strong>{FEET_TITLE}</strong>}
+              </label>
+              {st && <strong>{FEET_TITLE}</strong>}
+            </header>
+            {feet.on && (
+              <div className="params" onFocus={() => st && onSelect(at)}>
+                <div className="row">
+                  <Len label="Diameter" value={feet.diameter} min={0.25} onChange={(diameter) => setFinish({ feet: { ...feet, diameter } })} />
+                  <Len label="Height" value={feet.height} min={0.0625} onChange={(height) => setFinish({ feet: { ...feet, height } })} />
+                  <Len label="In from edges" value={feet.inset} min={0.125} title="How far the centre of each foot is from both edges of its corner." onChange={(inset) => setFinish({ feet: { ...feet, inset } })} />
+                </div>
+                <small className="hint">One under each corner, screwed on after the board is oiled.</small>
+              </div>
+            )}
+            {st?.warning && <p className="warning">{text(st.warning)}</p>}
+          </div>
+        );
+      })()}
       {anyTouch && finishAt('sand') < 0 && (
         <p className="warning">Finishing needs a glued panel: end the steps with a Glue up.</p>
       )}
-      <div className="add-step">
-        <span>Add a step after {numberOf(addAt)}. {addAfter}</span>
-        <div>
-          {ADDABLE.map(({ type, hint }) => {
-            const ok = stepFits(type, addKind);
-            const needs = stepNeeds(type) === 'panel'
-              ? 'a glued panel: select the First glue-up, or a Glue up, Trim, Flatten or Add a border step, to add it after'
-              : 'loose slices: select a Cross cut, Rip the panel, Turn, Flip, Offset, Insert or Interleave step to add it after';
-            return (
-              <button
-                key={type}
-                disabled={!ok}
-                title={ok ? hint : `${hint}. Needs ${needs}.`}
-                onClick={() => {
-                  onChange(insertStep(design, addAt + 1, newStep(type)));
-                  onSelect(addAt + 1);
-                }}
-              >{STEP_TITLES[type]}</button>
-            );
-          })}
-        </div>
-        <small>Click a step above to choose where the new one goes.</small>
-      </div>
     </section>
   );
 }

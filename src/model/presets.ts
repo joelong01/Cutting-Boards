@@ -1,6 +1,6 @@
 import { blockRecipe, reblock } from './blocks';
 import { makeDesign, type Parts } from './design';
-import { DEFAULT_FINISH } from './finish';
+import { DEFAULT_FINISH, NO_FINISH } from './finish';
 import { fitThickness, fitToTarget } from './fit';
 import { withAutoName } from './naming';
 import { BUILTIN_SPECIES } from './species';
@@ -225,7 +225,9 @@ const STARTERS: (Omit<Preset, 'make'> & { make: () => Parts | Design })[] = [
       name: 'Three-wood chevron',
       target: { length: 16, width: 10, thickness: 0.8125 },
       layup: {
-        length: 30, thickness: 1, repeat: 5, closeWithFirst: false,
+        // Long for its width: an angled cut only gives full-length slices from the middle of the
+        // panel, and it is the slices side by side that make the board's length.
+        length: 42, thickness: 1, repeat: 5, closeWithFirst: false,
         strips: [strip('maple', 0.75), strip('walnut', 0.75), strip('cherry', 0.75), strip('padauk', 0.25)],
       },
       steps: steps(
@@ -267,8 +269,42 @@ const STARTERS: (Omit<Preset, 'make'> & { make: () => Parts | Design })[] = [
  * Each one's `make` returns a fresh design that knows its pattern and is
  * named from its woods, so the name follows when the woods are changed.
  */
-/** The starters the lists of designs offer: each design once, whichever grain it starts in. */
-export const designs = (): Preset[] => PRESETS.filter((p) => !p.twin);
+/** How hard a design is to make. */
+export type Level = 'beginner' | 'intermediate' | 'advanced';
+
+/** The levels, easiest first, with the words that head each group in a list of designs. */
+export const LEVELS: { level: Level; label: string }[] = [
+  { level: 'beginner', label: 'Beginner' },
+  { level: 'intermediate', label: 'Intermediate' },
+  { level: 'advanced', label: 'Advanced' },
+];
+
+/**
+ * Every design on offer, by key, in the order the lists show them: easiest first, by level and
+ * then within it. Beginner boards are square cuts and one or two plain glue-ups, with or without
+ * a plain border. Intermediate ones add something to get right: an offset, accent strips between
+ * the slices, an angled cut. Advanced ones are several glue-ups that must line up with each other, or bevels.
+ */
+const BY_DIFFICULTY: [string, Level][] = [
+  ['single-end-grain', 'beginner'], ['edge-grain-stripes', 'beginner'], ['edge-grain-border', 'beginner'], ['checkerboard', 'beginner'], ['chess', 'beginner'],
+  ['brick', 'intermediate'], ['maple-purpleheart', 'intermediate'], ['chevron', 'intermediate'],
+  ['double', 'advanced'], ['basket-weave', 'advanced'], ['tumbling-blocks', 'advanced'],
+];
+
+/** A design's level, by its key. One not in the list is taken as advanced. */
+export const levelOf = (key: string): Level => BY_DIFFICULTY.find(([k]) => k === key)?.[1] ?? 'advanced';
+
+/** Things with a key, in the order the lists of designs show them: easiest first. Any not in the list go last. */
+function byDifficulty<T extends { key: string }>(items: T[]): T[] {
+  const place = (key: string) => {
+    const at = BY_DIFFICULTY.findIndex(([k]) => k === key);
+    return at < 0 ? BY_DIFFICULTY.length : at;
+  };
+  return [...items].sort((a, b) => place(a.key) - place(b.key));
+}
+
+/** The starters the lists of designs offer: each design once, whichever grain it starts in, easiest first. */
+export const designs = (): Preset[] => byDifficulty(PRESETS.filter((p) => !p.twin));
 
 export const PRESETS: Preset[] = STARTERS.map((p) => ({
   ...p,
@@ -277,6 +313,24 @@ export const PRESETS: Preset[] = STARTERS.map((p) => ({
     return withAutoName({ ...('layup' in made ? makeDesign(made) : made), style: p.style, autoName: true }, BUILTIN_SPECIES);
   },
 }));
+
+/**
+ * A board to build from nothing: the strips and their glue-up, which every recipe starts with,
+ * and no more. No pattern, no finishing touches and no feet: everything else is put in by adding
+ * steps and ticking what is wanted. It has its own name, which the app does not rewrite, and no
+ * pattern to be listed under, so the Target board tile shows it as "Your own design".
+ */
+export function customDesign(target: Design['target']): Design {
+  return makeDesign({
+    name: 'Custom board',
+    autoName: false,
+    target,
+    finish: NO_FINISH,
+    layup: { length: 18, thickness: 1.25, repeat: 8, closeWithFirst: false, strips: [strip('maple', 1.5)] },
+    steps: [],
+    customSpecies: [],
+  });
+}
 
 /** The design a first launch opens with. */
 export const defaultDesign = (): Design => PRESETS.find((p) => p.key === 'maple-purpleheart')!.make();
@@ -427,7 +481,8 @@ export function doubleBorder(o: DoubleBorderOptions): Design {
       { type: 'glue' },
       flatten,
       { type: 'rotate' },
-      { type: 'crosscut', width: cell, kerf: o.line, angle: 0 },
+      // Each cut saws out a spacer: its whole width, however thin the blade.
+      { type: 'crosscut', width: cell, kerf: o.line, angle: 0, spacer: o.line },
       { type: 'insert', species: o.outer, thickness: o.line, every: 1, ends: true },
       { type: 'glue' },
       flatten,
@@ -559,6 +614,8 @@ export interface Offer {
   blurb: string;
   /** The pattern as designs made from it carry it (`Design.style`), which is how an open design is matched to its offer. */
   style: string;
+  /** How hard it is to make, which is what the lists group and order by. */
+  level: Level;
   make: () => Design;
 }
 
@@ -573,17 +630,17 @@ const chessSquare = (target: Design['target']) => Math.max(0.5, Math.round(Math.
 const sized = (base: Design, target: Design['target']): Design => fitThickness(fitToTarget({ ...base, target }));
 
 /**
- * Every design on offer, each made at `target` or as near as its pattern allows: the starters,
- * each once, then the chess board (eight squares each way, as wide as the board asked for) and
+ * Every design on offer, easiest first (see `levelOf`), each made at `target` or as near as its
+ * pattern allows: the starters, each once, the chess board (eight squares each way, as wide as the board asked for) and
  * the double border board (a whole number of blocks, the nearest to the size). The board wizard
- * shows them as cards and the Target board tile lists them.
+ * shows them as cards and the Target board tile lists them, both under a heading for each level.
  */
 export function catalog(target: Design['target']): Offer[] {
   const blocks = {
     along: doubleBorderCount(target.length, DOUBLE.block, DOUBLE.line),
     across: doubleBorderCount(target.width, DOUBLE.block, DOUBLE.line),
   };
-  return [
+  return byDifficulty([
     ...designs().map((p) => ({ key: p.key, label: p.label, blurb: p.blurb, style: p.style, make: () => sized(p.make(), target) })),
     {
       key: 'chess', label: 'Chess board', style: 'chess board',
@@ -595,7 +652,7 @@ export function catalog(target: Design['target']): Offer[] {
       blurb: 'Maple blocks, each ringed with walnut, in a white oak grid. Three glue-ups: strips with a cheap spacer in them, then slices turned on end with a three-strip stack between them, then the panel sawn through each spacer and the oak glued into the kerfs.',
       make: () => doubleBorder({ ...DOUBLE, ...blocks, thickness: target.thickness, grain: 'end' }),
     },
-  ];
+  ]).map((o) => ({ ...o, level: levelOf(o.key) }));
 }
 
 /**

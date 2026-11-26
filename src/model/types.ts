@@ -103,7 +103,7 @@ export interface Stage {
    */
   step?: number;
   /** Set on the stage of a finishing step: which touch it is. */
-  finish?: FinishPart | 'sand';
+  finish?: FinishPart | 'sand' | 'feet';
   /**
    * Carried by the stages of a 3D board from its strips until its pieces are glued into the
    * block: the three woods, the thickness of the boards the strips were ripped from, and how many
@@ -118,6 +118,8 @@ export interface Stage {
     count?: number;
     /** True once those boards have been ripped into their diamond strips, which is when they can be glued into logs. */
     ripped?: boolean;
+    /** True once the strips are glued into logs, which is when the logs can be glued side by side into a row. */
+    logs?: boolean;
   };
   /**
    * Carried by a panel once finishing has started: the panel as it was before any finishing cut,
@@ -236,7 +238,12 @@ export type Step = StepKind & {
 export type StepKind =
   /** Rip and mill the strips the board starts from. Always the first step. */
   | ({ id: string; type: 'strips' } & Layup)
-  | { id: string; type: 'crosscut'; width: number; kerf: number; angle: number }
+  /**
+   * Saw a panel across into slices `width` wide. `spacer`, when set, says each cut saws out a
+   * spacer that wide (see `StripSpec.spacer`): the cut takes that much, in as many passes of the
+   * blade as it needs, and never less than the blade's own kerf.
+   */
+  | { id: string; type: 'crosscut'; width: number; kerf: number; angle: number; spacer?: number }
   /**
    * Saw a glued panel lengthways into strips `width` wide. They are then worked as slices. With
    * `tilt` the blade leans that many degrees and the work is the loose boards of an end-grain 3D
@@ -301,6 +308,12 @@ export interface Finish {
    * designs saved before there was one, which is the same as off.
    */
   template?: { on: boolean; stripWidth: number; thickness: number };
+  /**
+   * A foot screwed under each corner of the board, the last thing done: round, `diameter` across
+   * and `height` tall, its centre `inset` in from both edges of its corner. Absent in designs
+   * saved before there were feet, which is the same as off.
+   */
+  feet?: { on: boolean; diameter: number; height: number; inset: number };
 }
 
 export interface Allowance {

@@ -262,9 +262,11 @@ export class BoardScene {
   /**
    * Render one stage to a PNG data URL without disturbing what is on screen. With `size`
    * (width, height in pixels) the picture is drawn that small, which is far quicker to encode
-   * than a full-window one; the canvas is put back to its own size afterwards.
+   * than a full-window one; the canvas is put back to its own size afterwards. With `view` the
+   * picture is taken from that side (`top` shows the whole face of a board, square on) and not
+   * from wherever the view on screen happens to be looking.
    */
-  snapshot(stage: Stage, size?: [number, number]): string {
+  snapshot(stage: Stage, size?: [number, number], view?: ViewName): string {
     const keep = {
       shown: this.shown, gapMul: this.gapMul, motionT: this.motionT, anim: this.anim,
       autoFit: this.autoFit, fitGoal: this.fitGoal, tagsOn: this.tagsOn,
@@ -285,6 +287,8 @@ export class BoardScene {
     this.build(stage, false);
     this.gapMul = 1;
     this.motionT = 1;
+    // The camera is put back where it was once the picture is taken.
+    if (view) this.camera.position.copy(this.controls.target).addScaledVector(new THREE.Vector3(...VIEW_DIRS[view]).normalize(), 40);
     this.fit(true, true);
     this.applyTransforms();
     this.renderer.render(this.scene, this.camera);

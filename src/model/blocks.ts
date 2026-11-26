@@ -1,6 +1,6 @@
 import { dimensionsOf, layupOf, withLayup } from './design';
 import { roundTo } from './fractions';
-import { faceNormal, sub, dot, translate, bbox } from './geometry';
+import { faceNormal, sub, dot } from './geometry';
 import { newId } from './ids';
 import type { Design, Layup, Piece, Step, StripSpec, Vec3 } from './types';
 
@@ -9,11 +9,14 @@ import type { Design, Layup, Piece, Step, StripSpec, Vec3 } from './types';
  * every point, which read as stacked cubes. No row of straight cuts through a striped panel makes
  * that, so its strips are not square: each is ripped on the table saw with the blade tilted 30°,
  * which leaves a diamond (60° rhombus) cross-section. Three strips, one of each wood, glue into a
- * hexagonal log. The logs are cross cut into short pieces, the pieces are stood on end, and they
- * pack like honeycomb into a block whose top is the pattern, end grain up.
+ * hexagonal log. The logs are glued side by side, flat to flat, into one row, and the row is
+ * cross cut into slices: each slice is a whole row of the pattern in one piece. The slices are
+ * stood on end, every other one slid half a log along so the points of one fit the hollows of
+ * the next, and glued. Nothing smaller than a slice is ever handled.
  *
- * The recipe is ordinary steps: rip the strips, glue up, cross cut, turn to end grain, glue up,
- * trim, flatten. The actions know a 3D board by the `block` its stages carry.
+ * The recipe is ordinary steps: mill the boards, bevel rip, glue up (the logs), glue up (the
+ * row), cross cut, turn to end grain, offset, glue up, trim, flatten. The actions know a 3D
+ * board by the `block` its stages carry.
  *
  * That is the board with end grain on top. With face grain on top it is the same pattern made
  * from flat strips by ordinary steps, with no special actions at all: see blocksFlat.ts. The
@@ -21,9 +24,6 @@ import type { Design, Layup, Piece, Step, StripSpec, Vec3 } from './types';
  */
 
 const SIN60 = Math.sqrt(3) / 2;
-
-/** The longest strip the fit asks for: past this it rips more strips and not longer ones. */
-const MAX_STRIP = 30;
 
 /** Space left between the logs as they lie on the bench, drawn side by side. */
 const LOG_GAP = 0.5;
@@ -72,42 +72,48 @@ const flattened = (steps: Step[], grid: number) => steps.reduce((t, s) => t + (s
  * its sizes can give way. From the target and the thickness of the boards its strips are ripped
  * from, which sets the size of its diamonds, it sets:
  *
- * - how many pieces the block has, along and across;
+ * - how many logs are in a row, which is how many strips each board is ripped into: enough to
+ *   cover the target width;
+ * - how many rows there are, enough to cover the target length, and so how long the boards are:
+ *   one slice for each row, with a kerf between;
  * - the cross cut, to the target thickness plus what the flattening takes off;
- * - how many strips are ripped from each board and how long the boards are, so the logs cut
- *   into at least the pieces needed, with no board longer than 30 inches;
- * - the first Trim step, which saws the board out of the block.
+ * - the offset, half a log, which is the boards' own thickness;
+ * - the first Trim step, which saws the board out of the ragged block.
  *
  * When the design rounds its sizes, the counting is done with the rounded ones, since those are
- * what the board is built from: a rounded kerf or cut must not leave the block a piece short.
+ * what the board is built from.
  *
  * A design that is not an end-grain 3D board is returned as it is.
  */
 export function reblock(design: Design): Design {
   const layup = layupOf(design);
   if (!layup.blocks || layup.blocks.flat) return design;
-  const grid = dimensionsOf(design).rounding;
-  const lay = blockLayout(design.target.length, design.target.width, roundTo(layup.thickness, grid));
+  const dims = dimensionsOf(design);
+  const grid = dims.rounding;
+  const height = roundTo(layup.thickness, grid);
+  // Logs run across the board in a row, and the rows stack along it.
+  const lay = blockLayout(design.target.width, design.target.length, height);
   const trimAt = design.steps.findIndex((s) => s.type === 'trim');
   const cutAt = design.steps.findIndex((s) => s.type === 'crosscut');
+  const shiftAt = design.steps.findIndex((s) => s.type === 'shift');
   const cut = design.steps[cutAt];
-  const kerf = roundTo(dimensionsOf(design).kerf ?? (cut?.type === 'crosscut' ? Math.max(0, cut.kerf) : 0.125), grid);
+  const kerf = roundTo(dims.kerf ?? (cut?.type === 'crosscut' ? Math.max(0, cut.kerf) : 0.125), grid);
   const thick = design.target.thickness + flattened(design.steps, grid);
-  // The pieces as they are cut: the cut's width is rounded like everything else.
+  // The slices as they are cut: the cut's width is rounded like everything else.
   const piece = roundTo(thick, grid);
-  const need = lay.along * lay.across;
-  const count = Math.ceil(need / Math.max(1, Math.floor((MAX_STRIP + kerf) / (piece + kerf))));
   // To the next quarter inch over what the cuts and their kerfs take, and a whole number of rounding steps.
-  const quarter = Math.ceil((Math.ceil(need / count) * (piece + kerf) - kerf) * 4 - 1e-9) / 4;
+  const quarter = Math.ceil((lay.across * (piece + kerf) - kerf) * 4 - 1e-9) / 4;
   const steps = design.steps.map((s, i) => (
     // The bevel rip's width is only a record of the diamonds' side.
     s.type === 'rip' && s.tilt ? { ...s, width: lay.side }
-      : i === trimAt && s.type === 'trim' ? { ...s, auto: false, ...lay.trim }
+      : i === trimAt && s.type === 'trim' ? { ...s, auto: false, x0: lay.trim.z0, x1: lay.trim.z1, z0: lay.trim.x0, z1: lay.trim.x1 }
         : i === cutAt && s.type === 'crosscut' ? { ...s, width: thick, angle: 0 }
-          : s));
+          // Half a log is the height of a diamond, which is the thickness of the boards.
+          : i === shiftAt && s.type === 'shift' ? { ...s, amount: layup.thickness }
+            : s));
   return withLayup({ ...design, steps }, {
     blocks: { along: lay.along, across: lay.across },
-    repeat: count,
+    repeat: lay.along,
     length: grid > 0 ? Math.ceil(quarter / grid - 1e-9) * grid : quarter,
     strips: layup.strips.map((s) => ({ ...s, width: lay.side })),
     scale: undefined, along: undefined,
@@ -116,24 +122,27 @@ export function reblock(design: Design): Design {
 
 /**
  * The strips and steps of an end-grain 3D board, at placeholder sizes that `reblock` then sets:
- * rip the boards into diamond strips, glue the strips into logs, cut them up, stand the pieces
- * on end and glue the block. `woods` are its three, one for each face of the cubes, and `height`
- * is the thickness of the boards, which is the height of a diamond.
+ * rip the boards into diamond strips, glue the strips into logs, glue the logs into a row, cut
+ * the row into slices, stand them on end, slide every other one half a log, and glue. `woods`
+ * are its three, one for each face of the cubes, and `height` is the thickness of the boards,
+ * which is the height of a diamond.
  */
 export function blockRecipe(woods: Pick<StripSpec, 'species'>[], height: number): { layup: Layup; steps: Step[] } {
   /** A step with a fresh id. */
   const step = <S extends Omit<Step, 'id'>>(st: S) => ({ ...st, id: newId() }) as unknown as Step;
   return {
     layup: {
-      length: 26, thickness: height, repeat: 3, closeWithFirst: false,
+      length: 14, thickness: height, repeat: 6, closeWithFirst: false,
       strips: woods.slice(0, 3).map((w) => ({ id: newId(), species: w.species, width: blockSide(height) })),
       blocks: { along: 2, across: 2 },
     },
     steps: [
       step({ type: 'rip', width: blockSide(height), kerf: 0.125, tilt: 30 }),
       step({ type: 'glue' }),
+      step({ type: 'glue' }),
       step({ type: 'crosscut', width: 1.625, kerf: 0.125, angle: 0 }),
       step({ type: 'turn', sel: { mode: 'all' } }),
+      step({ type: 'shift', sel: { mode: 'every', n: 2, offset: 1 }, amount: height }),
       step({ type: 'glue' }),
       step({ type: 'trim', auto: false, x0: 0, x1: 0, z0: 0, z1: 0 }),
       step({ type: 'flatten', top: 0.0625, bottom: 0.0625 }),
@@ -209,26 +218,23 @@ export function blockLogs(woods: string[], thickness: number, length: number, lo
 }
 
 /**
- * The pieces of a 3D board's block, standing on end where they are glued: one list of pieces for
- * each row, the rows in order across the board. `woods` are the three woods, one for each face of
- * the cubes; every piece has them in the same order round it. `height` is how tall the pieces
- * stand. `tone` gives a strip its lightness from its number. The grain is upright: they are
- * lengths of log on end.
+ * The logs of a 3D board glued side by side into one row, flat to flat, lying along the bench:
+ * each hexagon has a point up and a point down, so the row's top and bottom are zigzags. A slice
+ * cut across it is a whole row of the pattern.
  */
-export function blockRows(woods: string[], thickness: number, height: number, along: number, across: number, tone: (i: number) => number): Piece[][] {
-  const s = blockSide(thickness), h = s * SIN60;
-  const rows: Piece[][] = [];
-  let n = 0;
-  for (let j = 0; j < across; j++) {
-    const row: Piece[] = [];
-    for (let i = 0; i < along; i++) {
-      const cx = i * 2 * h + (j % 2 ? h : 0), cz = j * 1.5 * s;
-      for (let f = 0; f < 3; f++) {
-        row.push(solid([[cx, cz], corner(cx, cz, s, 30, 2 * f), corner(cx, cz, s, 30, 2 * f + 1), corner(cx, cz, s, 30, 2 * f + 2)], 0, height, standing, woods[f % woods.length], [0, 1, 0], tone(n++)));
-      }
-    }
-    rows.push(row);
-  }
-  const min = bbox(rows.flat()).min;
-  return rows.map((row) => translate(row, [-min[0], -min[1], -min[2]]));
+export function blockRow(woods: string[], thickness: number, length: number, logs: number, tone: (i: number) => number): Piece[] {
+  const s = blockSide(thickness);
+  return Array.from({ length: logs }, (_, i) => {
+    // Flat to flat, the logs' middles are two diamond heights apart.
+    const cz = thickness + i * 2 * thickness;
+    return woods.map((wood, f) => solid(
+      [[cz, s], corner(cz, s, s, 30, 2 * f), corner(cz, s, s, 30, 2 * f + 1), corner(cz, s, s, 30, 2 * f + 2)],
+      0, length, lying, wood, [1, 0, 0], tone(f * logs + i)));
+  }).flat();
+}
+
+/** A round post standing on end: centred on (x, z), from `bottom` up `height`, drawn with 24 flat sides. A foot under a board is one. */
+export function post(x: number, z: number, radius: number, bottom: number, height: number, species: string, tone: number): Piece {
+  const round = Array.from({ length: 24 }, (_, k): [number, number] => [x + radius * Math.cos((k * Math.PI) / 12), z + radius * Math.sin((k * Math.PI) / 12)]);
+  return solid(round, bottom, bottom + height, standing, species, [0, 1, 0], tone);
 }

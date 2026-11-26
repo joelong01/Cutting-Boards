@@ -54,9 +54,9 @@ export function flatRecipe(woods: Pick<StripSpec, 'species'>[], width: number): 
   const s = blockSide(width), kerf = 0.125;
   const strips: StripSpec[] = [
     { id: newId(), species: left, width },
-    { id: newId(), species: top, width: topWidth(s, kerf), locked: true },
+    { id: newId(), species: top, width: topWidth(s, kerf) },
     { id: newId(), species: right, width },
-    { id: newId(), species: top, width: topWidth(s, kerf), locked: true },
+    { id: newId(), species: top, width: topWidth(s, kerf) },
   ];
   const everyOther = { mode: 'every', n: 2, offset: 1 } as const;
   const flatten = { type: 'flatten', top: 0.0625, bottom: 0.0625 } as const;
@@ -92,11 +92,10 @@ export function turnedBlocks(design: Design, flat: boolean): Design {
 }
 
 /**
- * A 3D board as this version makes it. One saved before its recipes were split into single
- * operations is missing steps the engine now expects: an end-grain one has no bevel rip between
- * milling its boards and gluing the logs, and a face-grain one is the old recipe of loose tiles.
- * The first gets the rip put in; the second is rebuilt from strips with the same woods and
- * diamonds. Any other design, and a 3D board already current, is returned as it is.
+ * A 3D board as this version makes it. One saved by an earlier version has a recipe the engine no
+ * longer runs: an end-grain one glued loose lengths of log, where it now slices a row of logs,
+ * and a face-grain one was loose tiles. Either is given the current recipe with the same woods
+ * and diamonds. Any other design, and a 3D board already current, is returned as it is.
  */
 export function currentBlocks(design: Design): Design {
   const layup = layupOf(design);
@@ -104,9 +103,77 @@ export function currentBlocks(design: Design): Design {
   if (layup.blocks.flat) {
     return layup.strips.length >= 4 ? design : fitFlatBlocks({ ...design, steps: flatRecipe(layup.strips, layup.strips[0]?.width ?? 1.25) });
   }
-  if (design.steps.some((st) => st.type === 'rip' && st.tilt)) return design;
-  const rip = blockRecipe(layup.strips, layup.thickness).steps[0];
-  return reblock({ ...design, steps: [design.steps[0], rip, ...design.steps.slice(1)] });
+  // The end-grain recipe as it is now: boards, a bevel rip, logs, a row, slices slid to nest.
+  const recipe = blockRecipe(layup.strips, layup.thickness);
+  const current = design.steps.slice(1).map((st) => st.type).join() === recipe.steps.map((st) => st.type).join()
+    && design.steps.some((st) => st.type === 'rip' && st.tilt);
+  return current ? design : reblock({ ...design, steps: [design.steps[0], ...recipe.steps] });
+}
+
+/** What a board's first step makes: ordinary strips, the three boards of an end-grain 3D board, or the flat strips of a face-grain one. */
+export type MadeFrom = 'strips' | 'boards' | 'flat';
+
+/** What a design's first step makes. */
+export function madeFrom(design: Pick<Design, 'steps'>): MadeFrom {
+  const blocks = layupOf(design).blocks;
+  return !blocks ? 'strips' : blocks.flat ? 'flat' : 'boards';
+}
+
+/**
+ * The design with its first step making something else. Only the first step changes. Going to a
+ * 3D board it keeps the woods it has, up to three, and makes them up to three; the sizes that
+ * follow from the diamonds are then the fit's to set. Called by `inferBlocks`, never by a choice
+ * on screen.
+ */
+export function withMadeFrom(design: Design, kind: MadeFrom): Design {
+  if (madeFrom(design) === kind) return design;
+  const layup = layupOf(design);
+  const woods = [...new Set([...layup.strips.filter((st) => !st.spacer).map((st) => st.species), 'maple', 'walnut', 'cherry'])].slice(0, 3).map((species) => ({ species }));
+  if (kind === 'strips') return withLayup(design, { blocks: undefined, strips: woods.map((w) => ({ id: newId(), species: w.species, width: 1.5 })) });
+  if (kind === 'boards') {
+    return withLayup(design, { blocks: { along: 2, across: 2 }, strips: woods.map((w) => ({ id: newId(), species: w.species, width: blockSide(layup.thickness) })) });
+  }
+  const first = flatRecipe(woods, 1.25)[0] as Extract<Step, { type: 'strips' }>;
+  return withLayup(design, { blocks: first.blocks, strips: first.strips });
+}
+
+/** The steps of the face-grain 3D board, by type, leaving out the flattening, which can go anywhere. */
+const FLAT_STEPS = ['glue', 'crosscut', 'flip', 'shift', 'glue', 'trim', 'rip', 'flip', 'glue', 'trim'];
+
+/**
+ * What a design's first step has to be making, read from the rest of the recipe, so that nobody
+ * has to say:
+ *
+ * - **boards**, when the step straight after it is a rip with the blade tilted: that is the bevel
+ *   rip of an end-grain 3D board, and nothing else is ripped at a tilt before any glue-up;
+ * - **flat**, when the recipe is the face-grain 3D board's: four strips in the order left, top,
+ *   right, top, cross cut at 30°, flipped, slid, glued, ripped, flipped and glued;
+ * - **strips** otherwise.
+ */
+export function madeFromSteps(design: Pick<Design, 'steps'>): MadeFrom {
+  const second = design.steps[1];
+  if (second?.type === 'rip' && (second.tilt ?? 0) > 0) return 'boards';
+  const strips = layupOf(design).strips;
+  const types = design.steps.slice(1).map((st) => st.type).filter((t) => t !== 'flatten');
+  const cut = design.steps.find((st) => st.type === 'crosscut');
+  const pattern = strips.length === 4 && strips[1].species === strips[3].species && strips[0].species !== strips[1].species && strips[2].species !== strips[1].species;
+  if (pattern && types.join() === FLAT_STEPS.join() && cut?.type === 'crosscut' && cut.angle === 30) return 'flat';
+  return 'strips';
+}
+
+/**
+ * The design with its first step making what the rest of its recipe needs (`madeFromSteps`).
+ * This is what turns a custom board into a 3D board as its steps are added, and back if they are
+ * taken away. A design that is already right is returned as it is.
+ */
+export function inferBlocks(design: Design): Design {
+  const want = madeFromSteps(design);
+  if (madeFrom(design) === want) return design;
+  // The flat board's four strips are already there, or it would not have been recognised: only the mark is missing.
+  if (want === 'flat') return withLayup(design, { blocks: { along: 2, across: 2, flat: true } });
+  // Back to plain strips, the strips stay as they are.
+  if (want === 'strips') return withLayup(design, { blocks: undefined });
+  return withMadeFrom(design, want);
 }
 
 /** The index of the n-th step of a type (0 for the first), or -1. */

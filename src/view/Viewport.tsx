@@ -5,7 +5,7 @@ import type { Species, Stage } from '../model/types';
 import { BoardScene, type HoverInfo, type ViewName } from './scene';
 
 export interface ViewportHandle {
-  snapshot: (stage: Stage, size?: [number, number]) => string;
+  snapshot: (stage: Stage, size?: [number, number], view?: ViewName) => string;
   capture: () => string;
   view: (name: ViewName) => void;
 }
@@ -54,7 +54,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(
   }, []);
 
   useImperativeHandle(ref, () => ({
-    snapshot: (s, size) => sceneRef.current?.snapshot(s, size) ?? '',
+    snapshot: (s, size, view) => sceneRef.current?.snapshot(s, size, view) ?? '',
     capture: () => sceneRef.current?.capture() ?? '',
     view: (name) => sceneRef.current?.view(name),
   }), []);

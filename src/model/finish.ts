@@ -10,6 +10,8 @@ export const DEFAULT_FINISH: Required<Finish> = {
   corners: { on: true, radius: 0.5 },
   roundover: { on: true, radius: 0.125 },
   template: { on: false, stripWidth: 2, thickness: 0.5 },
+  // Off unless asked for. The sizes are those of the common brass-and-rubber screw-on feet.
+  feet: { on: false, diameter: 0.82, height: 0.35, inset: 1 },
 };
 
 export const NO_FINISH: Finish = {
@@ -18,12 +20,14 @@ export const NO_FINISH: Finish = {
   corners: { ...DEFAULT_FINISH.corners, on: false },
   roundover: { ...DEFAULT_FINISH.roundover, on: false },
   template: { ...DEFAULT_FINISH.template, on: false },
+  feet: { ...DEFAULT_FINISH.feet, on: false },
 };
 
 /** The finishing options of a design, with the defaults filled in for designs that predate them. */
 export function finishOf(design: Pick<Design, 'finish'>): Required<Finish> {
   return {
     template: { ...DEFAULT_FINISH.template, ...design.finish?.template },
+    feet: { ...DEFAULT_FINISH.feet, ...design.finish?.feet },
     groove: { ...DEFAULT_FINISH.groove, ...design.finish?.groove },
     chamfer: { ...DEFAULT_FINISH.chamfer, ...design.finish?.chamfer },
     corners: { ...DEFAULT_FINISH.corners, ...design.finish?.corners },
