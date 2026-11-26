@@ -91,7 +91,7 @@ export function reblock(design: Design): Design {
   const trimAt = design.steps.findIndex((s) => s.type === 'trim');
   const cutAt = design.steps.findIndex((s) => s.type === 'crosscut');
   const cut = design.steps[cutAt];
-  const kerf = roundTo(cut?.type === 'crosscut' ? Math.max(0, cut.kerf) : 0.125, grid);
+  const kerf = roundTo(dimensionsOf(design).kerf ?? (cut?.type === 'crosscut' ? Math.max(0, cut.kerf) : 0.125), grid);
   const thick = design.target.thickness + flattened(design.steps, grid);
   // The pieces as they are cut: the cut's width is rounded like everything else.
   const piece = roundTo(thick, grid);

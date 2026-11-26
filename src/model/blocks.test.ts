@@ -6,6 +6,7 @@ import { bbox, boxSize, faceNormal, volume } from './geometry';
 import { convertGrain, grainOf, withGrain } from './grain';
 import { run } from './pipeline';
 import { PRESETS, designs } from './presets';
+import { validateDesign } from './storage';
 import type { Design, Piece, Stage } from './types';
 
 /** The 3D board starter, as the lists of designs make it. */
@@ -33,7 +34,7 @@ describe('3D board (tumbling blocks)', () => {
   it('is these steps, in order, with no error or warning, and finishes at exactly its target size', () => {
     const stages = run(board());
     expect(stages.slice(0, 8).map((s) => `${s.title} (${s.kind})`)).toEqual([
-      'Rip the strips (strips)', 'Bevel rip (strips)', 'Glue up (panel)', 'Cross cut (slices)', 'Turn to end grain (slices)', 'Glue up (panel)', 'Trim (panel)', 'Flatten (panel)',
+      'Mill the boards (strips)', 'Bevel rip (strips)', 'Glue up (panel)', 'Cross cut (slices)', 'Turn to end grain (slices)', 'Glue up (panel)', 'Trim (panel)', 'Flatten (panel)',
     ]);
     expect(stages.filter((s) => s.error || s.warning).map((s) => `${s.title}: ${s.error ?? s.warning}`)).toEqual([]);
     const size = stages.at(-1)!.size;
@@ -57,8 +58,11 @@ describe('3D board (tumbling blocks)', () => {
       expect(size[2]).toBeCloseTo(5.5, 9);
     }
     expect(boards.stock!.map((l) => [l.species, l.count, l.thickness, l.width, l.length])).toEqual([['maple', 1, 1.25, 5.5, 24.5], ['walnut', 1, 1.25, 5.5, 24.5], ['cherry', 1, 1.25, 5.5, 24.5]]);
+    // The instruction is only this operation: nothing about the cuts to come.
     expect(boards.summary).toBe('Mill a board of each wood 1 1/4″ thick, 5 1/2″ wide and 24 1/2″ long: maple, walnut and cherry. '
-      + 'Plane all three to the same thickness in one session: it sets the size of the diamonds.');
+      + 'Plane all three to the same thickness in one session.');
+    expect(boards.summary).not.toMatch(/30°|diamond|strip/);
+    expect(boards.title).toBe('Mill the boards');
   });
 
   it('then rips each board with the blade tilted 30°, a step of its own, into diamond strips', () => {
@@ -81,6 +85,37 @@ describe('3D board (tumbling blocks)', () => {
     expect(strips.stock).toBeUndefined();
     expect(strips.summary).toBe('Tilt the table saw blade 30° and rip 3 strips from each board, every one a diamond in cross-section: the two sawn faces slope at 60° and are as wide as the top and bottom, about 1 7/16″. '
       + 'Test the setup on scrap first: three strips must close into a hexagon with no gap.');
+  });
+
+  it('a 3D board saved before the bevel rip was a step of its own gets one when it is opened', () => {
+    const d = board();
+    // As the earlier version saved it: strips, then straight to gluing the logs.
+    const old = JSON.parse(JSON.stringify({ ...d, steps: d.steps.filter((_, i) => i !== 1) }));
+    expect(run(old)[1].error).toMatch(/ripped into strips first/);
+    const opened = validateDesign(old);
+    expect(opened.steps.map((s) => s.type)).toEqual(d.steps.map((s) => s.type));
+    expect(opened.steps[1]).toMatchObject({ type: 'rip', tilt: 30 });
+    expect(run(opened).filter((s) => s.error || s.warning)).toEqual([]);
+    expect(run(opened).at(-1)!.size.map((v) => Math.round(v * 1e6) / 1e6)).toEqual([16, 1.5, 12]);
+    // One that is current is left exactly as it is.
+    expect(validateDesign(JSON.parse(JSON.stringify(d))).steps).toEqual(d.steps);
+  });
+
+  it('a face-grain 3D board saved as loose tiles is rebuilt from strips when it is opened', () => {
+    const d = board();
+    const old = JSON.parse(JSON.stringify({
+      ...d,
+      steps: [
+        { ...d.steps[0], thickness: 1.625, blocks: { along: 7, across: 6, flat: true }, strips: layupOf(d).strips.map((s) => ({ ...s, width: 1.25 })) },
+        { id: 'c', type: 'crosscut', width: 1.443, kerf: 0.125, angle: 30 }, { id: 'g', type: 'glue' },
+        { id: 't', type: 'trim', auto: false, x0: 0, x1: 0, z0: 0, z1: 0 }, { id: 'f', type: 'flatten', top: 0.0625, bottom: 0.0625 },
+      ],
+    }));
+    const opened = validateDesign(old);
+    expect(layupOf(opened).strips.map((s) => s.species)).toEqual(['walnut', 'maple', 'cherry', 'maple']);
+    expect(grainOf(opened)).toBe('edge');
+    expect(run(opened).filter((s) => s.error || s.warning)).toEqual([]);
+    expect(run(opened).at(-1)!.size.map((v) => Math.round(v * 1e6) / 1e6)).toEqual([16, 1.5, 12]);
   });
 
   it('will not glue the boards into logs before they are ripped', () => {
@@ -223,6 +258,21 @@ describe('3D board (tumbling blocks)', () => {
       const size = run(wider).at(-1)!.size;
       expect([size[0], size[1], size[2]].map((v) => Math.round(v * 1e6) / 1e6)).toEqual([16, 1.5, 12]);
       expect(run(wider).filter((s) => s.error || s.warning)).toEqual([]);
+    });
+
+    it('works its stock length out directly, and it is the shortest that gives the slices: a quarter inch less is one slice short', () => {
+      /** How many slices of a design's angled cut are full length. */
+      const fullSlices = (d: Design) => {
+        const lengths = run(d)[3].slices.map((s) => boxSize(bbox(s.pieces))[2]);
+        return lengths.filter((l) => Math.max(...lengths) - l < 1e-6).length;
+      };
+      for (const target of [{ length: 16, width: 12, thickness: 1.5 }, { length: 20, width: 16, thickness: 2 }, { length: 12, width: 9, thickness: 0.75 }]) {
+        const d = fitToTarget({ ...flat(), target });
+        const columns = layupOf(d).blocks!.along;
+        expect(fullSlices(d)).toBeGreaterThanOrEqual(columns);
+        const shorter = withLayup({ ...d, autoFit: false }, { length: layupOf(d).length - 0.25 });
+        expect(fullSlices(shorter)).toBeLessThan(columns);
+      }
     });
 
     it('is not rounded: its sizes follow from the 60° of the diamonds', () => {

@@ -4,7 +4,7 @@ import { fitToTarget, withAutoFit } from './model/fit';
 import { convertGrain, grainOf, withGrain, type Grain } from './model/grain';
 import { withAutoName } from './model/naming';
 import { DEFAULT_DIMENSIONS, dimensionsOf, layupOf } from './model/design';
-import { matches, pieceCount, run } from './model/pipeline';
+import { matches, pieceCount, run, wholeSteps } from './model/pipeline';
 import { PRESETS, catalog, defaultDesign, designs, offerOf } from './model/presets';
 import { allSpecies, speciesById } from './model/species';
 import {
@@ -30,7 +30,8 @@ const params = new URLSearchParams(location.search);
  * when the app still owns its name.
  */
 const held = (d: Design): Design => {
-  const set = d.dimensions ? d : { ...d, dimensions: DEFAULT_DIMENSIONS };
+  // One saved with some settings but not the newer ones gets those at their usual values.
+  const set = { ...d, dimensions: { ...DEFAULT_DIMENSIONS, ...d.dimensions } };
   return withAutoName(set.autoFit === false ? set : fitToTarget(set), allSpecies(set));
 };
 
@@ -221,7 +222,34 @@ export function App() {
   }, [undo, redo, stages.length]);
 
   // The step that produced the stage on screen; its selection is outlined and clickable.
-  const step: Step | undefined = design.steps[index];
+  // The step cards show each step whole, while the view steps through every operation: these
+  // go between a card's place in the list and a stage's.
+  const cards = useMemo(() => {
+    const whole = wholeSteps(design, stages);
+    const steps = whole.filter((st) => st.step !== undefined).length;
+    const firstTouch = stages.findIndex((st) => st.step === undefined);
+    /** The stage that shows a card's result: the last operation of its step, or its finishing touch. */
+    const stageOf = (card: number) => (card < steps ? stages.map((st) => st.step).lastIndexOf(card) : firstTouch + (card - steps));
+    /** The card a stage belongs to. */
+    const cardOf = (at: number) => stages[at].step ?? steps + (at - firstTouch);
+    /** A card's number: the numbers of the operations it covers, as they are in the view and the instructions. */
+    const numberOf = (card: number) => {
+      const last = stageOf(card), first = card < steps ? stages.findIndex((st) => st.step === card) : last;
+      return first === last ? String(last + 1) : `${first + 1}–${last + 1}`;
+    };
+    return { whole, stageOf, cardOf, numberOf };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stages]);
+  const step: Step | undefined = stages[index].step === undefined ? undefined : design.steps[stages[index].step!];
+  // A card picked in the list shows its step's result: its last operation. The card is noted and
+  // turned into a stage once the stages are those of the design as it now is, because picking a
+  // card and changing the design (adding a step, say) can happen in one go.
+  const [wantCard, setWantCard] = useState<number | null>(null);
+  useEffect(() => {
+    if (wantCard === null) return;
+    setSelected(cards.stageOf(wantCard));
+    setWantCard(null);
+  }, [wantCard, cards]);
   const sel: Selector | null = step && 'sel' in step ? step.sel : null;
   const stage = stages[index];
   const highlights = useMemo(
@@ -489,7 +517,7 @@ export function App() {
         </nav>
         {tab === 'design' ? (
           <>
-            <section className="card board-pick">
+            <section className="card board-pick" onClick={() => setSelected(stages.length - 1)} title="Shows the finished board">
               <h3>Target board</h3>
               <label className="field">
                 <span>Design</span>
@@ -535,7 +563,7 @@ export function App() {
                 })}
               </div>
             </section>
-            <section className="card target">
+            <section className="card target" onClick={() => setSelected(stages.length - 1)} title="Shows the finished board">
               <h3>Dimensions</h3>
               <div className="row">
                 <Len label="Length" value={design.target.length} min={1} onChange={(length) => setDesign({ ...design, target: { ...design.target, length } })} />
@@ -574,6 +602,13 @@ export function App() {
                   </select>
                 </label>
                 <Len
+                  label="Saw kerf"
+                  value={dims.kerf ?? 0.125}
+                  min={0}
+                  title="How thick your saw blade cuts. Every cut uses it, and the stock is sized to allow for the wood it turns to dust."
+                  onChange={(kerf) => setDims({ kerf })}
+                />
+                <Len
                   label="Thinnest strip"
                   value={dims.minWidth}
                   min={0}
@@ -600,8 +635,8 @@ export function App() {
                 </p>
               </div>
             </section>
-            <LayupEditor warning={stages[0]?.error ? undefined : stages[0]?.warning} design={design} species={species} onChange={setDesign} onNotice={setMessage} selected={index === 0} onSelect={() => setSelected(0)} />
-            <StepList design={design} stages={stages} species={species} selected={index} onSelect={setSelected} onChange={setDesign} />
+            <LayupEditor warning={cards.whole[0]?.error ? undefined : cards.whole[0]?.warning} design={design} species={species} onChange={setDesign} onNotice={setMessage} selected={cards.cardOf(index) === 0} onSelect={() => setWantCard(0)} />
+            <StepList design={design} stages={cards.whole} species={species} selected={cards.cardOf(index)} onSelect={setWantCard} onChange={setDesign} numberOf={cards.numberOf} />
           </>
         ) : (
           <CutListPanel design={design} cutList={cutList} species={species} onChange={setDesign} units={units} />

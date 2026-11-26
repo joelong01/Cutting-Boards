@@ -57,8 +57,8 @@ export function milledStrips(layup: Pick<Layup, 'strips' | 'scale'>, grid = 0): 
   return layup.strips.map((s) => ({ ...s, width: roundTo(isLocked(s) ? s.width : s.width * scale, grid) }));
 }
 
-/** What a new board starts with: fractions to the nearest 1/16 inch, and nothing thinner than 1/8. */
-export const DEFAULT_DIMENSIONS: Dimensions = { notation: 'fraction', rounding: 1 / 16, minWidth: 1 / 8 };
+/** What a new board starts with: fractions to the nearest 1/16 inch, nothing thinner than 1/8, and a saw blade 1/8 thick. */
+export const DEFAULT_DIMENSIONS: Dimensions = { notation: 'fraction', rounding: 1 / 16, minWidth: 1 / 8, kerf: 1 / 8 };
 
 /** A design's dimension settings; one saved before there were any writes fractions, rounds nothing and has no minimum. */
 export const dimensionsOf = (design: Pick<Design, 'dimensions'>): Dimensions =>
@@ -83,6 +83,8 @@ export interface Sizing {
   cut: number;
   /** The step every size is rounded to where it is used, or 0 for none: the design's rounding. */
   grid: number;
+  /** The saw kerf every cut uses, when the design sets one; otherwise each cutting step's own. */
+  kerf?: number;
 }
 
 /** Sizes used exactly as asked for. */
@@ -100,5 +102,6 @@ export function sizingOf(design: Pick<Design, 'steps' | 'dimensions'>): Sizing {
     scale: layup.scale ?? 1, along: layup.along ?? 0, alongOn: stood ? 'thickness' : cut ? 'crosscut' : null, cut: cut?.width ?? 0,
     // A face-grain 3D board's sizes are fixed by the 60° of its diamonds and are not rounded: see blocksFlat.ts.
     grid: layup.blocks?.flat ? 0 : dimensionsOf(design).rounding,
+    kerf: dimensionsOf(design).kerf,
   };
 }

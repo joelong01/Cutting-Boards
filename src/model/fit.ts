@@ -234,7 +234,7 @@ export function withAutoFit(prev: Design, next: Design): Design {
   if (next.autoFit === false) return next;
   // Which steps are the very same objects as before: all of them, or all but the strips.
   const alike = (from: number) => prev.steps.length === next.steps.length && prev.steps.every((s, i) => i < from || s === next.steps[i]);
-  const same = alike(0) && prev.target === next.target && prev.autoFit !== false && dimensionsOf(prev).rounding === dimensionsOf(next).rounding;
+  const same = alike(0) && prev.target === next.target && prev.autoFit !== false && dimensionsOf(prev).rounding === dimensionsOf(next).rounding && dimensionsOf(prev).kerf === dimensionsOf(next).kerf;
   // The board keeps lying the way it did before the edit; only a change to the steps after the
   // strips can turn it.
   return same ? next : fitToTarget(next, alike(1) ? prev : next);

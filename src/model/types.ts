@@ -72,6 +72,36 @@ export interface Stage {
    * back. They are drawn beside the work.
    */
   aside?: Slice[];
+  /**
+   * Pieces made at this stage for the next one to use, lying beside the work: accent strips just
+   * milled, before they are placed between the slices. They belong to this stage only.
+   */
+  beside?: Slice[];
+  /**
+   * Carried from milling a border to gluing it on: the pieces for the two ends and the two
+   * sides, placed where they go round the panel as it now lies, and the sentence for each
+   * glue-up. Gluing the ends on uses up `ends`; gluing the sides on uses up the rest.
+   */
+  frame?: {
+    ends: Piece[]; sides: Piece[]; endsText: string; sidesText: string;
+    /**
+     * Set while the pieces of an end-grain border are still being made, which takes two more
+     * operations after milling strips: the two small panels the strips are glued into, then the
+     * pieces cross cut from those, with the sentence for each. Gone once the pieces are cut.
+     */
+    making?: { panels: Slice[]; panelsText: string; pieces: Slice[]; piecesText: string };
+  };
+  /**
+   * Set on milled strips some of which are planks still waiting for a face of another wood on
+   * both sides: the strips as they will be once the faces are glued on, and the sentence for
+   * doing it. Until then the planks and their faces lie on the bench as separate pieces.
+   */
+  faced?: { slices: Slice[]; summary: string };
+  /**
+   * Which step of the design this stage belongs to, by its place in the list. A step made of
+   * several operations has a stage for each, all with its number. Finishing stages have none.
+   */
+  step?: number;
   /** Set on the stage of a finishing step: which touch it is. */
   finish?: FinishPart | 'sand';
   /**
@@ -287,6 +317,12 @@ export interface Dimensions {
   notation: Notation;
   rounding: number;
   minWidth: number;
+  /**
+   * How much wood the saw blade turns to dust at each cut. With it set, every cut in the recipe
+   * uses it, whatever kerf its own step carries, and the stock is sized to allow for it. Absent
+   * means each cutting step's own kerf is used, which is how designs were before this.
+   */
+  kerf?: number;
 }
 
 export interface Design {

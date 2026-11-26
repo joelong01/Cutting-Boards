@@ -76,8 +76,13 @@ blue **Show the board ›** bar along the bottom goes back to the board.
     its target, visibly. A size smaller than one step (a saw kerf, a 1/16 inch flattening pass)
     is kept as it is, and a trim is not rounded: it is sawn to the size it leaves. New boards
     start at 1/16 inch.
+  - **Saw kerf**: how thick the blade cuts, 1/8 inch to start with. Every cut in the recipe uses
+    it, the cutting steps have no kerf field of their own, and the stock is sized to allow for it
+    (on the 3D board, the boards are also wide enough for the corner a bevel rip wastes).
   - **Thinnest strip**: the thinnest the planer or sander can work, 1/8 inch to start with. A
     step that mills anything thinner is flagged, and strip widths cannot be typed below it.
+
+  Clicking either tile shows the finished board.
 - **Strips.** Step 1, "Mill strips for first glue-up": species, width, order, a repeat count, and
   "end with first strip" for a symmetric panel. Lengths accept shop fractions (`1 1/8`, `3/4`);
   Up/Down nudges by 1/16.
@@ -209,6 +214,27 @@ Its sizes are not rounded, since they follow from the 60° of the diamonds.
 
 In either recipe each step is one operation at the bench, with its own picture and instruction.
 
+## One operation, one stage
+
+What the view plays, and what the instructions number, is one operation at the bench at a time:
+mill, glue, cut, turn, place. A step in the Design tab is usually one operation. Three are
+several, and each of their operations has its own stage, picture and sentence
+(`performEach` in `src/model/pipeline.ts`):
+
+- **Start another panel**: mill its pieces (the first slices go to one side), glue faces onto
+  any planks that take them, glue it up.
+- **Insert accent strips**: mill the strips, which lie beside the slices, then place them.
+- **Add a border**: mill the pieces, glue on the ends, glue on the sides. An end-grain border's
+  pieces are made first: mill strips, glue two small panels, cut the pieces from them.
+
+A card that covers several operations is numbered with all of them ("8–9"), so the numbers in
+the list, the view and the printed instructions agree. An instruction says only its own
+operation, not what came before or what comes next. `run` gives a stage per operation and
+`runSteps` gives each step whole, for anything that asks what a step leaves.
+
+Known exception: an accent strip that is itself a slice of another glue-up (a pattern) is still
+described in one long instruction.
+
 ## How it models wood
 
 Every piece is a convex solid with a species and a grain direction (`src/model/geometry.ts`). A
@@ -277,8 +303,8 @@ grains, a line per stage. A change to how the recipe is run must leave every lin
 ## Checks
 
 ```powershell
-npm test                                   # 447 tests of the model: dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
-npm run smoke                              # builds, then 43 checks of the real window: the Target board and Dimensions tiles, the grain switch, 3D view, wizard, print preview, edge tags, add step, accent strips, removing strips and woods, pinned target size, hiding the panel, save and open
+npm test                                   # 461 tests of the model: one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
+npm run smoke                              # builds, then 45 checks of the real window: the Target board and Dimensions tiles, the grain switch, 3D view, wizard, print preview, edge tags, add step, accent strips, removing strips and woods, pinned target size, hiding the panel, save and open
 node scripts/run.mjs --selftest            # save, list, read and delete a design through the app
 node scripts/run.mjs --screenshot=out.png --query=preset=brick   # render one frame and exit
 ```

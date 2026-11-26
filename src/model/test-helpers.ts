@@ -1,4 +1,4 @@
-import { run as runAll } from './pipeline';
+import { runSteps as runAll } from './pipeline';
 import type { Design, Stage } from './types';
 
 /**

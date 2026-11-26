@@ -24,7 +24,7 @@ describe('dimensions: notation, rounding and the thinnest strip', () => {
     expect(d.dimensions).toBeUndefined();
     expect(dimensionsOf(d)).toEqual({ notation: 'fraction', rounding: 0, minWidth: 0 });
     expect(unitsOf(d)).toEqual({ imperial: true, metric: false, decimal: false, step: undefined });
-    expect(DEFAULT_DIMENSIONS).toEqual({ notation: 'fraction', rounding: 1 / 16, minWidth: 1 / 8 });
+    expect(DEFAULT_DIMENSIONS).toEqual({ notation: 'fraction', rounding: 1 / 16, minWidth: 1 / 8, kerf: 1 / 8 });
   });
 
   it('rounds to the nearest step, keeps anything smaller than a step, and never rounds to nothing', () => {
@@ -112,7 +112,7 @@ describe('dimensions: notation, rounding and the thinnest strip', () => {
     const stages = run(d, (id) => id);
     expect(stages[0].warning).toBe('Thinner than the 1/4″ minimum: purpleheart at 1/8″. Make it at least that, or lower the minimum under Dimensions.');
     // The purpleheart put between the slices later is flagged on its own step.
-    expect(stages.filter((s) => s.warning?.includes('Thinner than')).map((s) => s.title)).toEqual(['Rip the strips', 'Insert accent strips']);
+    expect(stages.filter((s) => s.warning?.includes('Thinner than')).map((s) => s.title)).toEqual(['Rip the strips', 'Mill the accent strips']);
     expect(run(withDims(preset('maple-purpleheart'), { rounding: 0, minWidth: 0.125 })).some((s) => s.warning?.includes('Thinner than'))).toBe(false);
     expect(run(preset('maple-purpleheart')).some((s) => s.warning?.includes('Thinner than'))).toBe(false);
   });
@@ -126,6 +126,35 @@ describe('dimensions: notation, rounding and the thinnest strip', () => {
       expect(size[2]).toBeCloseTo(12, 6);
       expect(Math.abs(size[1] - 1.5)).toBeLessThan(dims.rounding + 1e-9);
     }
+  });
+
+  it('a saw kerf under Dimensions is the kerf of every cut, and the stock is sized for it', () => {
+    const base = { ...preset('maple-purpleheart'), target: { length: 16, width: 12, thickness: 1.125 } };
+    const thin = withDims(base, { rounding: 0, kerf: 1 / 16 }), thick = withDims(base, { rounding: 0, kerf: 3 / 16 });
+    for (const d of [thin, thick]) {
+      const stages = run(d);
+      expect(stages.filter((s) => s.error)).toEqual([]);
+      expect(stages.find((s) => s.title === 'Cross cut')!.summary).toContain(`(kerf ${d.dimensions!.kerf === 1 / 16 ? '1/16″' : '3/16″'})`);
+      // The board still comes out at its target: the wider kerf is paid for in stock, not in size.
+      const size = stages.at(-1)!.size;
+      expect([size[0], size[2]].map((v) => Math.round(v * 1e6) / 1e6)).toEqual([16, 12]);
+    }
+    expect(layupOf(thick).length).toBeGreaterThan(layupOf(thin).length);
+    // Without the setting each cutting step keeps its own kerf.
+    expect(run(withDims(base, { rounding: 0 })).find((s) => s.title === 'Cross cut')!.summary).toContain('(kerf 1/8″)');
+    expect(run(preset('maple-purpleheart')).find((s) => s.title === 'Cross cut')!.summary).toContain('(kerf 1/8″)');
+    // Changing it is a reason to fit again.
+    expect(withAutoFit(thin, { ...thin, dimensions: { ...thin.dimensions!, kerf: 3 / 16 } })).not.toBe(thin);
+  });
+
+  it('the boards of a 3D board are milled wide enough for the kerf of every cut and the corner the bevel wastes', () => {
+    const narrow = withDims(preset('tumbling-blocks'), { rounding: 0, kerf: 1 / 16 }), wide = withDims(preset('tumbling-blocks'), { rounding: 0, kerf: 1 / 4 });
+    const width = (d: Design) => run(d)[0].stock![0].width;
+    expect(width(wide)).toBeGreaterThan(width(narrow));
+    // Three strips 1.443 on a side, the half-strip corner, and three kerfs as they lie across a 30° cut.
+    const side = 1.25 / (Math.sqrt(3) / 2);
+    expect(width(wide)).toBeGreaterThanOrEqual(side / 2 + 3 * (side + 0.25 / (Math.sqrt(3) / 2)) - 1e-9);
+    for (const d of [narrow, wide]) expect(run(d).filter((s) => s.error)).toEqual([]);
   });
 
   it('lists every design once for the Target board tile and knows which one an open board is', () => {

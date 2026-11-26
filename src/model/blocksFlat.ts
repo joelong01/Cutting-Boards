@@ -4,7 +4,7 @@ import { NO_FINISH } from './finish';
 import { roundTo } from './fractions';
 import { bbox } from './geometry';
 import { newId } from './ids';
-import { run } from './pipeline';
+import { runSteps } from './pipeline';
 import type { Design, Piece, Step, StripSpec } from './types';
 
 /**
@@ -91,6 +91,24 @@ export function turnedBlocks(design: Design, flat: boolean): Design {
   return reblock({ ...design, steps: [{ ...recipe.layup, id: newId(), type: 'strips' }, ...recipe.steps] });
 }
 
+/**
+ * A 3D board as this version makes it. One saved before its recipes were split into single
+ * operations is missing steps the engine now expects: an end-grain one has no bevel rip between
+ * milling its boards and gluing the logs, and a face-grain one is the old recipe of loose tiles.
+ * The first gets the rip put in; the second is rebuilt from strips with the same woods and
+ * diamonds. Any other design, and a 3D board already current, is returned as it is.
+ */
+export function currentBlocks(design: Design): Design {
+  const layup = layupOf(design);
+  if (!layup.blocks) return design;
+  if (layup.blocks.flat) {
+    return layup.strips.length >= 4 ? design : fitFlatBlocks({ ...design, steps: flatRecipe(layup.strips, layup.strips[0]?.width ?? 1.25) });
+  }
+  if (design.steps.some((st) => st.type === 'rip' && st.tilt)) return design;
+  const rip = blockRecipe(layup.strips, layup.thickness).steps[0];
+  return reblock({ ...design, steps: [design.steps[0], rip, ...design.steps.slice(1)] });
+}
+
 /** The index of the n-th step of a type (0 for the first), or -1. */
 const nth = (steps: Step[], type: Step['type'], n: number) => steps.map((s, i) => (s.type === type ? i : -1)).filter((i) => i >= 0)[n] ?? -1;
 
@@ -150,7 +168,7 @@ export function fitFlatBlocks(design: Design): Design {
   const grid = dimensionsOf(design).rounding;
   const width = layup.strips[0].width, s = blockSide(width);
   const rip = steps[ripAt] as Extract<Step, { type: 'rip' }>;
-  const kerf = Math.max(0, rip.kerf), row = 1.5 * s;
+  const kerf = Math.max(0, dimensionsOf(design).kerf ?? rip.kerf), row = 1.5 * s;
   const thickness = design.target.thickness + steps.reduce((t, st) => t + (st.type === 'flatten' ? roundTo(st.top, grid) + roundTo(st.bottom, grid) : 0), 0);
   const rows = Math.max(2, Math.ceil(design.target.length / row - 1e-9));
   const columns = Math.max(2, Math.ceil(design.target.width / width - 1e-9));
@@ -167,7 +185,7 @@ export function fitFlatBlocks(design: Design): Design {
                 : st)),
   }, { strips, thickness, repeat, length, blocks: { along: columns, across: rows, flat: true }, scale: undefined, along: undefined });
   /** The stages of a trial design up to and including step `to`, without the finishing. */
-  const upTo = (d: Design, to: number) => run({ ...d, steps: d.steps.slice(0, to + 1), finish: NO_FINISH });
+  const upTo = (d: Design, to: number) => runSteps({ ...d, steps: d.steps.slice(0, to + 1), finish: NO_FINISH });
   const period = strips.reduce((t, st) => t + st.width, 0);
   const need = rows * row + (rows - 1) * kerf;
   /** Which slices of a cross cut are full length: the first and last of the run in the middle, or null if there are none. */
@@ -182,8 +200,15 @@ export function fitFlatBlocks(design: Design): Design {
   let best = design;
   // Enough repeats for the slices to be as long as the rows need, with room for the slide and the slanted ends.
   for (let repeat = Math.max(1, Math.ceil(((need + row + kerf) * SIN60) / period)); repeat <= 60; repeat++) {
-    // Long enough stock for the full slices the width takes: found by trying, a quarter inch at a time.
-    let length = Math.ceil(((columns * (width + kerf)) / SIN60) * 4) / 4;
+    // Long enough stock for the full slices the width takes. Turned 30° for the cut, the panel
+    // is cut from one corner at a pitch of a slice and a kerf: the first full-length slice is the
+    // first that starts past the slant of the near end (half the panel's width along the cut),
+    // and the stock has to reach the far side of the last one in use. That is worked out here,
+    // to the next quarter inch, and checked by running the cut; the loop only runs on if the
+    // engine counts fewer, which keeps this from depending on the sum being exactly right.
+    const pitch = width + kerf;
+    const firstFull = Math.ceil((repeat * period * 0.5) / pitch - 1e-9);
+    let length = Math.ceil((((firstFull + columns - 1) * pitch + width) / SIN60) * 4 - 1e-9) / 4;
     let trial = sized(repeat, length, {}, {});
     let full = fullRun(trial);
     while (length <= MAX_STOCK && (!full || full.last - full.first + 1 < columns)) {

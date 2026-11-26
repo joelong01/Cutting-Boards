@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { dimensionsOf, isLocked, layupOf, milledStrips, sizingOf, withAlong, withLayup } from '../model/design';
 import { changeStrip } from '../model/link';
-import { blockSide } from '../model/blocks';
+import { blockSide, boardWidth } from '../model/blocks';
 import { expandStrips } from '../model/pipeline';
 import { newId } from '../model/presets';
 import { speciesById } from '../model/species';
@@ -79,10 +79,9 @@ export function LayupEditor({ design, species, onChange, onNotice, selected, onS
   };
 
   if (layup.blocks) {
-    const pieces = layup.blocks.along * layup.blocks.across;
     return (
       <section className={`step first${selected ? ' selected' : ''}`}>
-        <header onClick={onSelect} title="Show the strips, ripped and ready to glue into logs"><em>1</em><strong>Rip the strips</strong></header>
+        <header onClick={onSelect} title={layup.blocks.flat ? 'Show the strips, ripped and ready to glue' : 'Show the three boards, milled'}><em>1</em><strong>{layup.blocks.flat ? 'Rip the strips' : 'Mill the boards'}</strong></header>
         <div className="row">
           {layup.blocks.flat ? (
             <Len
@@ -97,7 +96,7 @@ export function LayupEditor({ design, species, onChange, onNotice, selected, onS
               label="Board thickness"
               value={layup.thickness}
               min={0.5}
-              title="The boards the strips are ripped from. Thicker boards make bigger blocks."
+              title="How thick the three boards are milled. Thicker boards make bigger blocks."
               onChange={(thickness) => set({ thickness })}
             />
           )}
@@ -112,7 +111,7 @@ export function LayupEditor({ design, species, onChange, onNotice, selected, onS
             />
           )}
           <Len
-            label="Strip length"
+            label={layup.blocks.flat ? 'Strip length' : 'Board length'}
             value={layup.length}
             min={1}
             disabled={held}
@@ -133,13 +132,15 @@ export function LayupEditor({ design, species, onChange, onNotice, selected, onS
             </div>
           ))}
         </div>
-        <div className="row">
-          <Int label={(layup.blocks.flat ? 'Repeats of the pattern' : 'Strips of each wood') + (held ? ' (from target)' : '')} value={layup.repeat} min={1} max={40} disabled={held} onChange={(repeat) => set({ repeat })} />
-        </div>
+        {layup.blocks.flat && (
+          <div className="row">
+            <Int label={held ? 'Repeats of the pattern (from target)' : 'Repeats of the pattern'} value={layup.repeat} min={1} max={40} disabled={held} onChange={(repeat) => set({ repeat })} />
+          </div>
+        )}
         <p className="note">
           {layup.blocks.flat
-            ? `Flat strips, ripped square, in the order left, top, right, top: the two faces ${inches(layup.strips[0]?.width ?? 1)} wide and the top ${inches(layup.strips[1]?.width ?? 0.5)}. ${layup.repeat} repeats make a panel ${inches(layup.strips.reduce((t, x) => t + x.width, 0) * layup.repeat)} wide, which the steps below cut and flip twice into ${layup.blocks.across} rows of blocks, ${layup.blocks.along} slices wide. Nothing smaller than a slice is handled.`
-            : `One board of each wood, ripped next with the blade tilted 30° into strips about ${inches(blockSide(layup.thickness))} on every side. ${layup.repeat} of each wood make ${layup.repeat} hexagonal log${layup.repeat > 1 ? 's' : ''}, cut into the ${pieces} pieces of the block: ${layup.blocks.across} rows of ${layup.blocks.along}.`}
+            ? `Flat strips, ripped square, in the order left, top, right, top: the two faces ${inches(layup.strips[0]?.width ?? 1)} wide and the top ${inches(layup.strips[1]?.width ?? 0.5)}, all ${inches(layup.thickness)} thick and ${inches(layup.length)} long. ${layup.repeat} repeats of the four: ${4 * layup.repeat} strips.`
+            : `Three boards, one of each wood: ${inches(layup.thickness)} thick, ${inches(boardWidth(blockSide(layup.thickness), layup.repeat, dimensionsOf(design).kerf))} wide and ${inches(layup.length)} long.`}
         </p>
         {warning && <p className="warning">{text(warning)}</p>}
       </section>

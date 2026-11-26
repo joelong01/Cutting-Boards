@@ -6,19 +6,19 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 9.375000 x 0.750000 x 10.750000 | 89191982d2933e63",
   " 2 Trim | panel 1 | 8.875000 x 0.750000 x 10.750000 | ee7f2514dc898b47",
   " 3 Cross cut | slices 6 | 8.250000 x 0.750000 x 10.750000 | e4ff2de05595d8f7",
-  " 4 Turn to end grain | slices 6 | 4.500000 x 1.375000 x 10.750000 | 5006ece219c385ac",
-  " 5 Start another panel | panel 1 | 8.000000 x 1.875000 x 13.250000 | aside 6 | 3c6c0b7c27078fa3",
+  " 4 Turn to end grain | slices 6 | 4.500000 x 1.375000 x 10.750000 | ed493f533527457b",
+  " 5 Start another panel | panel 1 | 8.000000 x 1.875000 x 13.250000 | aside 6 | a2c85d9ec299705e",
   " 6 Flatten | panel 1 | 8.000000 x 1.750000 x 13.250000 | aside 6 | de6edb77ee870780",
   " 7 Trim | panel 1 | 7.500000 x 1.750000 x 13.250000 | aside 6 | 34021df2c3f570ca",
   " 8 Cross cut | slices 5 | 6.875000 x 1.750000 x 13.250000 | aside 6 | b474ab8a91c9fd59",
-  " 9 Turn to end grain | slices 5 | 8.750000 x 1.375000 x 13.250000 | aside 6 | 205907bc28aee61f",
+  " 9 Turn to end grain | slices 5 | 8.750000 x 1.375000 x 13.250000 | aside 6 | c7f82e24321b26bb",
   "10 Interleave the slices | slices 11 | 13.250000 x 1.375000 x 13.250000 | 5f0f942f0119c1e4",
-  "11 Offset | slices 11 | 13.250000 x 1.375000 x 15.750000 | 1958e89343ba9860",
+  "11 Offset | slices 11 | 13.250000 x 1.375000 x 15.750000 | 56428ff21b401134",
   "12 Glue up | panel 1 | 13.250000 x 1.375000 x 15.750000 | 55424e5dbfe5b9c6",
   "13 Flatten | panel 1 | 13.250000 x 1.250000 x 15.750000 | dda2387cf1f0da88",
   "14 Trim | panel 1 | 12.500000 x 1.250000 x 10.000000 | 2a8cce68edb8ad13",
   "15 Finish | panel 1 | 12.500000 x 1.250000 x 10.000000 | 6cb082dd571034f0",
-  "cut list | 7 lines | 2.589952 bf | yield 0.406065 | a531bf301943a744",
+  "cut list | 7 lines | 2.589952 bf | yield 0.406065 | e5f0d54286f9b350",
 ]
 `;
 
@@ -28,21 +28,21 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 13.500000 x 1.000000 x 10.750000 | 376a77d9ae367acf",
   " 2 Trim | panel 1 | 13.000000 x 1.000000 x 10.750000 | adec2c0acc6fc09b",
   " 3 Cross cut | slices 7 | 12.250000 x 1.000000 x 10.750000 | 4b11c1b6ae8a9ebe",
-  " 4 Turn to end grain | slices 7 | 7.000000 x 1.750000 x 10.750000 | d903d946e678140f",
-  " 5 Start another panel | panel 1 | 11.750000 x 2.375000 x 17.250000 | aside 7 | 802dd05b89cc56e4",
+  " 4 Turn to end grain | slices 7 | 7.000000 x 1.750000 x 10.750000 | 88468d8c779f9b17",
+  " 5 Start another panel | panel 1 | 11.750000 x 2.375000 x 17.250000 | aside 7 | 367bade04ba554b6",
   " 6 Flatten | panel 1 | 11.750000 x 2.250000 x 17.250000 | aside 7 | f69ab1c0caf7a724",
   " 7 Trim | panel 1 | 11.250000 x 2.250000 x 17.250000 | aside 7 | d8aef0c5d029cc86",
   " 8 Cross cut | slices 6 | 10.500000 x 2.250000 x 17.250000 | aside 7 | 1622c341934b181f",
-  " 9 Turn to end grain | slices 6 | 13.500000 x 1.750000 x 17.250000 | aside 7 | ca24e6b428dd8538",
+  " 9 Turn to end grain | slices 6 | 13.500000 x 1.750000 x 17.250000 | aside 7 | 0969de29b33213b9",
   "10 Interleave the slices | slices 13 | 20.500000 x 1.750000 x 17.250000 | 322245e9a7964405",
-  "11 Offset | slices 13 | 20.500000 x 1.750000 x 20.500000 | 5a847c5386c70db0",
+  "11 Offset | slices 13 | 20.500000 x 1.750000 x 20.500000 | 20bc33cc807f8068",
   "12 Glue up | panel 1 | 20.500000 x 1.750000 x 20.500000 | 33982403c4bdd38f",
   "13 Flatten | panel 1 | 20.500000 x 1.625000 x 20.500000 | 2c68d623ad829792",
   "14 Trim | panel 1 | 19.500000 x 1.625000 x 9.750000 | 07af9d421996a065",
-  "15 Add a border | panel 1 | 23.750000 x 1.625000 x 14.000000 | bb09bf79cdfc0b44",
+  "15 Add a border | panel 1 | 23.750000 x 1.625000 x 14.000000 | ff17f4f1f51420bb",
   "16 Flatten | panel 1 | 23.750000 x 1.500000 x 14.000000 | 6e18bcc75da3a15e",
   "17 Finish | panel 1 | 23.750000 x 1.500000 x 14.000000 | 2498993cec8b5f2a",
-  "cut list | 11 lines | 8.073351 bf | yield 0.421418 | 4f4f3041ddafcacb",
+  "cut list | 11 lines | 8.073351 bf | yield 0.421418 | 96b7c3deb1447403",
 ]
 `;
 
@@ -52,21 +52,21 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 10.125000 x 0.750000 x 10.750000 | d6b06dadbd29c0fe",
   " 2 Trim | panel 1 | 9.625000 x 0.750000 x 10.750000 | c29616a4e8522c39",
   " 3 Cross cut | slices 6 | 9.000000 x 0.750000 x 10.750000 | beb09d5b7b2706c9",
-  " 4 Turn to end grain | slices 6 | 4.500000 x 1.500000 x 10.750000 | 665138f3bec30a78",
-  " 5 Start another panel | panel 1 | 8.625000 x 1.875000 x 13.250000 | aside 6 | 25003ef16eb5bc47",
+  " 4 Turn to end grain | slices 6 | 4.500000 x 1.500000 x 10.750000 | 3b4b9a3efa30cced",
+  " 5 Start another panel | panel 1 | 8.625000 x 1.875000 x 13.250000 | aside 6 | 9dccc653c540a5ee",
   " 6 Flatten | panel 1 | 8.625000 x 1.750000 x 13.250000 | aside 6 | 53ee5399bcad14d6",
   " 7 Trim | panel 1 | 8.125000 x 1.750000 x 13.250000 | aside 6 | ceebe3165e97e8ba",
   " 8 Cross cut | slices 5 | 7.500000 x 1.750000 x 13.250000 | aside 6 | 16565a6663aa5bcd",
-  " 9 Turn to end grain | slices 5 | 8.750000 x 1.500000 x 13.250000 | aside 6 | 452441fa8c37f3e5",
+  " 9 Turn to end grain | slices 5 | 8.750000 x 1.500000 x 13.250000 | aside 6 | ff418142d777aa0a",
   "10 Interleave the slices | slices 11 | 13.250000 x 1.500000 x 13.250000 | 34cc695691fbb5cd",
-  "11 Offset | slices 11 | 13.250000 x 1.500000 x 15.750000 | 3a525782ed050938",
+  "11 Offset | slices 11 | 13.250000 x 1.500000 x 15.750000 | 09193163bdbc797a",
   "12 Glue up | panel 1 | 13.250000 x 1.500000 x 15.750000 | 53de6eb0f122de46",
   "13 Flatten | panel 1 | 13.250000 x 1.375000 x 15.750000 | 87fe2541680743e9",
   "14 Trim | panel 1 | 12.500000 x 1.375000 x 10.000000 | 8be5c7d2501b3658",
-  "15 Add a border | panel 1 | 15.750000 x 1.375000 x 13.250000 | f0551c3d76058d9e",
+  "15 Add a border | panel 1 | 15.750000 x 1.375000 x 13.250000 | 65940e21c0289bdb",
   "16 Flatten | panel 1 | 15.750000 x 1.250000 x 13.250000 | 4e39d99776bd2857",
   "17 Finish | panel 1 | 15.750000 x 1.250000 x 13.250000 | 1cccb50097ce7c43",
-  "cut list | 11 lines | 4.202908 bf | yield 0.419780 | 5b62527c8a123f4a",
+  "cut list | 11 lines | 4.202908 bf | yield 0.419780 | 35586b84c645d420",
 ]
 `;
 
@@ -76,21 +76,21 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 6.000000 x 0.750000 x 8.250000 | c31965cc0e5001b8",
   " 2 Trim | panel 1 | 5.500000 x 0.750000 x 8.250000 | ee35977aed8927c1",
   " 3 Cross cut | slices 5 | 5.000000 x 0.750000 x 8.250000 | aedd7c72a8dfb921",
-  " 4 Turn to end grain | slices 5 | 3.750000 x 1.000000 x 8.250000 | 45c8181ea99e28bd",
-  " 5 Start another panel | panel 1 | 5.000000 x 1.875000 x 13.250000 | aside 5 | 5a2cf5ea545ecba9",
+  " 4 Turn to end grain | slices 5 | 3.750000 x 1.000000 x 8.250000 | 5d22b35624e13124",
+  " 5 Start another panel | panel 1 | 5.000000 x 1.875000 x 13.250000 | aside 5 | 357adae1c1ce162e",
   " 6 Flatten | panel 1 | 5.000000 x 1.750000 x 13.250000 | aside 5 | a435f4ee4bb9c161",
   " 7 Trim | panel 1 | 4.500000 x 1.750000 x 13.250000 | aside 5 | 43f3e758dcad5f8f",
   " 8 Cross cut | slices 4 | 4.000000 x 1.750000 x 13.250000 | aside 5 | a8de2c8bb984e9a2",
-  " 9 Turn to end grain | slices 4 | 7.000000 x 1.000000 x 13.250000 | aside 5 | 7d0e206e7c3c4efb",
+  " 9 Turn to end grain | slices 4 | 7.000000 x 1.000000 x 13.250000 | aside 5 | e6dc5c79bbf54b9c",
   "10 Interleave the slices | slices 9 | 10.750000 x 1.000000 x 13.250000 | 4f96b6b1db87856a",
-  "11 Offset | slices 9 | 10.750000 x 1.000000 x 15.750000 | 4d4a7accb0f7cc6c",
+  "11 Offset | slices 9 | 10.750000 x 1.000000 x 15.750000 | 55690a8f9088e082",
   "12 Glue up | panel 1 | 10.750000 x 1.000000 x 15.750000 | 0efc38a2816744f4",
   "13 Flatten | panel 1 | 10.750000 x 0.875000 x 15.750000 | d96c975a67e4c1e7",
   "14 Trim | panel 1 | 10.000000 x 0.875000 x 7.500000 | c4b5b8764538b0b7",
-  "15 Add a border | panel 1 | 13.250000 x 0.875000 x 10.750000 | a489fbaefb825d1b",
+  "15 Add a border | panel 1 | 13.250000 x 0.875000 x 10.750000 | 7f0aa628b9f69b6e",
   "16 Flatten | panel 1 | 13.250000 x 0.750000 x 10.750000 | 85172e8a5c784a11",
   "17 Finish | panel 1 | 13.250000 x 0.750000 x 10.750000 | e70f449c550f7773",
-  "cut list | 11 lines | 2.488498 bf | yield 0.282859 | 5afdb6413ae97dfa",
+  "cut list | 11 lines | 2.488498 bf | yield 0.282859 | 7d61ece6e99e5d38",
 ]
 `;
 
@@ -100,21 +100,21 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 9.500000 x 0.750000 x 8.250000 | 14c25948f4f85a4c",
   " 2 Trim | panel 1 | 9.000000 x 0.750000 x 8.250000 | 83ad8853509f388d",
   " 3 Cross cut | slices 6 | 8.250000 x 0.750000 x 8.250000 | fa18fab468d6f431",
-  " 4 Turn to end grain | slices 6 | 4.500000 x 1.375000 x 8.250000 | 93a2cf1eccac80af",
-  " 5 Start another panel | panel 1 | 8.000000 x 1.875000 x 13.250000 | aside 6 | f3eb74f2ce30c214",
+  " 4 Turn to end grain | slices 6 | 4.500000 x 1.375000 x 8.250000 | 1419759129ee3acc",
+  " 5 Start another panel | panel 1 | 8.000000 x 1.875000 x 13.250000 | aside 6 | 92e4e2bc18a9a84e",
   " 6 Flatten | panel 1 | 8.000000 x 1.750000 x 13.250000 | aside 6 | 5ba3fb15ce80fd0f",
   " 7 Trim | panel 1 | 7.500000 x 1.750000 x 13.250000 | aside 6 | 380f9a1074ae3495",
   " 8 Cross cut | slices 5 | 6.875000 x 1.750000 x 13.250000 | aside 6 | 2f1e51c56ca8c62f",
-  " 9 Turn to end grain | slices 5 | 8.750000 x 1.375000 x 13.250000 | aside 6 | 8c38943233ce3d07",
+  " 9 Turn to end grain | slices 5 | 8.750000 x 1.375000 x 13.250000 | aside 6 | 2d231a1a7275d52d",
   "10 Interleave the slices | slices 11 | 13.250000 x 1.375000 x 13.250000 | 20dab4a648027cdd",
-  "11 Offset | slices 11 | 13.250000 x 1.375000 x 15.750000 | 362e8c3a1b54cca8",
+  "11 Offset | slices 11 | 13.250000 x 1.375000 x 15.750000 | ddc81d5b65db2748",
   "12 Glue up | panel 1 | 13.250000 x 1.375000 x 15.750000 | d6450aa09c80f5d2",
   "13 Flatten | panel 1 | 13.250000 x 1.250000 x 15.750000 | f42b61fec66b3f2f",
   "14 Trim | panel 1 | 12.500000 x 1.250000 x 7.500000 | 3df985e872b407b4",
-  "15 Add a border | panel 1 | 15.750000 x 1.250000 x 10.750000 | 24fcfc3a80803c54",
+  "15 Add a border | panel 1 | 15.750000 x 1.250000 x 10.750000 | 37355d68141eb05b",
   "16 Flatten | panel 1 | 15.750000 x 1.125000 x 10.750000 | 3d059031f459e560",
   "17 Finish | panel 1 | 15.750000 x 1.125000 x 10.750000 | 6a2f9a21daecbd0d",
-  "cut list | 11 lines | 3.617052 bf | yield 0.353872 | 7bb205436390650f",
+  "cut list | 11 lines | 3.617052 bf | yield 0.353872 | f33ca5838618d40e",
 ]
 `;
 
@@ -124,21 +124,21 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 11.750000 x 0.750000 x 10.750000 | 15ceffd87779780f",
   " 2 Trim | panel 1 | 11.250000 x 0.750000 x 10.750000 | df141674418cf789",
   " 3 Cross cut | slices 7 | 10.500000 x 0.750000 x 10.750000 | 4a808cc0574cd966",
-  " 4 Turn to end grain | slices 7 | 5.250000 x 1.500000 x 10.750000 | 741a0a9ba710fe46",
-  " 5 Start another panel | panel 1 | 10.250000 x 1.875000 x 13.250000 | aside 7 | d7b2e8d90b30d9a0",
+  " 4 Turn to end grain | slices 7 | 5.250000 x 1.500000 x 10.750000 | 1591efd5a2f20060",
+  " 5 Start another panel | panel 1 | 10.250000 x 1.875000 x 13.250000 | aside 7 | ad3b861eee90de0e",
   " 6 Flatten | panel 1 | 10.250000 x 1.750000 x 13.250000 | aside 7 | bf94eddada6465f8",
   " 7 Trim | panel 1 | 9.750000 x 1.750000 x 13.250000 | aside 7 | efdc47d55b5ce696",
   " 8 Cross cut | slices 6 | 9.000000 x 1.750000 x 13.250000 | aside 7 | af59ed4d47b8342d",
-  " 9 Turn to end grain | slices 6 | 10.500000 x 1.500000 x 13.250000 | aside 7 | 553433150f0bdf79",
+  " 9 Turn to end grain | slices 6 | 10.500000 x 1.500000 x 13.250000 | aside 7 | fbd848d260013d01",
   "10 Interleave the slices | slices 13 | 15.750000 x 1.500000 x 13.250000 | 708a13212f25ee12",
-  "11 Offset | slices 13 | 15.750000 x 1.500000 x 15.750000 | 4c5a971c85204c90",
+  "11 Offset | slices 13 | 15.750000 x 1.500000 x 15.750000 | 75685d21068c2602",
   "12 Glue up | panel 1 | 15.750000 x 1.500000 x 15.750000 | 0068e1a97bde0f00",
   "13 Flatten | panel 1 | 15.750000 x 1.375000 x 15.750000 | 5222e9577698d58f",
   "14 Trim | panel 1 | 15.000000 x 1.375000 x 10.000000 | 769e78ebc858d244",
-  "15 Add a border | panel 1 | 18.250000 x 1.375000 x 13.250000 | 52ec3c05c34a47f8",
+  "15 Add a border | panel 1 | 18.250000 x 1.375000 x 13.250000 | 3b4b9f292af2ca64",
   "16 Flatten | panel 1 | 18.250000 x 1.250000 x 13.250000 | 67d6a098977bfe1d",
   "17 Finish | panel 1 | 18.250000 x 1.250000 x 13.250000 | a0f88f0305ebb85d",
-  "cut list | 11 lines | 4.789876 bf | yield 0.427480 | 828612cd6a1f24fc",
+  "cut list | 11 lines | 4.789876 bf | yield 0.427480 | 7c313e526fe56a52",
 ]
 `;
 
@@ -148,21 +148,21 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 19.500000 x 0.750000 x 15.750000 | a946cfa39bba9d60",
   " 2 Trim | panel 1 | 19.000000 x 0.750000 x 15.750000 | a93b497d4eea76f5",
   " 3 Cross cut | slices 8 | 18.000000 x 0.750000 x 15.750000 | 541b76c818156bd2",
-  " 4 Turn to end grain | slices 8 | 6.000000 x 2.250000 x 15.750000 | 3470b12367622a02",
-  " 5 Start another panel | panel 1 | 17.125000 x 1.875000 x 18.250000 | aside 8 | 0c03f5b19c10d189",
+  " 4 Turn to end grain | slices 8 | 6.000000 x 2.250000 x 15.750000 | 9896fd362c56cb7c",
+  " 5 Start another panel | panel 1 | 17.125000 x 1.875000 x 18.250000 | aside 8 | 6ed2533641ac3abd",
   " 6 Flatten | panel 1 | 17.125000 x 1.750000 x 18.250000 | aside 8 | 1836cef621dc2b43",
   " 7 Trim | panel 1 | 16.625000 x 1.750000 x 18.250000 | aside 8 | 83382ab89614cb7c",
   " 8 Cross cut | slices 7 | 15.750000 x 1.750000 x 18.250000 | aside 8 | bd465c983898df5a",
-  " 9 Turn to end grain | slices 7 | 12.250000 x 2.250000 x 18.250000 | aside 8 | 00e79bce77b1dbe7",
+  " 9 Turn to end grain | slices 7 | 12.250000 x 2.250000 x 18.250000 | aside 8 | cb6404e42a341026",
   "10 Interleave the slices | slices 15 | 18.250000 x 2.250000 x 18.250000 | 27f466bf811a9b45",
-  "11 Offset | slices 15 | 18.250000 x 2.250000 x 20.750000 | b2252bae361c2a3a",
+  "11 Offset | slices 15 | 18.250000 x 2.250000 x 20.750000 | 7aed94815ac7557e",
   "12 Glue up | panel 1 | 18.250000 x 2.250000 x 20.750000 | 3f1c3a0fea4a1ccf",
   "13 Flatten | panel 1 | 18.250000 x 2.125000 x 20.750000 | 1aaa528d879e96c3",
   "14 Trim | panel 1 | 17.500000 x 2.125000 x 15.000000 | 1abb0c2416ad8615",
-  "15 Add a border | panel 1 | 20.750000 x 2.125000 x 18.250000 | 771448dae6eb1e4b",
+  "15 Add a border | panel 1 | 20.750000 x 2.125000 x 18.250000 | 116e167e600f8bfe",
   "16 Flatten | panel 1 | 20.750000 x 2.000000 x 18.250000 | d7951e3ccaa45253",
   "17 Finish | panel 1 | 20.750000 x 2.000000 x 18.250000 | 694cfdf3b6ce6119",
-  "cut list | 11 lines | 9.949110 bf | yield 0.522074 | 218c9ba585b05c21",
+  "cut list | 11 lines | 9.949110 bf | yield 0.522074 | 13856daefbc54cbe",
 ]
 `;
 
@@ -172,21 +172,21 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 10.125000 x 0.750000 x 10.750000 | d6b06dadbd29c0fe",
   " 2 Trim | panel 1 | 9.625000 x 0.750000 x 10.750000 | c29616a4e8522c39",
   " 3 Cross cut | slices 6 | 9.000000 x 0.750000 x 10.750000 | beb09d5b7b2706c9",
-  " 4 Turn to end grain | slices 6 | 4.500000 x 1.500000 x 10.750000 | 665138f3bec30a78",
-  " 5 Start another panel | panel 1 | 8.625000 x 1.875000 x 13.250000 | aside 6 | 25003ef16eb5bc47",
+  " 4 Turn to end grain | slices 6 | 4.500000 x 1.500000 x 10.750000 | 3b4b9a3efa30cced",
+  " 5 Start another panel | panel 1 | 8.625000 x 1.875000 x 13.250000 | aside 6 | 9dccc653c540a5ee",
   " 6 Flatten | panel 1 | 8.625000 x 1.750000 x 13.250000 | aside 6 | 53ee5399bcad14d6",
   " 7 Trim | panel 1 | 8.125000 x 1.750000 x 13.250000 | aside 6 | ceebe3165e97e8ba",
   " 8 Cross cut | slices 5 | 7.500000 x 1.750000 x 13.250000 | aside 6 | 16565a6663aa5bcd",
-  " 9 Turn to end grain | slices 5 | 8.750000 x 1.500000 x 13.250000 | aside 6 | 452441fa8c37f3e5",
+  " 9 Turn to end grain | slices 5 | 8.750000 x 1.500000 x 13.250000 | aside 6 | ff418142d777aa0a",
   "10 Interleave the slices | slices 11 | 13.250000 x 1.500000 x 13.250000 | 34cc695691fbb5cd",
-  "11 Offset | slices 11 | 13.250000 x 1.500000 x 15.750000 | 3a525782ed050938",
+  "11 Offset | slices 11 | 13.250000 x 1.500000 x 15.750000 | 09193163bdbc797a",
   "12 Glue up | panel 1 | 13.250000 x 1.500000 x 15.750000 | 53de6eb0f122de46",
   "13 Flatten | panel 1 | 13.250000 x 1.375000 x 15.750000 | 87fe2541680743e9",
   "14 Trim | panel 1 | 12.500000 x 1.375000 x 10.000000 | 8be5c7d2501b3658",
-  "15 Add a border | panel 1 | 15.750000 x 1.375000 x 13.250000 | f0551c3d76058d9e",
+  "15 Add a border | panel 1 | 15.750000 x 1.375000 x 13.250000 | 65940e21c0289bdb",
   "16 Flatten | panel 1 | 15.750000 x 1.250000 x 13.250000 | 4e39d99776bd2857",
   "17 Finish | panel 1 | 15.750000 x 1.250000 x 13.250000 | 1cccb50097ce7c43",
-  "cut list | 11 lines | 4.202908 bf | yield 0.419780 | 5b62527c8a123f4a",
+  "cut list | 11 lines | 4.202908 bf | yield 0.419780 | 35586b84c645d420",
 ]
 `;
 
@@ -196,13 +196,13 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 24.500000 x 1.250000 x 14.000000 | d94e8f2dc6607297",
   " 2 Trim | panel 1 | 24.000000 x 1.250000 x 14.000000 | db68ef85c2e5662a",
   " 3 Cross cut | slices 13 | 21.125000 x 1.250000 x 14.000000 | de2fd5b27634246f",
-  " 4 Turn to end grain | slices 13 | 16.250000 x 1.625000 x 14.000000 | ff1e944c52e103d7",
-  " 5 Offset | slices 13 | 16.250000 x 1.625000 x 15.000000 | 35032654f6e7f250",
+  " 4 Turn to end grain | slices 13 | 16.250000 x 1.625000 x 14.000000 | e6293523ff735eac",
+  " 5 Offset | slices 13 | 16.250000 x 1.625000 x 15.000000 | a3258359fe729adf",
   " 6 Glue up | panel 1 | 16.250000 x 1.625000 x 15.000000 | dcac6594cc16c8e5",
   " 7 Trim | panel 1 | 16.250000 x 1.625000 x 13.000000 | 2bfc61064b839dcc",
   " 8 Flatten | panel 1 | 16.250000 x 1.500000 x 13.000000 | d9ee415c108e11fb",
   " 9 Finish | panel 1 | 16.250000 x 1.500000 x 13.000000 | 11bacd2553cf1d8b",
-  "cut list | 1 lines | 3.951172 bf | yield 0.544853 | 8372cb32dace32ca",
+  "cut list | 1 lines | 3.951172 bf | yield 0.544853 | 0509a6082f205f48",
 ]
 `;
 
@@ -212,13 +212,13 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 10.500000 x 1.200000 x 10.000000 | 4d657b7c4d3fa86e",
   " 2 Trim | panel 1 | 10.000000 x 1.200000 x 10.000000 | 69006b0d82d58b00",
   " 3 Cross cut | slices 10 | 8.750000 x 1.200000 x 10.000000 | 4691a7cc5418d67f",
-  " 4 Turn to end grain | slices 10 | 12.000000 x 0.875000 x 10.000000 | 2e01613276975c8e",
-  " 5 Offset | slices 10 | 12.000000 x 0.875000 x 11.000000 | 228659d7ee1b46cc",
+  " 4 Turn to end grain | slices 10 | 12.000000 x 0.875000 x 10.000000 | 5bf315aacb672fbf",
+  " 5 Offset | slices 10 | 12.000000 x 0.875000 x 11.000000 | 9f0153044e7c9121",
   " 6 Glue up | panel 1 | 12.000000 x 0.875000 x 11.000000 | 11d5066642320620",
   " 7 Trim | panel 1 | 12.000000 x 0.875000 x 9.000000 | 7f83bfc39bc5f754",
   " 8 Flatten | panel 1 | 12.000000 x 0.750000 x 9.000000 | 792e3c24d8d696a2",
   " 9 Finish | panel 1 | 12.000000 x 0.750000 x 9.000000 | cc0723110db0d33b",
-  "cut list | 1 lines | 1.230360 bf | yield 0.432975 | ab85474119d7926b",
+  "cut list | 1 lines | 1.230360 bf | yield 0.432975 | c1b8d46433f46037",
 ]
 `;
 
@@ -228,13 +228,13 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 17.000000 x 1.208333 x 11.181818 | 6ab057b329616ca3",
   " 2 Trim | panel 1 | 16.500000 x 1.208333 x 11.181818 | d3f6aa7b6ba74ed1",
   " 3 Cross cut | slices 12 | 15.000000 x 1.208333 x 11.181818 | c2f837359d9d2305",
-  " 4 Turn to end grain | slices 12 | 14.500000 x 1.250000 x 11.181818 | 87d150ca2a73210b",
-  " 5 Offset | slices 12 | 14.500000 x 1.250000 x 12.113636 | 4497614d32b7b142",
+  " 4 Turn to end grain | slices 12 | 14.500000 x 1.250000 x 11.181818 | 5670a468b740c32b",
+  " 5 Offset | slices 12 | 14.500000 x 1.250000 x 12.113636 | fe9f93669c9744ae",
   " 6 Glue up | panel 1 | 14.500000 x 1.250000 x 12.113636 | 042f6f04e5a69b50",
   " 7 Trim | panel 1 | 14.500000 x 1.250000 x 10.250000 | 4880822aa6169eb2",
   " 8 Flatten | panel 1 | 14.500000 x 1.125000 x 10.250000 | bd36d86eaf77ecbb",
   " 9 Finish | panel 1 | 14.500000 x 1.125000 x 10.250000 | 1b15c06007f93b4b",
-  "cut list | 1 lines | 2.175071 bf | yield 0.517022 | e803588bda42fc34",
+  "cut list | 1 lines | 2.175071 bf | yield 0.517022 | 854dbff6105cdd51",
 ]
 `;
 
@@ -244,13 +244,13 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 20.000000 x 1.230769 x 12.923077 | ca6fb09d2610004b",
   " 2 Trim | panel 1 | 19.500000 x 1.230769 x 12.923077 | f761bf1384088fc6",
   " 3 Cross cut | slices 13 | 17.875000 x 1.230769 x 12.923077 | 8cef9ef7a18936ce",
-  " 4 Turn to end grain | slices 13 | 16.000000 x 1.375000 x 12.923077 | 250b3b448c351779",
-  " 5 Offset | slices 13 | 16.000000 x 1.375000 x 13.846154 | b15a07d9d98c7dd3",
+  " 4 Turn to end grain | slices 13 | 16.000000 x 1.375000 x 12.923077 | f48331770ed3f1e3",
+  " 5 Offset | slices 13 | 16.000000 x 1.375000 x 13.846154 | 181a42e0d09e54f4",
   " 6 Glue up | panel 1 | 16.000000 x 1.375000 x 13.846154 | 9b34bb43f22302d8",
   " 7 Trim | panel 1 | 16.000000 x 1.375000 x 12.000000 | 44e1acfddd01674a",
   " 8 Flatten | panel 1 | 16.000000 x 1.250000 x 12.000000 | 981a6ef4a9a70b8c",
   " 9 Finish | panel 1 | 16.000000 x 1.250000 x 12.000000 | cdeb643a01cca5b0",
-  "cut list | 1 lines | 2.979633 bf | yield 0.545209 | a9e5921ae8ff0ec7",
+  "cut list | 1 lines | 2.979633 bf | yield 0.545209 | ea7d82d09da2a22e",
 ]
 `;
 
@@ -260,13 +260,13 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 36.500000 x 1.250000 x 16.941176 | 89e874896b773dab",
   " 2 Trim | panel 1 | 36.000000 x 1.250000 x 16.941176 | 1f669ae1347afea6",
   " 3 Cross cut | slices 16 | 34.000000 x 1.250000 x 16.941176 | 03543443752564f4",
-  " 4 Turn to end grain | slices 16 | 20.000000 x 2.125000 x 16.941176 | 29e016dee7577aec",
-  " 5 Offset | slices 16 | 20.000000 x 2.125000 x 17.882353 | d85909957113a2d1",
+  " 4 Turn to end grain | slices 16 | 20.000000 x 2.125000 x 16.941176 | 3f149fa469617590",
+  " 5 Offset | slices 16 | 20.000000 x 2.125000 x 17.882353 | 09278ad6f1b07bea",
   " 6 Glue up | panel 1 | 20.000000 x 2.125000 x 17.882353 | 01405a02c72579cc",
   " 7 Trim | panel 1 | 20.000000 x 2.125000 x 16.000000 | 2d78d4875f6a530e",
   " 8 Flatten | panel 1 | 20.000000 x 2.000000 x 16.000000 | 3ef5a99acf21e0bc",
   " 9 Finish | panel 1 | 20.000000 x 2.000000 x 16.000000 | b14f22ae4b319672",
-  "cut list | 1 lines | 7.057100 bf | yield 0.621288 | 44001cc500595aa4",
+  "cut list | 1 lines | 7.057100 bf | yield 0.621288 | 1227e89a94447062",
 ]
 `;
 
@@ -276,12 +276,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 18.250000 x 1.625000 x 14.000000 | d9941d7343164d63",
   " 2 Trim | panel 1 | 17.750000 x 1.625000 x 14.000000 | b81be9dc36f9cf62",
   " 3 Cross cut | slices 13 | 16.250000 x 1.625000 x 14.000000 | 2610372624154cb9",
-  " 4 Offset | slices 13 | 16.250000 x 1.625000 x 15.000000 | 126a6584f2de5a36",
+  " 4 Offset | slices 13 | 16.250000 x 1.625000 x 15.000000 | 5fa175e17b1cc2ea",
   " 5 Glue up | panel 1 | 16.250000 x 1.625000 x 15.000000 | 47e86754716f0aac",
   " 6 Trim | panel 1 | 16.250000 x 1.625000 x 13.000000 | 3ede6a8eababf23d",
   " 7 Flatten | panel 1 | 16.250000 x 1.500000 x 13.000000 | 452bebe9db9a0ef4",
   " 8 Finish | panel 1 | 16.250000 x 1.500000 x 13.000000 | 98d2750193ec7f8a",
-  "cut list | 1 lines | 3.728434 bf | yield 0.577403 | 94a562f44b223c69",
+  "cut list | 1 lines | 3.728434 bf | yield 0.577403 | 70717e012e48e7ef",
 ]
 `;
 
@@ -291,13 +291,13 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 24.500000 x 1.250000 x 14.000000 | d94e8f2dc6607297",
   " 2 Trim | panel 1 | 24.000000 x 1.250000 x 14.000000 | db68ef85c2e5662a",
   " 3 Cross cut | slices 13 | 21.125000 x 1.250000 x 14.000000 | de2fd5b27634246f",
-  " 4 Turn to end grain | slices 13 | 16.250000 x 1.625000 x 14.000000 | ff1e944c52e103d7",
-  " 5 Offset | slices 13 | 16.250000 x 1.625000 x 15.000000 | 35032654f6e7f250",
+  " 4 Turn to end grain | slices 13 | 16.250000 x 1.625000 x 14.000000 | e6293523ff735eac",
+  " 5 Offset | slices 13 | 16.250000 x 1.625000 x 15.000000 | a3258359fe729adf",
   " 6 Glue up | panel 1 | 16.250000 x 1.625000 x 15.000000 | dcac6594cc16c8e5",
   " 7 Trim | panel 1 | 16.250000 x 1.625000 x 13.000000 | 2bfc61064b839dcc",
   " 8 Flatten | panel 1 | 16.250000 x 1.500000 x 13.000000 | d9ee415c108e11fb",
   " 9 Finish | panel 1 | 16.250000 x 1.500000 x 13.000000 | 11bacd2553cf1d8b",
-  "cut list | 1 lines | 3.951172 bf | yield 0.544853 | 8372cb32dace32ca",
+  "cut list | 1 lines | 3.951172 bf | yield 0.544853 | 0509a6082f205f48",
 ]
 `;
 
@@ -307,12 +307,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 22.500000 x 1.500000 x 12.000000 | c7b9fc4fa52d4886",
   " 2 Trim | panel 1 | 22.000000 x 1.500000 x 12.000000 | 4c5ba2ce1318f6b2",
   " 3 Cross cut | slices 12 | 19.500000 x 1.500000 x 12.000000 | 5f512ae19d83c95f",
-  " 4 Turn to end grain | slices 12 | 18.000000 x 1.625000 x 12.000000 | eff1104bd2dcdf13",
-  " 5 Flip | slices 12 | 18.000000 x 1.625000 x 12.000000 | 59737ed94125557b",
+  " 4 Turn to end grain | slices 12 | 18.000000 x 1.625000 x 12.000000 | d07ccfcdf816aaef",
+  " 5 Flip | slices 12 | 18.000000 x 1.625000 x 12.000000 | 522b25969d9b0b52",
   " 6 Glue up | panel 1 | 18.000000 x 1.625000 x 12.000000 | c929765dfbc6cb08",
   " 7 Flatten | panel 1 | 18.000000 x 1.500000 x 12.000000 | a62354fc6296ea17",
   " 8 Finish | panel 1 | 18.000000 x 1.500000 x 12.000000 | f3e90c0e5017edce",
-  "cut list | 2 lines | 3.712674 bf | yield 0.592754 | 5c079e65997cc91f",
+  "cut list | 2 lines | 3.712674 bf | yield 0.592754 | 6b008bca03c761d3",
 ]
 `;
 
@@ -322,12 +322,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 8.500000 x 1.500000 x 9.000000 | a55f1c3e02a524f9",
   " 2 Trim | panel 1 | 8.000000 x 1.500000 x 9.000000 | 1ff7c7fdb5eaeb80",
   " 3 Cross cut | slices 8 | 7.000000 x 1.500000 x 9.000000 | 7f9a5361cbc4f6e4",
-  " 4 Turn to end grain | slices 8 | 12.000000 x 0.875000 x 9.000000 | 07947aa0aedbb653",
-  " 5 Flip | slices 8 | 12.000000 x 0.875000 x 9.000000 | 7306e061be0a45d9",
+  " 4 Turn to end grain | slices 8 | 12.000000 x 0.875000 x 9.000000 | efee4af7455ceb58",
+  " 5 Flip | slices 8 | 12.000000 x 0.875000 x 9.000000 | feda987436706063",
   " 6 Glue up | panel 1 | 12.000000 x 0.875000 x 9.000000 | 825aaff7158301f1",
   " 7 Flatten | panel 1 | 12.000000 x 0.750000 x 9.000000 | 72c152b713bddba7",
   " 8 Finish | panel 1 | 12.000000 x 0.750000 x 9.000000 | 1fb6ada7d2051808",
-  "cut list | 2 lines | 1.125651 bf | yield 0.470525 | 9c1a3fb7b4bb4e0a",
+  "cut list | 2 lines | 1.125651 bf | yield 0.470525 | 70cebddd98cc2378",
 ]
 `;
 
@@ -337,12 +337,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 14.250000 x 1.450000 x 10.250000 | dc321b7c3e3e705b",
   " 2 Trim | panel 1 | 13.750000 x 1.450000 x 10.250000 | 0402a075a5cfe337",
   " 3 Cross cut | slices 10 | 12.500000 x 1.450000 x 10.250000 | 7c7b66b2d01db569",
-  " 4 Turn to end grain | slices 10 | 14.500000 x 1.250000 x 10.250000 | c92dbfd32e836d0d",
-  " 5 Flip | slices 10 | 14.500000 x 1.250000 x 10.250000 | 4be9790e6d8b66ee",
+  " 4 Turn to end grain | slices 10 | 14.500000 x 1.250000 x 10.250000 | d27395dbec80abd7",
+  " 5 Flip | slices 10 | 14.500000 x 1.250000 x 10.250000 | 632397fb9ce387ca",
   " 6 Glue up | panel 1 | 14.500000 x 1.250000 x 10.250000 | 583410528cdcd8d1",
   " 7 Flatten | panel 1 | 14.500000 x 1.125000 x 10.250000 | d6a3206a6511a7a4",
   " 8 Finish | panel 1 | 14.500000 x 1.125000 x 10.250000 | 9fb80ab61a6c6eca",
-  "cut list | 2 lines | 2.025391 bf | yield 0.553488 | 7bd21c738b5f01af",
+  "cut list | 2 lines | 2.025391 bf | yield 0.553488 | d6e0f21ce451a8f9",
 ]
 `;
 
@@ -352,12 +352,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 17.000000 x 1.454545 x 12.000000 | e703d56829c28d4c",
   " 2 Trim | panel 1 | 16.500000 x 1.454545 x 12.000000 | 6080749bf1afb142",
   " 3 Cross cut | slices 11 | 15.125000 x 1.454545 x 12.000000 | ed06ea9d5537ec7d",
-  " 4 Turn to end grain | slices 11 | 16.000000 x 1.375000 x 12.000000 | c30f1baec33d9567",
-  " 5 Flip | slices 11 | 16.000000 x 1.375000 x 12.000000 | 7eb0b614873b2221",
+  " 4 Turn to end grain | slices 11 | 16.000000 x 1.375000 x 12.000000 | d67a1fd1e35657ef",
+  " 5 Flip | slices 11 | 16.000000 x 1.375000 x 12.000000 | fdfd0e9d5d9c4b5a",
   " 6 Glue up | panel 1 | 16.000000 x 1.375000 x 12.000000 | 2a69852c84d23616",
   " 7 Flatten | panel 1 | 16.000000 x 1.250000 x 12.000000 | 83104c6649d228c8",
   " 8 Finish | panel 1 | 16.000000 x 1.250000 x 12.000000 | a15c99cbe5beef93",
-  "cut list | 2 lines | 2.769886 bf | yield 0.585275 | 344cde38316ba485",
+  "cut list | 2 lines | 2.769886 bf | yield 0.585275 | aab1341e103f5352",
 ]
 `;
 
@@ -367,12 +367,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 32.000000 x 1.428571 x 16.000000 | 2f84212c4d9d8c26",
   " 2 Trim | panel 1 | 31.500000 x 1.428571 x 16.000000 | 4cbc8b6d1fc1e5f0",
   " 3 Cross cut | slices 14 | 29.750000 x 1.428571 x 16.000000 | 906cb26eb180136c",
-  " 4 Turn to end grain | slices 14 | 20.000000 x 2.125000 x 16.000000 | da43a5e3473feb5c",
-  " 5 Flip | slices 14 | 20.000000 x 2.125000 x 16.000000 | bbc2b158970197cd",
+  " 4 Turn to end grain | slices 14 | 20.000000 x 2.125000 x 16.000000 | dc638f475bfb3078",
+  " 5 Flip | slices 14 | 20.000000 x 2.125000 x 16.000000 | a406b521a2a854ba",
   " 6 Glue up | panel 1 | 20.000000 x 2.125000 x 16.000000 | 9c3b07c115bf6543",
   " 7 Flatten | panel 1 | 20.000000 x 2.000000 x 16.000000 | 123f75cb6cbc8a85",
   " 8 Finish | panel 1 | 20.000000 x 2.000000 x 16.000000 | c63c59f09a66a6f3",
-  "cut list | 2 lines | 6.731771 bf | yield 0.651222 | a7affd2d8e28e574",
+  "cut list | 2 lines | 6.731771 bf | yield 0.651222 | 637f7fea543b2c2f",
 ]
 `;
 
@@ -382,11 +382,11 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 20.000000 x 1.625000 x 12.000000 | 2ba4126f114c92c7",
   " 2 Trim | panel 1 | 19.500000 x 1.625000 x 12.000000 | a56dc57b4852b45c",
   " 3 Cross cut | slices 12 | 18.000000 x 1.625000 x 12.000000 | cf543ff2a43ff315",
-  " 4 Flip | slices 12 | 18.000000 x 1.625000 x 12.000000 | b83ebf013014e67d",
+  " 4 Flip | slices 12 | 18.000000 x 1.625000 x 12.000000 | 382cd8764f47f42a",
   " 5 Glue up | panel 1 | 18.000000 x 1.625000 x 12.000000 | 22be105ddc17495c",
   " 6 Flatten | panel 1 | 18.000000 x 1.500000 x 12.000000 | 5730e41715ce1fcb",
   " 7 Finish | panel 1 | 18.000000 x 1.500000 x 12.000000 | 165d3f40212fb619",
-  "cut list | 2 lines | 3.554688 bf | yield 0.619099 | cdf349cebebafa12",
+  "cut list | 2 lines | 3.554688 bf | yield 0.619099 | 98761fb7e016fd7f",
 ]
 `;
 
@@ -396,12 +396,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 22.500000 x 1.500000 x 12.000000 | c7b9fc4fa52d4886",
   " 2 Trim | panel 1 | 22.000000 x 1.500000 x 12.000000 | 4c5ba2ce1318f6b2",
   " 3 Cross cut | slices 12 | 19.500000 x 1.500000 x 12.000000 | 5f512ae19d83c95f",
-  " 4 Turn to end grain | slices 12 | 18.000000 x 1.625000 x 12.000000 | eff1104bd2dcdf13",
-  " 5 Flip | slices 12 | 18.000000 x 1.625000 x 12.000000 | 59737ed94125557b",
+  " 4 Turn to end grain | slices 12 | 18.000000 x 1.625000 x 12.000000 | d07ccfcdf816aaef",
+  " 5 Flip | slices 12 | 18.000000 x 1.625000 x 12.000000 | 522b25969d9b0b52",
   " 6 Glue up | panel 1 | 18.000000 x 1.625000 x 12.000000 | c929765dfbc6cb08",
   " 7 Flatten | panel 1 | 18.000000 x 1.500000 x 12.000000 | a62354fc6296ea17",
   " 8 Finish | panel 1 | 18.000000 x 1.500000 x 12.000000 | f3e90c0e5017edce",
-  "cut list | 2 lines | 3.712674 bf | yield 0.592754 | 5c079e65997cc91f",
+  "cut list | 2 lines | 3.712674 bf | yield 0.592754 | 6b008bca03c761d3",
 ]
 `;
 
@@ -411,12 +411,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 11.375000 x 1.500000 x 12.000000 | 9f9552562dca531e",
   " 2 Trim | panel 1 | 10.875000 x 1.500000 x 12.000000 | 15c256b5ee6fc71d",
   " 3 Cross cut | slices 8 | 10.000000 x 1.500000 x 12.000000 | 8bd1ed29de0bec4f",
-  " 4 Turn to end grain | slices 8 | 12.000000 x 1.250000 x 12.000000 | 26e13b2397cc3516",
-  " 5 Flip | slices 8 | 12.000000 x 1.250000 x 12.000000 | 9d7028ba4b08754e",
+  " 4 Turn to end grain | slices 8 | 12.000000 x 1.250000 x 12.000000 | 0d92759c540dd2ff",
+  " 5 Flip | slices 8 | 12.000000 x 1.250000 x 12.000000 | c9d4a3cf79629434",
   " 6 Glue up | panel 1 | 12.000000 x 1.250000 x 12.000000 | 2c00bd2edb89c97f",
   " 7 Flatten | panel 1 | 12.000000 x 1.125000 x 12.000000 | b3beb77b23c031f6",
   " 8 Finish | panel 1 | 12.000000 x 1.125000 x 12.000000 | 17f851dae396c6c1",
-  "cut list | 2 lines | 1.955078 bf | yield 0.568883 | e89e0d4378b6379f",
+  "cut list | 2 lines | 1.955078 bf | yield 0.568883 | a36aa99f3b6a2955",
 ]
 `;
 
@@ -426,12 +426,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 14.375000 x 2.000000 x 16.000000 | 26d6893e06a65697",
   " 2 Trim | panel 1 | 13.875000 x 2.000000 x 16.000000 | 6e0f5f388947e3d5",
   " 3 Cross cut | slices 8 | 13.000000 x 2.000000 x 16.000000 | be800f92013702f0",
-  " 4 Turn to end grain | slices 8 | 16.000000 x 1.625000 x 16.000000 | afff8cffce8a4536",
-  " 5 Flip | slices 8 | 16.000000 x 1.625000 x 16.000000 | 2ad9839ebc93ae95",
+  " 4 Turn to end grain | slices 8 | 16.000000 x 1.625000 x 16.000000 | 54636a00d0a99ae6",
+  " 5 Flip | slices 8 | 16.000000 x 1.625000 x 16.000000 | d6fd126b7bc93553",
   " 6 Glue up | panel 1 | 16.000000 x 1.625000 x 16.000000 | b11ace7eaf419f16",
   " 7 Flatten | panel 1 | 16.000000 x 1.500000 x 16.000000 | 23bad4a8c870060e",
   " 8 Finish | panel 1 | 16.000000 x 1.500000 x 16.000000 | 6be96a46bda3a0bb",
-  "cut list | 2 lines | 4.083984 bf | yield 0.648756 | eebcbb997d7239e1",
+  "cut list | 2 lines | 4.083984 bf | yield 0.648756 | a2cf94bfb8286a69",
 ]
 `;
 
@@ -441,11 +441,11 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 13.375000 x 1.250000 x 12.000000 | 06a95b098dccdc35",
   " 2 Trim | panel 1 | 12.875000 x 1.250000 x 12.000000 | de3e1d9597054963",
   " 3 Cross cut | slices 8 | 12.000000 x 1.250000 x 12.000000 | ed7408c918a4074e",
-  " 4 Flip | slices 8 | 12.000000 x 1.250000 x 12.000000 | 5bcbfb9e20eb653a",
+  " 4 Flip | slices 8 | 12.000000 x 1.250000 x 12.000000 | a0d093fb5f8a2520",
   " 5 Glue up | panel 1 | 12.000000 x 1.250000 x 12.000000 | 8f8c6362152ca7f3",
   " 6 Flatten | panel 1 | 12.000000 x 1.125000 x 12.000000 | 85ef9e481624a208",
   " 7 Finish | panel 1 | 12.000000 x 1.125000 x 12.000000 | 3a57b1fa22f88fac",
-  "cut list | 2 lines | 1.946615 bf | yield 0.571357 | 3cc39a97eb84cdb9",
+  "cut list | 2 lines | 1.946615 bf | yield 0.571357 | cf8134f42503d67f",
 ]
 `;
 
@@ -455,11 +455,11 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 17.375000 x 1.625000 x 16.000000 | c52bbbcaaa7c3a82",
   " 2 Trim | panel 1 | 16.875000 x 1.625000 x 16.000000 | 6b41d7e7cb416d53",
   " 3 Cross cut | slices 8 | 16.000000 x 1.625000 x 16.000000 | 7a75b61ebb5506f8",
-  " 4 Flip | slices 8 | 16.000000 x 1.625000 x 16.000000 | 364fc526444b9629",
+  " 4 Flip | slices 8 | 16.000000 x 1.625000 x 16.000000 | 354d5b7b19d377c0",
   " 5 Glue up | panel 1 | 16.000000 x 1.625000 x 16.000000 | 198bf3a6c70660c5",
   " 6 Flatten | panel 1 | 16.000000 x 1.500000 x 16.000000 | e76b8ccb9e98a0d3",
   " 7 Finish | panel 1 | 16.000000 x 1.500000 x 16.000000 | 26e276ac5e36c10b",
-  "cut list | 2 lines | 4.067383 bf | yield 0.651404 | adc32ff2953e8a1a",
+  "cut list | 2 lines | 4.067383 bf | yield 0.651404 | 811a926d72311487",
 ]
 `;
 
@@ -468,12 +468,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 0 First glue-up | panel 1 | 30.000000 x 1.000000 x 12.500000 | 282038c34cbfa2d1",
   " 1 Flatten | panel 1 | 30.000000 x 0.875000 x 12.500000 | 0e290f0c3c05f5cf",
   " 2 Cross cut | slices 9 | 18.000000 x 0.875000 x 19.677670 | ac50ab1354bcf359",
-  " 3 Flip | slices 9 | 18.000000 x 0.875000 x 19.677670 | e598d3d6b98bcc99",
+  " 3 Flip | slices 9 | 18.000000 x 0.875000 x 19.677670 | 1cfc3445c64f7088",
   " 4 Glue up | panel 1 | 18.000000 x 0.875000 x 19.677670 | db81aef04eb9cd39",
   " 5 Trim | panel 1 | 18.000000 x 0.875000 x 9.354076 | 7439f6f886b86aca",
   " 6 Flatten | panel 1 | 18.000000 x 0.812500 x 9.354076 | 00e254f3e5710f80",
   " 7 Finish | panel 1 | 18.000000 x 0.812500 x 9.354076 | 71925fda08b2a4cf",
-  "cut list | 4 lines | 3.481445 bf | yield 0.260659 | ab0d5df99d6d1873",
+  "cut list | 4 lines | 3.481445 bf | yield 0.260659 | ce97a1162c6a6934",
 ]
 `;
 
@@ -482,12 +482,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 0 First glue-up | panel 1 | 19.500000 x 0.937500 x 15.000000 | c5b6634884037dc5",
   " 1 Flatten | panel 1 | 19.500000 x 0.812500 x 15.000000 | 2fe73e872ea566b6",
   " 2 Cross cut | slices 6 | 12.000000 x 0.812500 x 23.213203 | aee63597bbc195a4",
-  " 3 Flip | slices 6 | 12.000000 x 0.812500 x 23.213203 | 396bfb46635d72b5",
+  " 3 Flip | slices 6 | 12.000000 x 0.812500 x 23.213203 | fa71ab736735e672",
   " 4 Glue up | panel 1 | 12.000000 x 0.812500 x 23.213203 | 9c40181bc4eb2410",
   " 5 Trim | panel 1 | 12.000000 x 0.812500 x 10.790368 | 9ca92960a26b1b6e",
   " 6 Flatten | panel 1 | 12.000000 x 0.750000 x 10.790368 | f3ba71183bac8810",
   " 7 Finish | panel 1 | 12.000000 x 0.750000 x 10.790368 | 2a36674d39888290",
-  "cut list | 4 lines | 2.609212 bf | yield 0.245177 | b68e39eabec117d6",
+  "cut list | 4 lines | 2.609212 bf | yield 0.245177 | 9d19ceb72b4e6cee",
 ]
 `;
 
@@ -496,12 +496,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 0 First glue-up | panel 1 | 25.500000 x 1.312500 x 15.000000 | 4225da18443b2ecd",
   " 1 Flatten | panel 1 | 25.500000 x 1.187500 x 15.000000 | 7ccd5b96a31c6e96",
   " 2 Cross cut | slices 8 | 16.000000 x 1.187500 x 23.213203 | a1798edb0319defc",
-  " 3 Flip | slices 8 | 16.000000 x 1.187500 x 23.213203 | 78be13f003528db6",
+  " 3 Flip | slices 8 | 16.000000 x 1.187500 x 23.213203 | 15be67d7ad9722e3",
   " 4 Glue up | panel 1 | 16.000000 x 1.187500 x 23.213203 | 7a41b5b70d1d0fa3",
   " 5 Trim | panel 1 | 16.000000 x 1.187500 x 10.775649 | 4b74424e4dfbfd48",
   " 6 Flatten | panel 1 | 16.000000 x 1.125000 x 10.775649 | 1223ec1ed46fd624",
   " 7 Finish | panel 1 | 16.000000 x 1.125000 x 10.775649 | 5cfe98cf602b2b24",
-  "cut list | 4 lines | 4.563314 bf | yield 0.285962 | 24e27eb7b91f5158",
+  "cut list | 4 lines | 4.563314 bf | yield 0.285962 | f2987a0cddd3a5e6",
 ]
 `;
 
@@ -510,12 +510,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 0 First glue-up | panel 1 | 27.500000 x 1.437500 x 17.500000 | 836307bfda0fd5d7",
   " 1 Flatten | panel 1 | 27.500000 x 1.312500 x 17.500000 | 536e315ac38a5c04",
   " 2 Cross cut | slices 8 | 16.000000 x 1.312500 x 26.748737 | 1536ae3ddaadddc6",
-  " 3 Flip | slices 8 | 16.000000 x 1.312500 x 26.748737 | b826c3fd5b238b9c",
+  " 3 Flip | slices 8 | 16.000000 x 1.312500 x 26.748737 | 37c69b366ee3928c",
   " 4 Glue up | panel 1 | 16.000000 x 1.312500 x 26.748737 | 80cb7c641612032b",
   " 5 Trim | panel 1 | 16.000000 x 1.312500 x 12.889610 | 8e59fee2c32a4119",
   " 6 Flatten | panel 1 | 16.000000 x 1.250000 x 12.889610 | b4d31bca8bf590fb",
   " 7 Finish | panel 1 | 16.000000 x 1.250000 x 12.889610 | b167bc2dc39ba3e6",
-  "cut list | 4 lines | 6.223551 bf | yield 0.280292 | 8db6cf299272476d",
+  "cut list | 4 lines | 6.223551 bf | yield 0.280292 | f6df984428d2bd33",
 ]
 `;
 
@@ -524,12 +524,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 0 First glue-up | panel 1 | 34.500000 x 2.187500 x 22.500000 | f0e8a6d572c257f2",
   " 1 Flatten | panel 1 | 34.500000 x 2.062500 x 22.500000 | b6ee6f07cbc2a703",
   " 2 Cross cut | slices 10 | 20.000000 x 2.062500 x 33.819805 | a8602e5e9e94a83f",
-  " 3 Flip | slices 10 | 20.000000 x 2.062500 x 33.819805 | 279c9a4a36ad9363",
+  " 3 Flip | slices 10 | 20.000000 x 2.062500 x 33.819805 | 46186b4ba4ae6221",
   " 4 Glue up | panel 1 | 20.000000 x 2.062500 x 33.819805 | c019eb1fe6263848",
   " 5 Trim | panel 1 | 20.000000 x 2.062500 x 17.110173 | 0a1155e18e799628",
   " 6 Flatten | panel 1 | 20.000000 x 2.000000 x 17.110173 | 44e944dcd41691ad",
   " 7 Finish | panel 1 | 20.000000 x 2.000000 x 17.110173 | 03989af78207a9c1",
-  "cut list | 4 lines | 14.751221 bf | yield 0.318069 | cc1ea12c68693bbf",
+  "cut list | 4 lines | 14.751221 bf | yield 0.318069 | 9ceb7f554f0ee08a",
 ]
 `;
 
@@ -538,12 +538,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 0 First glue-up | panel 1 | 30.000000 x 1.000000 x 12.500000 | 282038c34cbfa2d1",
   " 1 Flatten | panel 1 | 30.000000 x 0.875000 x 12.500000 | 0e290f0c3c05f5cf",
   " 2 Cross cut | slices 9 | 18.000000 x 0.875000 x 19.677670 | ac50ab1354bcf359",
-  " 3 Flip | slices 9 | 18.000000 x 0.875000 x 19.677670 | e598d3d6b98bcc99",
+  " 3 Flip | slices 9 | 18.000000 x 0.875000 x 19.677670 | 1cfc3445c64f7088",
   " 4 Glue up | panel 1 | 18.000000 x 0.875000 x 19.677670 | db81aef04eb9cd39",
   " 5 Trim | panel 1 | 18.000000 x 0.875000 x 9.354076 | 7439f6f886b86aca",
   " 6 Flatten | panel 1 | 18.000000 x 0.812500 x 9.354076 | 00e254f3e5710f80",
   " 7 Finish | panel 1 | 18.000000 x 0.812500 x 9.354076 | 71925fda08b2a4cf",
-  "cut list | 4 lines | 3.481445 bf | yield 0.260659 | ab0d5df99d6d1873",
+  "cut list | 4 lines | 3.481445 bf | yield 0.260659 | ce97a1162c6a6934",
 ]
 `;
 
@@ -553,18 +553,18 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 4.500000 x 2.000000 x 7.687500 | e31097a394251703",
   " 2 Trim | panel 1 | 4.000000 x 2.000000 x 7.687500 | eadbd9b6d3650409",
   " 3 Cross cut | slices 3 | 3.750000 x 2.000000 x 7.687500 | 5a29b065fc3b880d",
-  " 4 Turn to end grain | slices 3 | 6.000000 x 1.250000 x 7.687500 | 0ae2eeb5ff94cd42",
+  " 4 Turn to end grain | slices 3 | 6.000000 x 1.250000 x 7.687500 | be34a433c380b6d7",
   " 5 Insert accent strips | slices 7 | 8.250000 x 1.250000 x 7.687500 | a576bce198dd815e",
   " 6 Glue up | panel 1 | 8.250000 x 1.250000 x 7.687500 | 9cd9eaec2d68db36",
   " 7 Flatten | panel 1 | 8.250000 x 1.125000 x 7.687500 | c506e3a28e57b4f4",
   " 8 Quarter-turn panel | panel 1 | 7.687500 x 1.125000 x 8.250000 | 2b7e2fcbfd1661e3",
   " 9 Cross cut | slices 3 | 7.125000 x 1.125000 x 8.250000 | bbca57b03f727787",
-  "10 Insert accent strips | slices 7 | 7.875000 x 1.125000 x 8.250000 | 77a516db19346b85",
+  "10 Insert accent strips | slices 7 | 7.875000 x 1.125000 x 8.250000 | eb06bcd5a6e01c28",
   "11 Glue up | panel 1 | 7.875000 x 1.125000 x 8.250000 | da69e88b34a6fb04",
   "12 Flatten | panel 1 | 7.875000 x 1.000000 x 8.250000 | afd70d4607549c3f",
   "13 Trim | panel 1 | 7.875000 x 1.000000 x 7.875000 | 359705b6f64be75b",
   "14 Finish | panel 1 | 7.875000 x 1.000000 x 7.875000 | 0ff9839471f8c41d",
-  "cut list | 6 lines | 0.939738 bf | yield 0.435724 | 2e74584246913cce",
+  "cut list | 6 lines | 0.939738 bf | yield 0.435724 | 65ad11827bc50393",
 ]
 `;
 
@@ -574,18 +574,18 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 10.125000 x 1.500000 x 7.500000 | 18f21c41ce40574a",
   " 2 Trim | panel 1 | 9.625000 x 1.500000 x 7.500000 | a2cf4ce87d8db90e",
   " 3 Cross cut | slices 6 | 9.000000 x 1.500000 x 7.500000 | 703cc36820367ebf",
-  " 4 Turn to end grain | slices 6 | 9.000000 x 1.500000 x 7.500000 | c153511ad93d8448",
+  " 4 Turn to end grain | slices 6 | 9.000000 x 1.500000 x 7.500000 | f7198fe34fda7485",
   " 5 Insert accent strips | slices 13 | 11.625000 x 1.500000 x 7.500000 | 087b41d395ee0122",
   " 6 Glue up | panel 1 | 11.625000 x 1.500000 x 7.500000 | dec1bb29dedcf51e",
   " 7 Flatten | panel 1 | 11.625000 x 1.375000 x 7.500000 | b6e17355ddf46e8f",
   " 8 Quarter-turn panel | panel 1 | 7.500000 x 1.375000 x 11.625000 | d381f009b2e66f99",
   " 9 Cross cut | slices 4 | 7.000000 x 1.375000 x 11.625000 | e4e263bf11429b28",
-  "10 Insert accent strips | slices 9 | 7.625000 x 1.375000 x 11.625000 | fa9c4b80fe48e12d",
+  "10 Insert accent strips | slices 9 | 7.625000 x 1.375000 x 11.625000 | 91ada9e05ade7f7d",
   "11 Glue up | panel 1 | 7.625000 x 1.375000 x 11.625000 | 598c9ae6019961b7",
   "12 Flatten | panel 1 | 7.625000 x 1.250000 x 11.625000 | 35d2c0c3c14a2a70",
   "13 Trim | panel 1 | 7.625000 x 1.250000 x 11.375000 | 32e38fc73410e79c",
   "14 Finish | panel 1 | 7.625000 x 1.250000 x 11.375000 | 5a44a3563eb77b85",
-  "cut list | 6 lines | 1.415582 bf | yield 0.511419 | 88500bd3557c73ae",
+  "cut list | 6 lines | 1.415582 bf | yield 0.511419 | 0247ae70ced43c97",
 ]
 `;
 
@@ -600,12 +600,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 6 Flatten | panel 1 | 8.250000 x 1.125000 x 7.687500 | 0f4e125d9ae3af4b",
   " 7 Quarter-turn panel | panel 1 | 7.687500 x 1.125000 x 8.250000 | 83fd8f6952c6e979",
   " 8 Cross cut | slices 3 | 7.125000 x 1.125000 x 8.250000 | b23f52e1622aaa77",
-  " 9 Insert accent strips | slices 7 | 7.875000 x 1.125000 x 8.250000 | e4ca2bc852990835",
+  " 9 Insert accent strips | slices 7 | 7.875000 x 1.125000 x 8.250000 | a62524ce1145b6ee",
   "10 Glue up | panel 1 | 7.875000 x 1.125000 x 8.250000 | 1f4324e6846d211b",
   "11 Flatten | panel 1 | 7.875000 x 1.000000 x 8.250000 | 0973e4967ba167b9",
   "12 Trim | panel 1 | 7.875000 x 1.000000 x 7.875000 | 3fe340ebedfb418c",
   "13 Finish | panel 1 | 7.875000 x 1.000000 x 7.875000 | f47d513f32a95a3d",
-  "cut list | 6 lines | 0.897746 bf | yield 0.456105 | b04acd31419a042d",
+  "cut list | 6 lines | 0.897746 bf | yield 0.456105 | fc42165b480e4635",
 ]
 `;
 
@@ -620,12 +620,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 6 Flatten | panel 1 | 11.625000 x 1.375000 x 7.500000 | 6f1d218a2b6af633",
   " 7 Quarter-turn panel | panel 1 | 7.500000 x 1.375000 x 11.625000 | 387879f1a1655454",
   " 8 Cross cut | slices 4 | 7.000000 x 1.375000 x 11.625000 | 825fd2db50f8c16e",
-  " 9 Insert accent strips | slices 9 | 7.625000 x 1.375000 x 11.625000 | c869c605d2d30936",
+  " 9 Insert accent strips | slices 9 | 7.625000 x 1.375000 x 11.625000 | 3e6b96e5b3aa396b",
   "10 Glue up | panel 1 | 7.625000 x 1.375000 x 11.625000 | a9450e0a41c1f9b6",
   "11 Flatten | panel 1 | 7.625000 x 1.250000 x 11.625000 | 3b2cfe9253a64a74",
   "12 Trim | panel 1 | 7.625000 x 1.250000 x 11.375000 | ac8105ab9449844b",
   "13 Finish | panel 1 | 7.625000 x 1.250000 x 11.375000 | a93ea8969a93de09",
-  "cut list | 6 lines | 1.415582 bf | yield 0.511419 | c8926422688643a6",
+  "cut list | 6 lines | 1.415582 bf | yield 0.511419 | 8e324d980c7765cd",
 ]
 `;
 
@@ -634,10 +634,10 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 0 First glue-up | panel 1 | 14.500000 x 1.250000 x 10.000000 | 4d035ebb2cd3d316",
   " 1 Trim | panel 1 | 14.000000 x 1.250000 x 10.000000 | 7c778b9912f552ae",
   " 2 Flatten | panel 1 | 14.000000 x 1.187500 x 10.000000 | e5d1193b0c342b16",
-  " 3 Add a border | panel 1 | 16.000000 x 1.187500 x 12.000000 | 783430e50c57f6bd",
+  " 3 Add a border | panel 1 | 16.000000 x 1.187500 x 12.000000 | d65977f4e5da59f5",
   " 4 Flatten | panel 1 | 16.000000 x 1.125000 x 12.000000 | c314379fad3124d9",
   " 5 Finish | panel 1 | 16.000000 x 1.125000 x 12.000000 | 81971e8b62c6e0ca",
-  "cut list | 4 lines | 2.220757 bf | yield 0.656135 | 6d9d8b9d63ffc7a9",
+  "cut list | 4 lines | 2.220757 bf | yield 0.656135 | 8d830cd2801e1fe9",
 ]
 `;
 
@@ -646,10 +646,10 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 0 First glue-up | panel 1 | 10.500000 x 0.875000 x 7.000000 | 9bf085f60283e6f6",
   " 1 Trim | panel 1 | 10.000000 x 0.875000 x 7.000000 | 998b1d2edf952755",
   " 2 Flatten | panel 1 | 10.000000 x 0.812500 x 7.000000 | 551a8f100356b05c",
-  " 3 Add a border | panel 1 | 12.000000 x 0.812500 x 9.000000 | f671d87a03b759d0",
+  " 3 Add a border | panel 1 | 12.000000 x 0.812500 x 9.000000 | e4245f2d2f71a564",
   " 4 Flatten | panel 1 | 12.000000 x 0.750000 x 9.000000 | 4e330881ce8d1144",
   " 5 Finish | panel 1 | 12.000000 x 0.750000 x 9.000000 | def56f0892f32e93",
-  "cut list | 4 lines | 0.936523 bf | yield 0.568167 | 99ac9c6f166d7370",
+  "cut list | 4 lines | 0.936523 bf | yield 0.568167 | e8085fb66e892869",
 ]
 `;
 
@@ -658,10 +658,10 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 0 First glue-up | panel 1 | 13.000000 x 1.250000 x 8.250000 | 353cd3a5c0bd32ae",
   " 1 Trim | panel 1 | 12.500000 x 1.250000 x 8.250000 | 485e0876017db673",
   " 2 Flatten | panel 1 | 12.500000 x 1.187500 x 8.250000 | cf288351f6cc1ea8",
-  " 3 Add a border | panel 1 | 14.500000 x 1.187500 x 10.250000 | 69e2764d315c1cd0",
+  " 3 Add a border | panel 1 | 14.500000 x 1.187500 x 10.250000 | 31f909743220f89c",
   " 4 Flatten | panel 1 | 14.500000 x 1.125000 x 10.250000 | 625a7058573461c9",
   " 5 Finish | panel 1 | 14.500000 x 1.125000 x 10.250000 | 9b04329ae0c8c4d9",
-  "cut list | 4 lines | 1.744113 bf | yield 0.644334 | 5942935c35315670",
+  "cut list | 4 lines | 1.744113 bf | yield 0.644334 | 5d0375a9107f900c",
 ]
 `;
 
@@ -670,10 +670,10 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 0 First glue-up | panel 1 | 14.500000 x 1.375000 x 10.000000 | 6ca60c46d0092084",
   " 1 Trim | panel 1 | 14.000000 x 1.375000 x 10.000000 | 290b9e1f34f757a7",
   " 2 Flatten | panel 1 | 14.000000 x 1.312500 x 10.000000 | 1dae095342d831d6",
-  " 3 Add a border | panel 1 | 16.000000 x 1.312500 x 12.000000 | 04a552124a676d11",
+  " 3 Add a border | panel 1 | 16.000000 x 1.312500 x 12.000000 | 8164eb238004bc43",
   " 4 Flatten | panel 1 | 16.000000 x 1.250000 x 12.000000 | ed06bff3e6eca86f",
   " 5 Finish | panel 1 | 16.000000 x 1.250000 x 12.000000 | 73170fb4e4b79594",
-  "cut list | 4 lines | 2.425130 bf | yield 0.669490 | ee22a061ba6cb166",
+  "cut list | 4 lines | 2.425130 bf | yield 0.669490 | 3aaf1dd87c27f1a7",
 ]
 `;
 
@@ -682,10 +682,10 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 0 First glue-up | panel 1 | 18.500000 x 2.125000 x 14.000000 | 5ae222e984e3018f",
   " 1 Trim | panel 1 | 18.000000 x 2.125000 x 14.000000 | b6d220bc708d6b95",
   " 2 Flatten | panel 1 | 18.000000 x 2.062500 x 14.000000 | 188c4206826f1207",
-  " 3 Add a border | panel 1 | 20.000000 x 2.062500 x 16.000000 | bb79364c2dd2f379",
+  " 3 Add a border | panel 1 | 20.000000 x 2.062500 x 16.000000 | 8933f4f5a1140d1a",
   " 4 Flatten | panel 1 | 20.000000 x 2.000000 x 16.000000 | 33c0661700add3b1",
   " 5 Finish | panel 1 | 20.000000 x 2.000000 x 16.000000 | 6c71a38a4315bf59",
-  "cut list | 4 lines | 5.991211 bf | yield 0.732179 | 507fec725d430646",
+  "cut list | 4 lines | 5.991211 bf | yield 0.732179 | 59705e25645339f7",
 ]
 `;
 
@@ -694,10 +694,10 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 0 First glue-up | panel 1 | 14.500000 x 1.250000 x 10.000000 | 4d035ebb2cd3d316",
   " 1 Trim | panel 1 | 14.000000 x 1.250000 x 10.000000 | 7c778b9912f552ae",
   " 2 Flatten | panel 1 | 14.000000 x 1.187500 x 10.000000 | e5d1193b0c342b16",
-  " 3 Add a border | panel 1 | 16.000000 x 1.187500 x 12.000000 | 783430e50c57f6bd",
+  " 3 Add a border | panel 1 | 16.000000 x 1.187500 x 12.000000 | d65977f4e5da59f5",
   " 4 Flatten | panel 1 | 16.000000 x 1.125000 x 12.000000 | c314379fad3124d9",
   " 5 Finish | panel 1 | 16.000000 x 1.125000 x 12.000000 | 81971e8b62c6e0ca",
-  "cut list | 4 lines | 2.220757 bf | yield 0.656135 | 6d9d8b9d63ffc7a9",
+  "cut list | 4 lines | 2.220757 bf | yield 0.656135 | 8d830cd2801e1fe9",
 ]
 `;
 
@@ -707,12 +707,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Trim | panel 1 | 15.750000 x 1.229167 x 10.000000 | 4ceb5948e0485c1d",
   " 2 Flatten | panel 1 | 15.750000 x 1.166667 x 10.000000 | 3098445663b3882e",
   " 3 Cross cut | slices 12 | 14.250000 x 1.166667 x 10.000000 | 8e3235523858f2b3",
-  " 4 Turn to end grain | slices 12 | 14.000000 x 1.187500 x 10.000000 | 53e4e3dc5e50c996",
+  " 4 Turn to end grain | slices 12 | 14.000000 x 1.187500 x 10.000000 | 1d4ee0be8121f06d",
   " 5 Glue up | panel 1 | 14.000000 x 1.187500 x 10.000000 | 6deb9500a632e9b7",
-  " 6 Add a border | panel 1 | 16.000000 x 1.187500 x 12.000000 | 9171d46c033a6626",
+  " 6 Add a border | panel 1 | 16.000000 x 1.187500 x 12.000000 | 39577498d945ae22",
   " 7 Flatten | panel 1 | 16.000000 x 1.125000 x 12.000000 | b253de679f37db5e",
   " 8 Finish | panel 1 | 16.000000 x 1.125000 x 12.000000 | 44b457c6bf64201a",
-  "cut list | 4 lines | 2.674791 bf | yield 0.545333 | 7db2d1d0b8ba5873",
+  "cut list | 4 lines | 2.674791 bf | yield 0.545333 | 268e90aee7358d7c",
 ]
 `;
 
@@ -782,10 +782,10 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Trim | panel 1 | 18.750000 x 1.191667 x 11.000000 | b8076cc7d882e1a2",
   " 2 Flatten | panel 1 | 18.750000 x 1.066667 x 11.000000 | 5a4026943fed40a3",
   " 3 Cross cut | slices 15 | 16.875000 x 1.066667 x 11.000000 | f40ab459588fd2c4",
-  " 4 Turn to end grain | slices 15 | 16.000000 x 1.125000 x 11.000000 | 8630ecd2b8acf18b",
+  " 4 Turn to end grain | slices 15 | 16.000000 x 1.125000 x 11.000000 | 4e94e8bba6a409d6",
   " 5 Glue up | panel 1 | 16.000000 x 1.125000 x 11.000000 | warning | 8fb39e64b3793172",
   " 6 Finish | panel 1 | 16.000000 x 1.125000 x 11.000000 | 4c13d4f68f2ccbda",
-  "cut list | 3 lines | 2.198730 bf | yield 0.606354 | 76357d475f807b42",
+  "cut list | 3 lines | 2.198730 bf | yield 0.606354 | 6c0a281af2e8874b",
 ]
 `;
 
@@ -795,12 +795,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 20.500000 x 1.000000 x 12.250000 | 3f1abbe034795d47",
   " 2 Trim | panel 1 | 20.000000 x 1.000000 x 12.250000 | d267d2edcfd5d8f7",
   " 3 Cross cut | slices 14 | 17.500000 x 1.000000 x 12.250000 | a86ccb7be331144b",
-  " 4 Turn to end grain | slices 14 | 14.000000 x 1.250000 x 12.250000 | 210cd58d283c5b5c",
-  " 5 Insert accent strips | slices 27 | 15.625000 x 1.250000 x 12.250000 | 938685f8246f4cd1",
+  " 4 Turn to end grain | slices 14 | 14.000000 x 1.250000 x 12.250000 | d489d7d9f309c4ea",
+  " 5 Insert accent strips | slices 27 | 15.625000 x 1.250000 x 12.250000 | 8950d40e12de9413",
   " 6 Glue up | panel 1 | 15.625000 x 1.250000 x 12.250000 | 403ab2223d721f4e",
   " 7 Flatten | panel 1 | 15.625000 x 1.125000 x 12.250000 | c7512772004f0993",
   " 8 Finish | panel 1 | 15.625000 x 1.125000 x 12.250000 | 12714148f6eb9945",
-  "cut list | 3 lines | 2.748454 bf | yield 0.528325 | a63db3eced4eff3f",
+  "cut list | 3 lines | 2.748454 bf | yield 0.528325 | 50f4d0220ffd3606",
 ]
 `;
 
@@ -810,12 +810,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 11.500000 x 0.977273 x 9.000000 | a72be329bb8d9f0d",
   " 2 Trim | panel 1 | 11.000000 x 0.977273 x 9.000000 | bbce45186ba14ac9",
   " 3 Cross cut | slices 11 | 9.625000 x 0.977273 x 9.000000 | 840d51ff54edb0a2",
-  " 4 Turn to end grain | slices 11 | 10.750000 x 0.875000 x 9.000000 | ba23a114ca72034f",
-  " 5 Insert accent strips | slices 21 | 12.000000 x 0.875000 x 9.000000 | 929d4b47cc2e8a19",
+  " 4 Turn to end grain | slices 11 | 10.750000 x 0.875000 x 9.000000 | 9e2714832ee31792",
+  " 5 Insert accent strips | slices 21 | 12.000000 x 0.875000 x 9.000000 | f2e13755ec403c13",
   " 6 Glue up | panel 1 | 12.000000 x 0.875000 x 9.000000 | b95e78adc86e444b",
   " 7 Flatten | panel 1 | 12.000000 x 0.750000 x 9.000000 | 8695b9306ff474e8",
   " 8 Finish | panel 1 | 12.000000 x 0.750000 x 9.000000 | 26e8c32c510d42d9",
-  "cut list | 3 lines | 1.165463 bf | yield 0.455505 | 1a6009107235d33c",
+  "cut list | 3 lines | 1.165463 bf | yield 0.455505 | 49a118e1a3424a7f",
 ]
 `;
 
@@ -825,12 +825,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 18.250000 x 1.000000 x 10.250000 | 2147c545c80116ab",
   " 2 Trim | panel 1 | 17.750000 x 1.000000 x 10.250000 | 13bfce95acff85f9",
   " 3 Cross cut | slices 13 | 16.250000 x 1.000000 x 10.250000 | 361aabef16f49f9f",
-  " 4 Turn to end grain | slices 13 | 13.000000 x 1.250000 x 10.250000 | 2e7de4c835df2380",
-  " 5 Insert accent strips | slices 25 | 14.500000 x 1.250000 x 10.250000 | 0f331946d752fdf9",
+  " 4 Turn to end grain | slices 13 | 13.000000 x 1.250000 x 10.250000 | a43d92f5bad096f5",
+  " 5 Insert accent strips | slices 25 | 14.500000 x 1.250000 x 10.250000 | b41367ee0a8412b2",
   " 6 Glue up | panel 1 | 14.500000 x 1.250000 x 10.250000 | 04a0742f56461302",
   " 7 Flatten | panel 1 | 14.500000 x 1.125000 x 10.250000 | aa46efcb0c0db6eb",
   " 8 Finish | panel 1 | 14.500000 x 1.125000 x 10.250000 | 6c93108fae03e429",
-  "cut list | 3 lines | 2.082791 bf | yield 0.539118 | 8bbf364deec9f538",
+  "cut list | 3 lines | 2.082791 bf | yield 0.539118 | 9247aa1a109b7e49",
 ]
 `;
 
@@ -840,12 +840,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 23.000000 x 0.950000 x 12.000000 | c6b18cb990128f04",
   " 2 Trim | panel 1 | 22.500000 x 0.950000 x 12.000000 | 965f9a290d74bbaa",
   " 3 Cross cut | slices 15 | 20.625000 x 0.950000 x 12.000000 | 78c57ab4f03bda09",
-  " 4 Turn to end grain | slices 15 | 14.250000 x 1.375000 x 12.000000 | 5f2a3fef15e03b8f",
-  " 5 Insert accent strips | slices 29 | 16.000000 x 1.375000 x 12.000000 | 4585e78d9151aad9",
+  " 4 Turn to end grain | slices 15 | 14.250000 x 1.375000 x 12.000000 | f456a0a8ca4fcf7d",
+  " 5 Insert accent strips | slices 29 | 16.000000 x 1.375000 x 12.000000 | 9b6fc0154efa6c24",
   " 6 Glue up | panel 1 | 16.000000 x 1.375000 x 12.000000 | c2a6e0a7846835b9",
   " 7 Flatten | panel 1 | 16.000000 x 1.250000 x 12.000000 | 83d05d62c8e86743",
   " 8 Finish | panel 1 | 16.000000 x 1.250000 x 12.000000 | d6713c18ac724e46",
-  "cut list | 3 lines | 2.911979 bf | yield 0.557138 | a97df466e0d41f9c",
+  "cut list | 3 lines | 2.911979 bf | yield 0.557138 | 66157781209061a0",
 ]
 `;
 
@@ -855,12 +855,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 41.000000 x 0.993056 x 16.000000 | 177ec4d53d2949dd",
   " 2 Trim | panel 1 | 40.500000 x 0.993056 x 16.000000 | 9c93fdac8379f8f6",
   " 3 Cross cut | slices 18 | 38.250000 x 0.993056 x 16.000000 | 744dae04bba9a485",
-  " 4 Turn to end grain | slices 18 | 17.875000 x 2.125000 x 16.000000 | eedee424431e9e3a",
-  " 5 Insert accent strips | slices 35 | 20.000000 x 2.125000 x 16.000000 | 4c697c6d9ff5f1fc",
+  " 4 Turn to end grain | slices 18 | 17.875000 x 2.125000 x 16.000000 | 62c608e4732a868c",
+  " 5 Insert accent strips | slices 35 | 20.000000 x 2.125000 x 16.000000 | 6aa53dd538eaa5fd",
   " 6 Glue up | panel 1 | 20.000000 x 2.125000 x 16.000000 | 2f50f28f7e63dd7b",
   " 7 Flatten | panel 1 | 20.000000 x 2.000000 x 16.000000 | c0e23c7ca7761fa2",
   " 8 Finish | panel 1 | 20.000000 x 2.000000 x 16.000000 | 5678295f8e28f325",
-  "cut list | 3 lines | 7.045175 bf | yield 0.622470 | 1792f1cab2370eef",
+  "cut list | 3 lines | 7.045175 bf | yield 0.622470 | 9e5d8cbe9609129c",
 ]
 `;
 
@@ -870,11 +870,11 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 16.500000 x 1.250000 x 12.000000 | e7c1675f8f6a4b65",
   " 2 Trim | panel 1 | 16.000000 x 1.250000 x 12.000000 | 560a91b0e3aba461",
   " 3 Cross cut | slices 15 | 14.250000 x 1.250000 x 12.000000 | 6cf763189c0c20ee",
-  " 4 Insert accent strips | slices 29 | 16.000000 x 1.250000 x 12.000000 | e1e690b687949c87",
+  " 4 Insert accent strips | slices 29 | 16.000000 x 1.250000 x 12.000000 | 919b977ec03ad3b3",
   " 5 Glue up | panel 1 | 16.000000 x 1.250000 x 12.000000 | ebe7d8574a817090",
   " 6 Flatten | panel 1 | 16.000000 x 1.125000 x 12.000000 | 752fba996bbec993",
   " 7 Finish | panel 1 | 16.000000 x 1.125000 x 12.000000 | 2c83a494212353ba",
-  "cut list | 3 lines | 2.655382 bf | yield 0.548279 | 370a678b2febac6a",
+  "cut list | 3 lines | 2.655382 bf | yield 0.548279 | 0ccd5c2334c31dc4",
 ]
 `;
 
@@ -884,12 +884,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 20.500000 x 1.000000 x 12.250000 | 3f1abbe034795d47",
   " 2 Trim | panel 1 | 20.000000 x 1.000000 x 12.250000 | d267d2edcfd5d8f7",
   " 3 Cross cut | slices 14 | 17.500000 x 1.000000 x 12.250000 | a86ccb7be331144b",
-  " 4 Turn to end grain | slices 14 | 14.000000 x 1.250000 x 12.250000 | 210cd58d283c5b5c",
-  " 5 Insert accent strips | slices 27 | 15.625000 x 1.250000 x 12.250000 | 938685f8246f4cd1",
+  " 4 Turn to end grain | slices 14 | 14.000000 x 1.250000 x 12.250000 | d489d7d9f309c4ea",
+  " 5 Insert accent strips | slices 27 | 15.625000 x 1.250000 x 12.250000 | 8950d40e12de9413",
   " 6 Glue up | panel 1 | 15.625000 x 1.250000 x 12.250000 | 403ab2223d721f4e",
   " 7 Flatten | panel 1 | 15.625000 x 1.125000 x 12.250000 | c7512772004f0993",
   " 8 Finish | panel 1 | 15.625000 x 1.125000 x 12.250000 | 12714148f6eb9945",
-  "cut list | 3 lines | 2.748454 bf | yield 0.528325 | a63db3eced4eff3f",
+  "cut list | 3 lines | 2.748454 bf | yield 0.528325 | 50f4d0220ffd3606",
 ]
 `;
 
@@ -959,10 +959,10 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Trim | panel 1 | 18.750000 x 1.191667 x 12.000000 | 5c7ff0b13ffa9294",
   " 2 Flatten | panel 1 | 18.750000 x 1.066667 x 12.000000 | 72a1c5e910e82e68",
   " 3 Cross cut | slices 15 | 16.875000 x 1.066667 x 12.000000 | a87603831b332f4d",
-  " 4 Turn to end grain | slices 15 | 16.000000 x 1.125000 x 12.000000 | b8780a02c2f3a2e5",
+  " 4 Turn to end grain | slices 15 | 16.000000 x 1.125000 x 12.000000 | 6b6aee61107df497",
   " 5 Glue up | panel 1 | 16.000000 x 1.125000 x 12.000000 | warning | 4f7c109f6a49904c",
   " 6 Finish | panel 1 | 16.000000 x 1.125000 x 12.000000 | 508c284881fcfb9d",
-  "cut list | 1 lines | 2.407031 bf | yield 0.605231 | 6f60bb0bc5a266c7",
+  "cut list | 1 lines | 2.407031 bf | yield 0.605231 | fd764daa5b1de246",
 ]
 `;
 
@@ -972,12 +972,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 22.500000 x 1.500000 x 12.000000 | 0a27c3d186152326",
   " 2 Trim | panel 1 | 22.000000 x 1.500000 x 12.000000 | 02ecf354027cecc0",
   " 3 Cross cut | slices 12 | 19.500000 x 1.500000 x 12.000000 | aca083d59fe36d1a",
-  " 4 Turn to end grain | slices 12 | 18.000000 x 1.625000 x 12.000000 | 48a738f72e3f7c57",
-  " 5 Flip | slices 12 | 18.000000 x 1.625000 x 12.000000 | fd7390fdb120228a",
+  " 4 Turn to end grain | slices 12 | 18.000000 x 1.625000 x 12.000000 | 819663a9f757076b",
+  " 5 Flip | slices 12 | 18.000000 x 1.625000 x 12.000000 | 96de20c227a82bab",
   " 6 Glue up | panel 1 | 18.000000 x 1.625000 x 12.000000 | 9848e8311f3d8a73",
   " 7 Flatten | panel 1 | 18.000000 x 1.500000 x 12.000000 | 1d7b88d097d94f15",
   " 8 Finish | panel 1 | 18.000000 x 1.500000 x 12.000000 | a18378fa08953382",
-  "cut list | 1 lines | 3.712674 bf | yield 0.592754 | 55dad58ac7d61986",
+  "cut list | 1 lines | 3.712674 bf | yield 0.592754 | 4106537175f736f5",
 ]
 `;
 
@@ -987,12 +987,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 8.500000 x 1.500000 x 9.000000 | b31dc4167ba865d6",
   " 2 Trim | panel 1 | 8.000000 x 1.500000 x 9.000000 | 774d2713499abba6",
   " 3 Cross cut | slices 8 | 7.000000 x 1.500000 x 9.000000 | db6e58cda246ba7d",
-  " 4 Turn to end grain | slices 8 | 12.000000 x 0.875000 x 9.000000 | 6eb2015c4a4563c8",
-  " 5 Flip | slices 8 | 12.000000 x 0.875000 x 9.000000 | 656f011d39aa4f89",
+  " 4 Turn to end grain | slices 8 | 12.000000 x 0.875000 x 9.000000 | 567260cbe6981e14",
+  " 5 Flip | slices 8 | 12.000000 x 0.875000 x 9.000000 | 7bda01902521c635",
   " 6 Glue up | panel 1 | 12.000000 x 0.875000 x 9.000000 | b88ce0cb7974cc41",
   " 7 Flatten | panel 1 | 12.000000 x 0.750000 x 9.000000 | 6802947b6bdb562c",
   " 8 Finish | panel 1 | 12.000000 x 0.750000 x 9.000000 | acc915f7dbdc4c57",
-  "cut list | 1 lines | 1.125651 bf | yield 0.470525 | dd43f0d0982d33c6",
+  "cut list | 1 lines | 1.125651 bf | yield 0.470525 | e8a00da456f089ec",
 ]
 `;
 
@@ -1002,12 +1002,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 14.250000 x 1.450000 x 10.250000 | 95a91821c0bab7b1",
   " 2 Trim | panel 1 | 13.750000 x 1.450000 x 10.250000 | 3c805e9862fa7b27",
   " 3 Cross cut | slices 10 | 12.500000 x 1.450000 x 10.250000 | 0521b05a71c4bf69",
-  " 4 Turn to end grain | slices 10 | 14.500000 x 1.250000 x 10.250000 | 5df81f716dd5e199",
-  " 5 Flip | slices 10 | 14.500000 x 1.250000 x 10.250000 | 4add9f90dfac43ee",
+  " 4 Turn to end grain | slices 10 | 14.500000 x 1.250000 x 10.250000 | 797694195447f5a0",
+  " 5 Flip | slices 10 | 14.500000 x 1.250000 x 10.250000 | bf1db58de943539d",
   " 6 Glue up | panel 1 | 14.500000 x 1.250000 x 10.250000 | 402e0e0aa5a2f93d",
   " 7 Flatten | panel 1 | 14.500000 x 1.125000 x 10.250000 | 2a5b3b4a46f52137",
   " 8 Finish | panel 1 | 14.500000 x 1.125000 x 10.250000 | e548667a8d70751a",
-  "cut list | 1 lines | 2.002886 bf | yield 0.559860 | 048d13e8506b8497",
+  "cut list | 1 lines | 2.002886 bf | yield 0.559860 | c02c9035aa3f1a34",
 ]
 `;
 
@@ -1017,12 +1017,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 17.000000 x 1.454545 x 12.000000 | 09b72e36aaef71e7",
   " 2 Trim | panel 1 | 16.500000 x 1.454545 x 12.000000 | c24c091175d4b3b2",
   " 3 Cross cut | slices 11 | 15.125000 x 1.454545 x 12.000000 | 52e4c51b7e1ede22",
-  " 4 Turn to end grain | slices 11 | 16.000000 x 1.375000 x 12.000000 | 2cdfc3a8d2135f61",
-  " 5 Flip | slices 11 | 16.000000 x 1.375000 x 12.000000 | 83776dd20a42c1a0",
+  " 4 Turn to end grain | slices 11 | 16.000000 x 1.375000 x 12.000000 | 5ea4c3535aa14f99",
+  " 5 Flip | slices 11 | 16.000000 x 1.375000 x 12.000000 | adb458a32bf8fd64",
   " 6 Glue up | panel 1 | 16.000000 x 1.375000 x 12.000000 | f62017f665be687e",
   " 7 Flatten | panel 1 | 16.000000 x 1.250000 x 12.000000 | 950cc0e8a44844ea",
   " 8 Finish | panel 1 | 16.000000 x 1.250000 x 12.000000 | d27c79138054b118",
-  "cut list | 1 lines | 2.769886 bf | yield 0.585275 | 170e6ef26f8c4439",
+  "cut list | 1 lines | 2.769886 bf | yield 0.585275 | d497dc64fd45e4d4",
 ]
 `;
 
@@ -1032,12 +1032,12 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 32.000000 x 1.428571 x 16.000000 | 5d6c02a15f7caf2f",
   " 2 Trim | panel 1 | 31.500000 x 1.428571 x 16.000000 | 918517c432c2021d",
   " 3 Cross cut | slices 14 | 29.750000 x 1.428571 x 16.000000 | 385e1e903d4dc39a",
-  " 4 Turn to end grain | slices 14 | 20.000000 x 2.125000 x 16.000000 | 3b9a34fd62b16965",
-  " 5 Flip | slices 14 | 20.000000 x 2.125000 x 16.000000 | 586476eefa74b55a",
+  " 4 Turn to end grain | slices 14 | 20.000000 x 2.125000 x 16.000000 | 2d7f18815d085b2b",
+  " 5 Flip | slices 14 | 20.000000 x 2.125000 x 16.000000 | f4577d777d1a5e09",
   " 6 Glue up | panel 1 | 20.000000 x 2.125000 x 16.000000 | fab198917c697b43",
   " 7 Flatten | panel 1 | 20.000000 x 2.000000 x 16.000000 | 05a3112b4d94868c",
   " 8 Finish | panel 1 | 20.000000 x 2.000000 x 16.000000 | 00c164a99f87a5ec",
-  "cut list | 1 lines | 6.683687 bf | yield 0.655953 | d3ca1f15c7b76cd4",
+  "cut list | 1 lines | 6.683687 bf | yield 0.655953 | 76616cf8f87ba462",
 ]
 `;
 
@@ -1047,11 +1047,11 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 20.000000 x 1.625000 x 12.000000 | 044b5e25d298c57b",
   " 2 Trim | panel 1 | 19.500000 x 1.625000 x 12.000000 | a4bbd9cd1b816491",
   " 3 Cross cut | slices 12 | 18.000000 x 1.625000 x 12.000000 | a0ba068e485c16ae",
-  " 4 Flip | slices 12 | 18.000000 x 1.625000 x 12.000000 | b7b79abd981ec198",
+  " 4 Flip | slices 12 | 18.000000 x 1.625000 x 12.000000 | 708eee0a1c3cc7b9",
   " 5 Glue up | panel 1 | 18.000000 x 1.625000 x 12.000000 | 9cc3c00104273813",
   " 6 Flatten | panel 1 | 18.000000 x 1.500000 x 12.000000 | 5d67754bddfa3747",
   " 7 Finish | panel 1 | 18.000000 x 1.500000 x 12.000000 | 27dc681eec019531",
-  "cut list | 1 lines | 3.554688 bf | yield 0.619099 | 55179c224b2a08dc",
+  "cut list | 1 lines | 3.554688 bf | yield 0.619099 | 12bd67a30ebec81e",
 ]
 `;
 
@@ -1061,18 +1061,18 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 1 Flatten | panel 1 | 22.500000 x 1.500000 x 12.000000 | 0a27c3d186152326",
   " 2 Trim | panel 1 | 22.000000 x 1.500000 x 12.000000 | 02ecf354027cecc0",
   " 3 Cross cut | slices 12 | 19.500000 x 1.500000 x 12.000000 | aca083d59fe36d1a",
-  " 4 Turn to end grain | slices 12 | 18.000000 x 1.625000 x 12.000000 | 48a738f72e3f7c57",
-  " 5 Flip | slices 12 | 18.000000 x 1.625000 x 12.000000 | fd7390fdb120228a",
+  " 4 Turn to end grain | slices 12 | 18.000000 x 1.625000 x 12.000000 | 819663a9f757076b",
+  " 5 Flip | slices 12 | 18.000000 x 1.625000 x 12.000000 | 96de20c227a82bab",
   " 6 Glue up | panel 1 | 18.000000 x 1.625000 x 12.000000 | 9848e8311f3d8a73",
   " 7 Flatten | panel 1 | 18.000000 x 1.500000 x 12.000000 | 1d7b88d097d94f15",
   " 8 Finish | panel 1 | 18.000000 x 1.500000 x 12.000000 | a18378fa08953382",
-  "cut list | 1 lines | 3.712674 bf | yield 0.592754 | 55dad58ac7d61986",
+  "cut list | 1 lines | 3.712674 bf | yield 0.592754 | 4106537175f736f5",
 ]
 `;
 
 exports[`reference outputs: running a design gives exactly what it gave before > tumbling-blocks 1`] = `
 [
-  " 0 First glue-up | strips 9 | 24.500000 x 1.250000 x 13.712069 | b1e6340b1596feb0",
+  " 0 First glue-up | strips 9 | 24.500000 x 1.250000 x 13.712069 | 77845c7179f3e475",
   " 1 Glue up | panel 1 | 24.500000 x 2.500000 x 9.660254 | 1d1c6f18b9612d2f",
   " 2 Cross cut | slices 14 | 22.750000 x 2.500000 x 9.660254 | 1b9148d194428835",
   " 3 Turn to end grain | slices 14 | 35.000000 x 1.625000 x 9.660254 | 1f9cccd20f958eca",
@@ -1080,13 +1080,13 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 5 Trim | panel 1 | 16.000000 x 1.625000 x 12.000000 | a9d4ad83d9ee7a71",
   " 6 Flatten | panel 1 | 16.000000 x 1.500000 x 12.000000 | 251ae4103df25fcc",
   " 7 Finish | panel 1 | 16.000000 x 1.500000 x 12.000000 | c8fcb7204cbf0777",
-  "cut list | 3 lines | 4.108887 bf | yield 0.475881 | bd25e016c9443578",
+  "cut list | 3 lines | 4.108887 bf | yield 0.475881 | eff25b5298a5850f",
 ]
 `;
 
 exports[`reference outputs: running a design gives exactly what it gave before > tumbling-blocks fitted to 12 x 9 x 0.75 1`] = `
 [
-  " 0 First glue-up | strips 3 | 30.000000 x 1.250000 x 5.051815 | 514298ea23637e57",
+  " 0 First glue-up | strips 3 | 30.000000 x 1.250000 x 5.051815 | 408ad02351118264",
   " 1 Glue up | panel 1 | 30.000000 x 2.500000 x 2.886751 | 0057f9cedf8f68c9",
   " 2 Cross cut | slices 30 | 26.250000 x 2.500000 x 2.886751 | 83e07234af0afa45",
   " 3 Turn to end grain | slices 30 | 75.000000 x 0.875000 x 2.886751 | 0bba3ab41439c738",
@@ -1094,13 +1094,13 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 5 Trim | panel 1 | 12.000000 x 0.875000 x 9.000000 | 6656b349c44bbca7",
   " 6 Flatten | panel 1 | 12.000000 x 0.750000 x 9.000000 | 25f89d403d53535b",
   " 7 Finish | panel 1 | 12.000000 x 0.750000 x 9.000000 | 25b53f73a2f830d7",
-  "cut list | 3 lines | 2.331055 bf | yield 0.227740 | 77386fcf6267cb20",
+  "cut list | 3 lines | 2.331055 bf | yield 0.227740 | cdc7271ae4ec4dae",
 ]
 `;
 
 exports[`reference outputs: running a design gives exactly what it gave before > tumbling-blocks fitted to 14.5 x 10.25 x 1.125 1`] = `
 [
-  " 0 First glue-up | strips 6 | 28.750000 x 1.250000 x 9.381942 | 42bee1fa01258c71",
+  " 0 First glue-up | strips 6 | 28.750000 x 1.250000 x 9.381942 | 9f2ce4635d1cec5d",
   " 1 Glue up | panel 1 | 28.750000 x 2.500000 x 6.273503 | 76da3e56fffb5501",
   " 2 Cross cut | slices 21 | 26.250000 x 2.500000 x 6.273503 | 6386da0241a9d64a",
   " 3 Turn to end grain | slices 21 | 52.500000 x 1.250000 x 6.273503 | 6652dc0e7c88d8ae",
@@ -1108,13 +1108,13 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 5 Trim | panel 1 | 14.500000 x 1.250000 x 10.250000 | 4dea2eccea175806",
   " 6 Flatten | panel 1 | 14.500000 x 1.125000 x 10.250000 | 7ad0914cd7de577f",
   " 7 Finish | panel 1 | 14.500000 x 1.125000 x 10.250000 | 29184773c2497864",
-  "cut list | 3 lines | 3.515381 bf | yield 0.319329 | a4d2e159b1922cfe",
+  "cut list | 3 lines | 3.515381 bf | yield 0.319329 | 7062a8349e6ed57e",
 ]
 `;
 
 exports[`reference outputs: running a design gives exactly what it gave before > tumbling-blocks fitted to 16 x 12 x 1.25 1`] = `
 [
-  " 0 First glue-up | strips 9 | 21.000000 x 1.250000 x 13.712069 | 8f7339c69a6bae9f",
+  " 0 First glue-up | strips 9 | 21.000000 x 1.250000 x 13.712069 | bffa943a0fea2e63",
   " 1 Glue up | panel 1 | 21.000000 x 2.500000 x 9.660254 | 0c00bcf8681ee9ca",
   " 2 Cross cut | slices 14 | 19.250000 x 2.500000 x 9.660254 | 313c53e0a0b00126",
   " 3 Turn to end grain | slices 14 | 35.000000 x 1.375000 x 9.660254 | 9c9e9108a1041626",
@@ -1122,13 +1122,13 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 5 Trim | panel 1 | 16.000000 x 1.375000 x 12.000000 | e108665367eafd66",
   " 6 Flatten | panel 1 | 16.000000 x 1.250000 x 12.000000 | a93d9a9a2efc5f80",
   " 7 Finish | panel 1 | 16.000000 x 1.250000 x 12.000000 | c3272d3e18035192",
-  "cut list | 3 lines | 3.544922 bf | yield 0.457661 | 34e8ef2273bcb58c",
+  "cut list | 3 lines | 3.544922 bf | yield 0.457661 | 9c92e0aed509358f",
 ]
 `;
 
 exports[`reference outputs: running a design gives exactly what it gave before > tumbling-blocks fitted to 20 x 16 x 2 1`] = `
 [
-  " 0 First glue-up | strips 18 | 27.000000 x 1.250000 x 26.702450 | 8c43c5a71554d321",
+  " 0 First glue-up | strips 18 | 27.000000 x 1.250000 x 26.702450 | c168e71ef7fff6a1",
   " 1 Glue up | panel 1 | 27.000000 x 2.500000 x 19.820508 | 68be771b1947ecc0",
   " 2 Cross cut | slices 12 | 25.500000 x 2.500000 x 19.820508 | f7ad1a78fd37524e",
   " 3 Turn to end grain | slices 12 | 30.000000 x 2.125000 x 19.820508 | 7caabe0651fa36c8",
@@ -1136,7 +1136,7 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 5 Trim | panel 1 | 20.000000 x 2.125000 x 16.000000 | 46380044fe756e11",
   " 6 Flatten | panel 1 | 20.000000 x 2.000000 x 16.000000 | cd4523e3ffdec71a",
   " 7 Finish | panel 1 | 20.000000 x 2.000000 x 16.000000 | 0f0c0f9b3c0f4f78",
-  "cut list | 3 lines | 8.321615 bf | yield 0.526991 | f34c31f918c76fea",
+  "cut list | 3 lines | 8.321615 bf | yield 0.526991 | a6bc13426eb050dc",
 ]
 `;
 
@@ -1145,24 +1145,24 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 0 First glue-up | panel 1 | 28.500000 x 1.875000 x 19.832532 | e5bf0fda135f3488",
   " 1 Flatten | panel 1 | 28.500000 x 1.750000 x 19.832532 | 0c8de6779faaaed6",
   " 2 Cross cut | slices 17 | 21.250000 x 1.750000 x 23.622323 | 0e1da2c9e1d96260",
-  " 3 Flip | slices 17 | 21.250000 x 1.750000 x 23.622323 | fe7b6911b634f199",
-  " 4 Offset | slices 17 | 21.250000 x 1.750000 x 25.912386 | c43b66891bc93520",
+  " 3 Flip | slices 17 | 21.250000 x 1.750000 x 23.622323 | ade575c436aec12e",
+  " 4 Offset | slices 17 | 21.250000 x 1.750000 x 25.912386 | de6f51b6230f845b",
   " 5 Glue up | panel 1 | 21.250000 x 1.750000 x 25.912386 | d6ca94ec8a7f64fc",
   " 6 Flatten | panel 1 | 21.250000 x 1.625000 x 25.912386 | 2512860a3ede16d0",
   " 7 Trim | panel 1 | 12.500000 x 1.625000 x 18.195508 | af2c39a4c9a3beb1",
   " 8 Rip the panel | slices 8 | 17.320508 x 1.625000 x 12.500000 | 1d48f718d0117afd",
-  " 9 Flip | slices 8 | 17.320508 x 1.625000 x 12.500000 | c484ab3544a0bdec",
+  " 9 Flip | slices 8 | 17.320508 x 1.625000 x 12.500000 | 5f8a94e8ede9ff7b",
   "10 Glue up | panel 1 | 17.320508 x 1.625000 x 12.500000 | e0ff411497cdce07",
   "11 Trim | panel 1 | 16.000000 x 1.625000 x 12.000000 | 0986469e88f6aee3",
   "12 Flatten | panel 1 | 16.000000 x 1.500000 x 12.000000 | 9700ef2402e2db01",
   "13 Finish | panel 1 | 16.000000 x 1.500000 x 12.000000 | 93ad933051ae9bf7",
-  "cut list | 3 lines | 9.150135 bf | yield 0.213695 | 4daacf5b7bab684b",
+  "cut list | 3 lines | 9.150135 bf | yield 0.213695 | 4352939a7361b440",
 ]
 `;
 
 exports[`reference outputs: running a design gives exactly what it gave before > tumbling-blocks turned to end grain 1`] = `
 [
-  " 0 First glue-up | strips 9 | 24.500000 x 1.250000 x 13.712069 | b1e6340b1596feb0",
+  " 0 First glue-up | strips 9 | 24.500000 x 1.250000 x 13.712069 | 77845c7179f3e475",
   " 1 Glue up | panel 1 | 24.500000 x 2.500000 x 9.660254 | 1d1c6f18b9612d2f",
   " 2 Cross cut | slices 14 | 22.750000 x 2.500000 x 9.660254 | 1b9148d194428835",
   " 3 Turn to end grain | slices 14 | 35.000000 x 1.625000 x 9.660254 | 1f9cccd20f958eca",
@@ -1170,6 +1170,6 @@ exports[`reference outputs: running a design gives exactly what it gave before >
   " 5 Trim | panel 1 | 16.000000 x 1.625000 x 12.000000 | a9d4ad83d9ee7a71",
   " 6 Flatten | panel 1 | 16.000000 x 1.500000 x 12.000000 | 251ae4103df25fcc",
   " 7 Finish | panel 1 | 16.000000 x 1.500000 x 12.000000 | c8fcb7204cbf0777",
-  "cut list | 3 lines | 4.108887 bf | yield 0.475881 | bd25e016c9443578",
+  "cut list | 3 lines | 4.108887 bf | yield 0.475881 | eff25b5298a5850f",
 ]
 `;

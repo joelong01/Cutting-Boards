@@ -6,7 +6,7 @@ import { buildCutList } from './cutlist';
 import { layupOf, withLayup } from './design';
 import { fitToTarget } from './fit';
 import { parseLength } from './fractions';
-import { actionsOf, applyStep, perform, run } from './pipeline';
+import { actionsOf, applyStep, perform, runSteps as run, stepStages } from './pipeline';
 import { PRESETS, newStep } from './presets';
 import type { Design, Stage, Step } from './types';
 
@@ -58,7 +58,7 @@ describe('primitive actions', () => {
     const a = bbox(before.slices[0].pieces), b = bbox(after.slices[0].pieces);
     expect(+(b.max[1] - b.min[1]).toFixed(6)).toBe(+(a.max[0] - a.min[0]).toFixed(6));
     expect(+(b.max[0] - b.min[0]).toFixed(6)).toBe(+(a.max[1] - a.min[1]).toFixed(6));
-    expect(after.summary).toMatch(/^Roll onto its side, end grain up: every slice/);
+    expect(after.summary).toMatch(/^Roll every slice onto its side, so the end grain faces up \(all \d+\)\.$/);
   });
 
   it('rotate takes any angle: 45 leans the slices over, keeps all the wood and says the angle', () => {
@@ -69,7 +69,7 @@ describe('primitive actions', () => {
     const g = after.slices[0].pieces[0].grain;
     expect(Math.abs(g[0])).toBeCloseTo(Math.SQRT1_2, 9);
     expect(Math.abs(g[1])).toBeCloseTo(Math.SQRT1_2, 9);
-    expect(after.summary).toMatch(/^Turn 45° about its length: every slice/);
+    expect(after.summary).toMatch(/^Turn every slice 45° about its length \(all \d+\)\.$/);
     // The same through a step of a design.
     const step: Step = { id: 't', type: 'turn', sel: ALL, angle: 45 };
     expect(applyStep(before, step, names).slices[0].pieces[0].grain).toEqual(g);
@@ -86,23 +86,48 @@ describe('primitive actions', () => {
     expect(up(flat)).toBe(false);
   });
 
-  it('a second panel is setting the slices aside, then ripping strips and gluing them up again', () => {
+  it('a second panel is two operations, each with its own stage: mill its strips (the slices go aside), then glue it up', () => {
     const before = sliced();
     const step = { ...newStep('panel'), thickness: 0.75 } as Extract<Step, { type: 'panel' }>;
-    expect(actionsOf(step).map((a) => a.type)).toEqual(['setAside', 'rip', 'glue']);
-    const aside = act(before, { type: 'setAside' }, names);
-    expect(aside.slices).toHaveLength(0);
-    expect(aside.aside).toHaveLength(before.slices.length);
-    const strips = act(aside, { type: 'rip', strips: step.strips, thickness: 0.75, extra: 0 }, names);
-    // The slices set aside wait through both actions.
-    expect(strips.aside).toHaveLength(before.slices.length);
-    const panel = act(strips, { type: 'glue' }, names);
+    expect(actionsOf(step).map((a) => a.type)).toEqual(['rip', 'glue']);
+    const mill = act(before, { type: 'rip', strips: step.strips, thickness: 0.75, extra: 0, second: true }, names);
+    // Clearing the bench is part of milling, not a step of its own: the slices wait to one side.
+    expect(mill.kind).toBe('strips');
+    expect(mill.aside).toHaveLength(before.slices.length);
+    expect(mill.summary).toMatch(new RegExp(`^Set the ${before.slices.length} slices aside, in order\\. Now a second panel: mill `));
+    const panel = act(mill, { type: 'glue' }, names);
+    const stages = stepStages(before, step, names);
+    expect(stages.map((s) => `${s.title} (${s.kind})`)).toEqual(['Mill the second panel (strips)', 'Glue up (panel)']);
+    expect(stages[0].summary).toBe(mill.summary);
+    expect(stages[1].summary).toBe(panel.summary);
+    expect(stages.every((s) => s.aside?.length === before.slices.length)).toBe(true);
+    // Seen whole, the step is its operations' sentences one after another.
     const viaStep = applyStep(before, step, names);
     expect(panel.size).toEqual(viaStep.size);
-    // The step's instruction is its three actions' sentences, one after another.
-    expect(viaStep.summary).toBe(`${aside.summary} ${strips.summary} ${panel.summary}`);
-    expect(viaStep.stock).toEqual(strips.stock);
+    expect(viaStep.summary).toBe(`${mill.summary} ${panel.summary}`);
+    expect(viaStep.stock).toEqual(mill.stock);
     expect(viaStep.aside).toHaveLength(before.slices.length);
+  });
+
+  it('planks that take a face of another wood are milled, then faced, then glued up: three operations', () => {
+    const before = sliced();
+    const strips = [{ id: 'a', species: 'walnut', width: 2, faces: { species: 'cherry', thickness: 0.125 } }, { id: 'b', species: 'maple', width: 1 }];
+    const step = { ...newStep('panel'), strips, thickness: 1, repeat: 2, length: 8 } as Extract<Step, { type: 'panel' }>;
+    expect(actionsOf(step).map((a) => a.type)).toEqual(['rip', 'glueFaces', 'glue']);
+    const [mill, faced, glued] = stepStages(before, step, names);
+    expect([mill.title, faced.title, glued.title]).toEqual(['Mill the second panel', 'Glue the faces on', 'Glue up']);
+    // Milled, each plank and its two faces lie apart: three pieces for a faced strip, one for a plain one.
+    expect(mill.slices).toHaveLength(2 * (3 + 1));
+    expect(mill.slices.every((sl) => sl.pieces.length === 1)).toBe(true);
+    expect(mill.summary).toContain('mill 2 walnut planks 3/4″ thick and 4 cherry face strips 1/8″ thick, all 2″ wide, 8″ long. Also mill 2 maple strips 1″ wide, 1″ thick.');
+    expect(mill.summary).not.toContain('glued');
+    // Faced, they are the four strips of the panel, the faced ones three layers thick.
+    expect(faced.slices.map((sl) => sl.pieces.length)).toEqual([3, 1, 3, 1]);
+    expect(faced.summary).toBe('Glue a cherry face to both sides of each of the 2 walnut planks. Each then counts as one strip 1″ thick.');
+    expect(faced.faced).toBeUndefined();
+    expect(glued.kind).toBe('panel');
+    expect(+glued.size[2].toFixed(6)).toBe(6);
+    expect(act(before, { type: 'glueFaces' }, names).error).toBe('There are no planks waiting for faces.');
   });
 
   it('a step whose second action cannot be done leaves the work as it was', () => {

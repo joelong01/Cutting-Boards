@@ -1,3 +1,4 @@
+import { currentBlocks } from './blocksFlat';
 import type { Design } from './types';
 
 /** What the desktop shell exposes (electron/preload.cts). Absent when run in a plain browser. */
@@ -36,7 +37,8 @@ export function validateDesign(raw: unknown): Design {
   if (!first || first.type !== 'strips' || !Array.isArray(first.strips)) {
     throw new Error('The design is missing its first step, the strips.');
   }
-  return {
+  // A 3D board from before its recipes were split into single operations is brought up to date.
+  return currentBlocks({
     version: 2,
     name: typeof d.name === 'string' && d.name ? d.name : 'Untitled board',
     style: typeof d.style === 'string' ? d.style : undefined,
@@ -48,7 +50,7 @@ export function validateDesign(raw: unknown): Design {
     finish: d.finish,
     steps: d.steps!,
     customSpecies: Array.isArray(d.customSpecies) ? d.customSpecies : [],
-  };
+  });
 }
 
 export const fileSafe = (name: string) => name.trim().replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'board';

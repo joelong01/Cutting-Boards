@@ -1,9 +1,9 @@
-import { BEVEL_TITLE, EMPTY, act, failed, type Action, type Names } from './actions';
+import { BEVEL_TITLE, BOARDS_TITLE, EMPTY, act, failed, type Action, type Names } from './actions';
 import { AS_ASKED, dimensionsOf, milledStrips, sizingOf, withAlong, type Sizing } from './design';
 import { inches, roundTo } from './fractions';
 import { finishOf } from './finish';
 import { newId } from './ids';
-import type { AccentStrip, Design, Finish, FinishPart, PatternStrip, Stage, Step, StockLine, StripSpec } from './types';
+import type { AccentStrip, Design, Finish, FinishPart, PatternStrip, Stage, Step, StripSpec } from './types';
 
 export { describeSelector, expandStrips, matches } from './actions';
 
@@ -34,27 +34,36 @@ const STEPS: { [K in Step['type']]: StepDef<K> } = {
     actions: (s, z) => [{ type: 'rip', strips: milledStrips(s, z.grid), thickness: z.alongOn === 'thickness' ? withAlong(s.thickness, z) : s.thickness, length: s.length, repeat: s.repeat, closeWithFirst: s.closeWithFirst,
       // The face-grain 3D board starts from ordinary strips; only the end-grain one's first step is its own.
       blocks: s.blocks?.flat ? undefined : s.blocks,
+      kerf: z.kerf,
     }],
     start: () => ({ strips: [{ id: newId(), species: 'maple', width: 1.5 }], thickness: 1.25, length: 18, repeat: 8, closeWithFirst: false }),
   },
-  crosscut: { title: 'Cross cut', needs: 'panel', actions: (s, z) => [{ type: 'crosscut', width: z.alongOn === 'crosscut' && Math.abs(s.width - z.cut) < 1e-9 ? withAlong(s.width, z) : s.width, kerf: s.kerf, angle: s.angle }], start: () => ({ width: 1.25, kerf: 0.125, angle: 0 }) },
+  crosscut: { title: 'Cross cut', needs: 'panel', actions: (s, z) => [{ type: 'crosscut', width: z.alongOn === 'crosscut' && Math.abs(s.width - z.cut) < 1e-9 ? withAlong(s.width, z) : s.width, kerf: z.kerf ?? s.kerf, angle: s.angle }], start: () => ({ width: 1.25, kerf: 0.125, angle: 0 }) },
   // Loose boards are ripped only on an end-grain 3D board, with the blade tilted; the action refuses any others.
-  rip: { title: 'Rip the panel', needs: 'panel', orStrips: true, actions: (s) => [{ type: 'ripPanel', width: s.width, kerf: s.kerf, tilt: s.tilt }], start: () => ({ width: 1.25, kerf: 0.125 }) },
+  rip: { title: 'Rip the panel', needs: 'panel', orStrips: true, actions: (s, z) => [{ type: 'ripPanel', width: s.width, kerf: z.kerf ?? s.kerf, tilt: s.tilt }], start: () => ({ width: 1.25, kerf: 0.125 }) },
   // Standing the slices up is what makes a board end grain: a quarter turn about each one's length.
   turn: { title: 'Turn to end grain', needs: 'slices', actions: (s) => [{ type: 'rotate', axis: 'z', angle: s.angle ?? 90, sel: s.sel }], start: () => ({ sel: { mode: 'all' } }) },
   flip: { title: 'Flip', needs: 'slices', actions: (s) => [{ type: 'rotate', axis: s.how === 'end' ? 'y' : 'z', angle: 180, sel: s.sel }], start: () => ({ sel: EVERY_OTHER, how: 'end' }) },
   // A slide is measured across the strips, so it keeps its proportion to them when they are scaled.
   shift: { title: 'Offset', needs: 'slices', actions: (s, z) => [{ type: 'shift', sel: s.sel, amount: s.amount * z.scale }], start: () => ({ sel: EVERY_OTHER, amount: 0.5 }) },
-  insert: { title: 'Insert accent strips', needs: 'slices', actions: (s) => [{ type: 'addStrips', spec: s }], start: () => ({ species: 'walnut', thickness: 0.125, every: 1 }) },
+  insert: { title: 'Insert accent strips', needs: 'slices', actions: (s) => [{ type: 'millAccents', spec: s }, { type: 'addStrips', spec: s }], start: () => ({ species: 'walnut', thickness: 0.125, every: 1 }) },
   glue: { title: 'Glue up', needs: 'slices', orStrips: true, actions: () => [{ type: 'glue' }], start: () => ({}) },
   trim: { title: 'Trim', needs: 'panel', actions: (s) => [{ type: 'trim', auto: s.auto, x0: s.x0, x1: s.x1, z0: s.z0, z1: s.z1 }], start: () => ({ auto: true, x0: 0, x1: 0, z0: 0, z1: 0 }) },
   flatten: { title: 'Flatten', needs: 'panel', actions: (s) => [{ type: 'flatten', top: s.top, bottom: s.bottom }], start: () => ({ top: 0.0625, bottom: 0.0625 }) },
   rotate: { title: 'Quarter-turn panel', needs: 'panel', actions: () => [{ type: 'rotate', axis: 'y', angle: 90 }], start: () => ({}) },
-  frame: { title: 'Add a border', needs: 'panel', actions: (s) => [{ type: 'border', spec: s }], start: () => ({ species: 'walnut', width: 1.5, lineSpecies: 'maple', line: 0.125, block: 3 }) },
+  frame: { title: 'Add a border', needs: 'panel', actions: (s) => [{ type: 'millBorder', spec: s }, { type: 'borderPanels' }, { type: 'borderCut' }, { type: 'borderEnds' }, { type: 'borderSides' }], start: () => ({ species: 'walnut', width: 1.5, lineSpecies: 'maple', line: 0.125, block: 3 }) },
   // A second panel is the first two steps over again, once the slices are out of the way.
   panel: {
     title: 'Start another panel', needs: 'slices',
-    actions: (s) => [{ type: 'setAside' }, { type: 'rip', strips: s.strips, thickness: s.thickness, extra: s.extra, repeat: s.repeat, length: s.length }, { type: 'glue' }],
+    // Three operations at most: mill the pieces (the slices go aside), glue faces onto any planks that take them, glue the panel.
+    actions: (s) => {
+      const faced = s.strips.some((st) => st.faces && st.faces.thickness > 0 && 2 * st.faces.thickness < s.thickness);
+      return [
+        { type: 'rip', strips: s.strips, thickness: s.thickness, extra: s.extra, repeat: s.repeat, length: s.length, second: true, loose: faced },
+        ...(faced ? [{ type: 'glueFaces' } as const] : []),
+        { type: 'glue' },
+      ];
+    },
     start: () => ({ strips: [{ id: newId(), species: 'walnut', width: 1 }, { id: newId(), species: 'maple', width: 1 }], thickness: 0.875, extra: 0 }),
   },
   combine: { title: 'Interleave the slices', needs: 'slices', actions: () => [{ type: 'interleave' }], start: () => ({}) },
@@ -81,8 +90,12 @@ export function newStep(type: Step['type']): Step {
   return { ...STEPS[type].start(), id: newId(), type } as Step;
 }
 
-/** What a step is called in the list and in the view: its type's name, except a rip with the blade tilted. */
-export const stepTitle = (step: Step): string => (step.type === 'rip' && step.tilt ? BEVEL_TITLE : STEPS[step.type].title);
+/** What a step is called in the list and in the view: its type's name, except a rip with the blade tilted and the milling of a 3D board's boards. */
+export const stepTitle = (step: Step): string => (
+  step.type === 'rip' && step.tilt ? BEVEL_TITLE
+    // An end-grain 3D board starts from three boards, not strips.
+    : step.type === 'strips' && step.blocks && !step.blocks.flat ? BOARDS_TITLE
+      : STEPS[step.type].title);
 
 /** The primitive actions that carry out a step, in order, at the sizes the design's fit gives (as asked for, unless given). */
 export function actionsOf(step: Step, sizing: Sizing = AS_ASKED): Action[] {
@@ -112,9 +125,9 @@ function rounded(a: Action, grid: number): Action {
     case 'crosscut': case 'ripPanel': return { ...a, width: r(a.width), kerf: r(a.kerf) };
     case 'shift': return { ...a, amount: r(a.amount) };
     case 'flatten': return { ...a, top: r(a.top), bottom: r(a.bottom) };
-    case 'addStrips':
+    case 'millAccents': case 'addStrips':
       return { ...a, spec: { ...accent(a.spec), ...(a.spec.more ? { more: a.spec.more.map(accent) } : {}), ...(a.spec.stagger !== undefined ? { stagger: r(a.spec.stagger) } : {}) } };
-    case 'border': return { ...a, spec: { ...a.spec, width: r(a.spec.width), line: r(a.spec.line), block: r(a.spec.block) } };
+    case 'millBorder': return { ...a, spec: { ...a.spec, width: r(a.spec.width), line: r(a.spec.line), block: r(a.spec.block) } };
     case 'roundCorners': case 'roundOver': return { ...a, radius: r(a.radius) };
     case 'chamfer': return { ...a, size: r(a.size) };
     case 'groove': return { ...a, inset: r(a.inset), width: r(a.width), depth: r(a.depth), cornerRadius: r(a.cornerRadius) };
@@ -125,22 +138,47 @@ function rounded(a: Action, grid: number): Action {
 }
 
 /**
- * Do a run of actions as one step and return the one stage that shows for it, under `title`.
- * Its instruction is each action's sentence in turn and its stock is all of theirs. If any
- * action cannot be done the step is not done at all: the work is left as it was, with the error.
+ * Do a run of actions as one step and return a stage for each: one operation at the bench, one
+ * picture, one instruction. A step that is a single action is one stage under the step's own
+ * `title`; in a step of several, each stage is named for its action. If any action cannot be
+ * done the step is not done at all: the one stage returned is the work as it was, with the error.
+ * An action with nothing to do in this case (see `borderPanels`) adds no stage.
  */
-export function perform(prev: Stage, actions: Action[], title: string, names: Names): Stage {
-  if (actions.length === 1) return { ...act(prev, actions[0], names), title };
+export function performEach(prev: Stage, actions: Action[], title: string, names: Names): Stage[] {
+  if (actions.length === 1) return [{ ...act(prev, actions[0], names), title }];
+  const parts: Stage[] = [];
   let at = prev;
-  const summaries: string[] = [];
-  const stock: StockLine[] = [];
   for (const action of actions) {
-    at = act(at, action, names);
-    if (at.error) return failed(prev, title, at.error);
-    if (at.summary) summaries.push(at.summary);
-    stock.push(...(at.stock ?? []));
+    const next = act(at, action, names);
+    // An action that hands back the very stage it was given had nothing to do: it adds no stage.
+    if (next === at) continue;
+    at = next;
+    if (at.error) return [failed(prev, title, at.error)];
+    parts.push(at);
   }
-  return { ...at, title, summary: summaries.join(' '), stock: stock.length ? stock : undefined };
+  return parts.length ? parts : [failed(prev, title, 'This step has nothing to do.')];
+}
+
+/**
+ * The stages of one step as a single stage under `title`: the work as the last leaves it, with
+ * every instruction in turn, all the stock, and any warnings. This is the step seen whole, which
+ * is what a step's card in the list shows and what sizes are read from.
+ */
+function whole(parts: Stage[], title: string): Stage {
+  if (parts.length === 1) return parts[0];
+  const stock = parts.flatMap((p) => p.stock ?? []);
+  const warning = parts.map((p) => p.warning).filter(Boolean).join(' ');
+  return {
+    ...parts[parts.length - 1], title,
+    summary: parts.map((p) => p.summary).filter(Boolean).join(' '),
+    stock: stock.length ? stock : undefined,
+    warning: warning || undefined,
+  };
+}
+
+/** Do a run of actions as one step and return the one stage that shows it whole: see `performEach` and `whole`. */
+export function perform(prev: Stage, actions: Action[], title: string, names: Names): Stage {
+  return whole(performEach(prev, actions, title, names), title);
 }
 
 /**
@@ -160,63 +198,130 @@ export const FINISH_STEPS: { part: FinishPart; title: string; action: (f: Requir
 export const SAND_TITLE = 'Sand and oil';
 
 /**
- * Do `actions` as the step called `title`, if the work is in a state to take it: an earlier step
+ * Do `actions` as the step called `title`, a stage for each (see `performEach`), if the work is in a state to take it: an earlier step
  * that left nothing on the bench has to be fixed first, and the work must be of the kind the
  * step `needs` (or ripped strips, with `orStrips`). A step that needs nothing is the first one.
  */
-function follow(prev: Stage, title: string, needs: Stage['kind'] | 'nothing', orStrips: boolean, actions: Action[], names: Names): Stage {
+function follow(prev: Stage, title: string, needs: Stage['kind'] | 'nothing', orStrips: boolean, actions: Action[], names: Names): Stage[] {
   if (needs === 'nothing') {
-    return prev === EMPTY ? perform(prev, actions, title, names)
-      : failed(prev, title, 'The strips are ripped first. For another panel, use "Start another panel".');
+    return prev === EMPTY ? performEach(prev, actions, title, names)
+      : [failed(prev, title, 'The strips are ripped first. For another panel, use "Start another panel".')];
   }
-  if (prev === EMPTY) return failed(prev, title, 'There is nothing on the bench yet. The first step has to rip the strips.');
-  if (prev.error && !prev.slices.some((s) => s.pieces.length)) return failed(prev, title, 'Fix the earlier step first.');
+  if (prev === EMPTY) return [failed(prev, title, 'There is nothing on the bench yet. The first step has to rip the strips.')];
+  if (prev.error && !prev.slices.some((s) => s.pieces.length)) return [failed(prev, title, 'Fix the earlier step first.')];
   if (prev.kind !== needs &&!(orStrips && prev.kind === 'strips')) {
-    return failed(prev, title, needs === 'panel'
+    return [failed(prev, title, needs === 'panel'
       ? 'This needs a glued panel. Add a "Glue up" step before it.'
-      : 'This works on loose slices. Add a "Cross cut" step before it.');
+      : 'This works on loose slices. Add a "Cross cut" step before it.')];
   }
-  return perform(prev, actions, title, names);
+  return performEach(prev, actions, title, names);
 }
 
 /**
- * Run one step on the previous stage and return the new stage. Never throws: a step that cannot
- * run returns a stage with an error. Slices set aside are carried through every step untouched,
- * until "Interleave the slices" uses them up, and what marks the work as a 3D board's (`block`)
- * is carried the same way until its pieces are glued into the block.
+ * Run one step on the previous stage and return its stages, one for each operation in it. Never
+ * throws: a step that cannot run returns one stage with an error. Slices set aside are carried
+ * through every stage untouched, until "Interleave the slices" uses them up, and what marks the
+ * work as a 3D board's (`block`) is carried the same way until its pieces are glued into the
+ * block. The step's note goes on its last instruction.
  */
-export function applyStep(prev: Stage, step: Step, names: Names, sizing: Sizing = AS_ASKED): Stage {
+export function stepStages(prev: Stage, step: Step, names: Names, sizing: Sizing = AS_ASKED): Stage[] {
   const def = STEPS[step.type];
-  const out = follow(prev, stepTitle(step), def.needs, !!def.orStrips, actionsOf(step, sizing), names);
-  if (prev.aside && !out.aside && (step.type !== 'combine' || out.error)) out.aside = prev.aside;
-  if (step.note && !out.error) out.summary = `${out.summary} ${step.note}`.trim();
-  // A 3D board's pieces stay marked as such until they are glued into its block.
-  if (prev.block && !('block' in out)) out.block = prev.block;
-  return out;
+  const parts = follow(prev, stepTitle(step), def.needs, !!def.orStrips, actionsOf(step, sizing), names);
+  let before = prev;
+  for (const out of parts) {
+    if (before.aside && !out.aside && (step.type !== 'combine' || out.error)) out.aside = before.aside;
+    // A 3D board's pieces stay marked as such until they are glued into its block.
+    if (before.block && !('block' in out)) out.block = before.block;
+    before = out;
+  }
+  const last = parts[parts.length - 1];
+  if (step.note && !last.error) last.summary = `${last.summary} ${step.note}`.trim();
+  return parts;
+}
+
+/** Run one step on the previous stage and return it whole, as one stage: see `stepStages`. */
+export function applyStep(prev: Stage, step: Step, names: Names, sizing: Sizing = AS_ASKED): Stage {
+  return whole(stepStages(prev, step, names, sizing), stepTitle(step));
 }
 
 /**
- * stages[i] is the result of steps[i], starting from a clear bench: in every starter design
- * stages[0] is the strips, ripped, and stages[1] the first glue-up. When the recipe ends in a sound panel, a stage follows for each finishing
- * touch the design has turned on, in the order of FINISH_STEPS, and one for sanding and oiling.
+ * Run a design from a clear bench. `parts[i]` are the stages of steps[i], one for each
+ * operation, and `steps[i]` is that step whole. When the recipe ends in a sound panel,
+ * `finishing` has a stage for each finishing touch the design has turned on, in the order of
+ * FINISH_STEPS, and one for sanding and oiling. Warnings are added to both views of a step.
  */
-export function run(design: Design, names: Names = (id) => id): Stage[] {
-  const stages: Stage[] = [];
+function build(design: Design, names: Names): { parts: Stage[][]; steps: Stage[]; finishing: Stage[] } {
+  const parts: Stage[][] = [];
   const sizing = sizingOf(design);
-  for (const step of design.steps) stages.push(applyStep(stages[stages.length - 1] ?? EMPTY, step, names, sizing));
+  let at = EMPTY;
+  for (const step of design.steps) {
+    const made = stepStages(at, step, names, sizing);
+    parts.push(made);
+    at = made[made.length - 1];
+  }
   // A design always has something to show, even one with no steps at all.
-  if (!stages.length) stages.push(failed(EMPTY, STEPS.strips.title, 'This design has no steps. Start a new board.'));
-  warnUnflattened(design, stages);
-  warnTooThin(design, stages, names);
-  const last = stages[stages.length - 1];
+  if (!parts.length) parts.push([failed(EMPTY, STEPS.strips.title, 'This design has no steps. Start a new board.')]);
+  const steps = parts.map((made, i) => whole(made, design.steps[i] ? stepTitle(design.steps[i]) : made[0].title));
+  parts.forEach((made, i) => {
+    for (const p of [...made, steps[i]]) p.step = i;
+  });
+  warnUnflattened(design, steps);
+  // What that found about a step seen whole belongs on its last operation too.
+  parts.forEach((made, i) => {
+    const last = made[made.length - 1];
+    if (last !== steps[i] && steps[i].warning && !last.warning) last.warning = steps[i].warning;
+  });
+  warnTooThin(design, [...new Set([...parts.flat(), ...steps])], names);
+  const finishing: Stage[] = [];
+  const last = steps[steps.length - 1];
   if (last.kind === 'panel' && !last.error) {
     const finish = finishOf(design);
     // The template is for the groove: without a groove there is nothing to make one for.
     const touches = FINISH_STEPS.filter((t) => finish[t.part].on && (t.part !== 'template' || finish.groove.on));
-    for (const t of touches) stages.push(perform(stages[stages.length - 1], [rounded(t.action(finish), sizing.grid)], t.title, names));
-    if (touches.length) stages.push(perform(stages[stages.length - 1], [{ type: 'sand' }], SAND_TITLE, names));
+    for (const t of touches) finishing.push(perform(finishing[finishing.length - 1] ?? last, [rounded(t.action(finish), sizing.grid)], t.title, names));
+    if (touches.length) finishing.push(perform(finishing[finishing.length - 1], [{ type: 'sand' }], SAND_TITLE, names));
   }
-  return stages;
+  return { parts, steps, finishing };
+}
+
+/**
+ * Every stage of a design, in order: one for each operation at the bench, which is what is
+ * drawn, played and written out as instructions. Each says which step it belongs to (`step`).
+ * A step that is one operation has one stage; "Start another panel" has several.
+ */
+export function run(design: Design, names: Names = (id) => id): Stage[] {
+  const built = build(design, names);
+  return [...built.parts.flat(), ...built.finishing];
+}
+
+/**
+ * The stages of `run` gathered step by step, without running the design again: each step whole
+ * (see `whole`), then the finishing stages as they are. The same as `runSteps` gives.
+ */
+export function wholeSteps(design: Design, stages: Stage[]): Stage[] {
+  const out: Stage[] = [];
+  for (let i = 0; i < stages.length;) {
+    const step = stages[i].step;
+    if (step === undefined) {
+      out.push(stages[i++]);
+      continue;
+    }
+    let j = i;
+    while (j < stages.length && stages[j].step === step) j++;
+    out.push(whole(stages.slice(i, j), design.steps[step] ? stepTitle(design.steps[step]) : stages[i].title));
+    i = j;
+  }
+  return out;
+}
+
+/**
+ * A design's stages with each step seen whole: stages[i] is the result of steps[i], with the
+ * instructions and stock of every operation in it, and the finishing stages follow. This is the
+ * view for a step's card in the list and for anything that asks what a step leaves.
+ */
+export function runSteps(design: Design, names: Names = (id) => id): Stage[] {
+  const built = build(design, names);
+  return [...built.steps, ...built.finishing];
 }
 
 /**

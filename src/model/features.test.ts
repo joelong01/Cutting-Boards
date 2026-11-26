@@ -302,7 +302,7 @@ describe('each kind of step', () => {
   });
 
   it('a slide towards edge A reads that way', () => {
-    expect(run(twoStrip(CUT, { type: 'shift', sel: { mode: 'all' }, amount: -0.5 }))[2].summary).toMatch(/^Slide 1\/2″ along its length, towards edge A: every slice/);
+    expect(run(twoStrip(CUT, { type: 'shift', sel: { mode: 'all' }, amount: -0.5 }))[2].summary).toMatch(/^Slide every slice 1\/2″ along its length, towards edge A \(all \d+\)\.$/);
   });
 
   it('accent strips after every second slice go in half as often', () => {
@@ -747,7 +747,7 @@ describe('basket weave board', () => {
     expect(stages[9].slices).toHaveLength(4);
     expect(stages[10].slices).toHaveLength(9);
     expect(stages[10].warning).toBeUndefined();
-    expect(stages[11].summary).toMatch(/Slide 2 1\/2″ along its length, towards edge A: every 4th slice, starting with slice 4 \(2 of 9\)/);
+    expect(stages[11].summary).toMatch(/Slide every 4th slice, starting with slice 4, 2 1\/2″ along its length, towards edge A \(2 of the 9\)\./);
   });
 
   it('the second panel sizes itself, and its across bars are planks faced with the line wood', () => {
@@ -759,7 +759,8 @@ describe('basket weave board', () => {
     expect(panel.stock!.map((l) => [l.species, l.count, l.thickness, l.width])).toEqual([
       ['walnut', 3, 1.5, 3.25], ['cherry', 6, 0.1875, 3.25], ['cherry', 4, 1.875, 0.125], ['walnut', 2, 1.875, 1.5],
     ]);
-    expect(panel.summary).toMatch(/^Set the 5 slices aside, in order\. Now a second panel: first make 3 walnut planks 1 1\/2″ thick and 3 1\/4″ wide, with a cherry face 3\/16″ thick glued to both sides/);
+    expect(panel.summary).toMatch(/^Set the 5 slices aside, in order\. Now a second panel: mill 3 walnut planks 1 1\/2″ thick and 6 cherry face strips 3\/16″ thick, all 3 1\/4″ wide/);
+    expect(panel.summary).toContain('Glue a cherry face to both sides of each of the 3 walnut planks. Each then counts as one strip 1 7/8″ thick.');
     // Flattening takes the 3/16 faces down to the 1/8 line.
     const face = stages[6].slices[0].pieces.find((p) => p.species === 'cherry' && bbox([p]).max[2] - bbox([p]).min[2] > 3)!;
     expect(+(bbox([face]).max[1] - bbox([face]).min[1]).toFixed(4)).toBe(0.125);
@@ -776,6 +777,6 @@ describe('basket weave board', () => {
     // The weave sits inside it unchanged: the first across bar, moved in by the border.
     expect(woodAt(1.625 + 1.25, 1.625 + 1.25, board)).toBe('walnut');
     expect(woodAt(1.625 + 2.5, 1.625 + 2.5, board)).toBe('maple');
-    expect(bordered.find((s) => s.title === 'Add a border')!.summary).toMatch(/Glue up two walnut panels 1 1\/2″ thick/);
+    expect(bordered.find((s) => s.title === 'Add a border')!.summary).toMatch(/Mill walnut strips 1 1\/2″ thick and .* long for them.* Glue the strips edge to edge into two panels/);
   });
 });

@@ -355,9 +355,11 @@ export class BoardScene {
     const nodes = stage.slices.map((s) => this.buildSlice(s));
     for (const n of nodes) this.root.add(n.group);
     // Slices set aside sit past edge B of the work, clear of it, in the order they were cut.
-    const aside = (stage.aside ?? []).map((s) => this.buildSlice(s));
+    // Pieces just made for the next step (accent strips, milled but not yet placed) wait there too.
+    const waiting = [...(stage.aside ?? []), ...(stage.beside ?? [])];
+    const aside = waiting.map((s) => this.buildSlice(s));
     for (const n of aside) this.root.add(n.group);
-    const parked = aside.length ? bbox(stage.aside!.flatMap((s) => s.pieces)) : null;
+    const parked = aside.length ? bbox(waiting.flatMap((s) => s.pieces)) : null;
     this.shown = {
       kind: stage.kind, nodes, sizeX: size[0], sizeY: size[1], sizeZ: size[2],
       centerZ: (all.min[2] + all.max[2]) / 2,

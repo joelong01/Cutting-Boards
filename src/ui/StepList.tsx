@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { accentStrips, patternPeriod, withAccentStrips } from '../model/accent';
-import { OPENING_STEPS } from '../model/design';
+import { OPENING_STEPS, dimensionsOf, layupOf, withLayup } from '../model/design';
 import { FINISH_STEPS, SAND_TITLE, STEP_TITLES, stepFits, stepNeeds, stepTitle } from '../model/pipeline';
 import { finishOf } from '../model/finish';
 import { speciesById } from '../model/species';
@@ -17,6 +17,11 @@ interface Props {
   selected: number;
   onSelect: (stageIndex: number) => void;
   onChange: (d: Design) => void;
+  /**
+   * The number shown on a card: the numbers its operations have in the view and the written
+   * instructions, as "8" or "8–9". Without it cards are numbered by their place in the list.
+   */
+  numberOf?: (card: number) => string;
 }
 
 const ADDABLE: { type: StepType; hint: string }[] = [
@@ -41,8 +46,12 @@ const ADDABLE: { type: StepType; hint: string }[] = [
  * settings, result size and any error, plus the buttons that add steps. Step 1, milling and gluing
  * the strips, is the LayupEditor card above this list.
  */
-export function StepList({ design, stages, species, selected, onSelect, onChange }: Props) {
+export function StepList({ design, stages, species, selected, onSelect, onChange, numberOf = (card) => String(card + 1) }: Props) {
   const { len: inches, text } = useShow();
+  // With a saw kerf set under Dimensions every cut uses it, and the steps do not ask for their own.
+  const ownKerf = dimensionsOf(design).kerf === undefined;
+  // While the board size is held, counts are worked out, not typed.
+  const held = design.autoFit !== false;
   /** A stage's size as length x width x thickness. */
   const sizeText = (s: Stage) => `${inches(s.size[0])} × ${inches(s.size[2])} × ${inches(s.size[1])}`;
   /** Change some fields of one step. */
@@ -85,7 +94,7 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
     return (
       <div key={part} className={`step touch${st && selected === at ? ' selected' : ''}${on ? '' : ' off'}`} onClick={() => st && onSelect(at)}>
         <header>
-          {st && <em>{at + 1}</em>}
+          {st && <em>{numberOf(at)}</em>}
           {/* Only the tick turns the touch on and off. The title is outside its label, so clicking
               the title selects the card like any other step's; a touch that is off has no step to
               select, so there its title works the tick instead. */}
@@ -122,7 +131,7 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
         return (
           <div key={step.id} className={`step${selected === i ? ' selected' : ''}${st.error ? ' broken' : ''}`} onClick={() => onSelect(i)}>
             <header>
-              <em>{i + 1}</em>
+              <em>{numberOf(i)}</em>
               <strong>{stepTitle(step)}</strong>
               <span className="icons" onClick={(e) => e.stopPropagation()} style={pinned ? { display: 'none' } : undefined}>
                 <button title="Move earlier" disabled={i <= OPENING_STEPS} onClick={() => move(i, -1)}>↑</button>
@@ -140,16 +149,25 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
               {step.type === 'rip' && !step.tilt && (
                 <div className="row">
                   <Len label="Strip width" value={step.width} min={0.125} onChange={(width) => setStep(step.id, { width })} />
-                  <Len label="Kerf" value={step.kerf} onChange={(kerf) => setStep(step.id, { kerf })} />
+                  {ownKerf && <Len label="Kerf" value={step.kerf} onChange={(kerf) => setStep(step.id, { kerf })} />}
                 </div>
               )}
               {step.type === 'rip' && !!step.tilt && (
-                <p className="note">Blade tilted {step.tilt}°. The strips come out about {inches(step.width)} on every side, which follows from the thickness of the boards.</p>
+                <>
+                  <div className="row">
+                    <Int
+                      label={held ? 'Strips from each board (from target)' : 'Strips from each board'}
+                      value={layupOf(design).repeat} min={1} max={40} disabled={held}
+                      onChange={(repeat) => onChange(withLayup(design, { repeat }))}
+                    />
+                  </div>
+                  <p className="note">Blade tilted {step.tilt}°. Each strip is a diamond in cross-section, about {inches(step.width)} on every side.</p>
+                </>
               )}
               {step.type === 'crosscut' && (
                 <div className="row">
                   <Len label="Slice width" value={step.width} min={0.0625} onChange={(width) => setStep(step.id, { width })} />
-                  <Len label="Kerf" value={step.kerf} onChange={(kerf) => setStep(step.id, { kerf })} />
+                  {ownKerf && <Len label="Kerf" value={step.kerf} onChange={(kerf) => setStep(step.id, { kerf })} />}
                   <label className="field">
                     <span>Angle °</span>
                     <input className="int" type="number" min={-75} max={75} step={5} value={step.angle} onChange={(e) => setStep(step.id, { angle: Number(e.target.value) || 0 })} />
@@ -460,14 +478,14 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
       ))}
       {finishAt('sand') >= 0 && (
         <div className={`step touch${selected === finishAt('sand') ? ' selected' : ''}`} onClick={() => onSelect(finishAt('sand'))}>
-          <header><em>{finishAt('sand') + 1}</em><strong>{SAND_TITLE}</strong></header>
+          <header><em>{numberOf(finishAt('sand'))}</em><strong>{SAND_TITLE}</strong></header>
         </div>
       )}
       {anyTouch && finishAt('sand') < 0 && (
         <p className="warning">Finishing needs a glued panel: end the steps with a Glue up.</p>
       )}
       <div className="add-step">
-        <span>Add a step after {addAt + 1}. {addAfter}</span>
+        <span>Add a step after {numberOf(addAt)}. {addAfter}</span>
         <div>
           {ADDABLE.map(({ type, hint }) => {
             const ok = stepFits(type, addKind);
