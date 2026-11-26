@@ -244,8 +244,8 @@ const checks = [
       `({ enabled, heading: document.querySelector('.overlay.info strong').textContent, info: document.querySelector('.overlay.info').innerText, caption: document.querySelector('.overlay.caption').textContent, fields: [...document.querySelectorAll('.steps .step.selected .field > span:first-child')].map((e) => e.textContent) })`, 600));
     if (!r.enabled || r.heading !== '3. Rip the panel' || !/8 loose slices/.test(r.info) || !/^Rip the panel lengthways into 8 strips, each 1 1\/4″ wide/.test(r.caption) || r.fields.join() !== 'Strip width,Kerf') throw new Error(JSON.stringify(r));
   }],
-  ['a board finishes at exactly the target size: the grid opens at 16 x 12, says what its strips are milled to, and stays on target in edge grain', async () => {
-    const r = await probe('preset=maple-purpleheart', later(
+  ['with rounding set to Exact a board finishes at exactly the target size: the grid opens at 16 x 12, says what its strips are milled to, and stays on target in edge grain', async () => {
+    const r = await probe('preset=maple-purpleheart&rounding=0', later(
       `const note = () => document.querySelector('.card.target .note').textContent; const strips = () => ({ asked: [...document.querySelectorAll('.step.first .strip-row input')].map((i) => i.value).filter((v) => /^[0-9 /.]+$/.test(v)), fit: document.querySelector('.step.first .fit-note')?.textContent ?? '' }); const before = { note: note(), ...strips() }; [...document.querySelectorAll('.grain-switch button')].find((b) => b.textContent === 'Edge grain').click()`,
       `({ before, after: { note: note(), ...strips() }, broken: document.querySelectorAll('.step.broken').length })`, 1800));
     const ok = /Finishes at 16″ × 12″ × 1 1\/8″/.test(r.before.note) && /Finishes at 16″ × 12″ × 1 1\/8″/.test(r.after.note)
@@ -262,17 +262,34 @@ const checks = [
     const r = await probe('preset=maple-purpleheart&tab=cutlist', `({ text: document.querySelector('.cutlist').innerText })`);
     if (!/Hard maple/.test(r.text) || !/Purpleheart/.test(r.text) || !/Rip the strips/.test(r.text) || !/Juice groove/.test(r.text) || !/Sand and oil/.test(r.text) || !/board feet|bd ft|bf/i.test(r.text)) throw new Error(r.text.slice(0, 400));
   }],
-  ['the cut list has a units choice: Metric adds millimetres beside the inches, and Imperial off leaves millimetres only', async () => {
-    const r = await probe('preset=brick&tab=cutlist', later(
-      `const boxes = () => [...document.querySelectorAll('.cutlist .units input')]; const text = () => [...document.querySelectorAll('.cutlist table, .cutlist ol, .cutlist .note')].map((e) => e.innerText).join(' '); const shots = [{ on: boxes().map((b) => b.checked), text: text() }]; boxes()[1].click(); setTimeout(() => { shots.push({ on: boxes().map((b) => b.checked), text: text() }); boxes()[0].click(); }, 300); setTimeout(() => { shots.push({ on: boxes().map((b) => b.checked), text: text() }); boxes()[1].click(); }, 600)`,
-      `({ shots: shots.map((s) => ({ on: s.on, inch: (s.text.match(/″/g) || []).length, mm: (s.text.match(/ mm/g) || []).length, sample: s.text.slice(0, 90) })), last: boxes().map((b) => b.checked), saved: localStorage.getItem('cutting-boards.units.v1') })`, 900));
-    const [imperial, both, metric] = r.shots;
-    const ok = imperial.on.join() === 'true,false' && imperial.inch > 10 && imperial.mm === 0
-      && both.on.join() === 'true,true' && both.inch === imperial.inch && both.mm > 10
-      && metric.on.join() === 'false,true' && metric.inch === 0 && metric.mm > 10
-      // Turning the last unit off turns the other on.
-      && r.last.join() === 'true,false' && r.saved === '{"imperial":true,"metric":false}';
+  ['the Dimensions tile writes every length like a caliper does: fractions, decimal inches or millimetres, in the tile, the steps and the view', async () => {
+    const r = await probe('preset=tumbling-blocks', `(async () => { const pick = (label, value) => { const el = document.querySelector('select[aria-label="' + label + '"]'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(el, value); el.dispatchEvent(new Event('change', { bubbles: true })); }; const wait = (ms) => new Promise((r) => setTimeout(r, ms)); const read = () => ({ note: document.querySelector('.card.target .note').textContent, first: document.querySelector('.step.first .note').textContent, info: document.querySelector('.overlay.info').innerText, units: document.querySelector('select[aria-label="Units"]').value, round: document.querySelector('select[aria-label="Round to"]').selectedOptions[0].textContent }); const fraction = read(); pick('Units', 'decimal'); await wait(500); const decimal = read(); pick('Units', 'metric'); await wait(500); const metric = read(); return { fraction, decimal, metric, cutlistUnits: document.querySelectorAll('.cutlist .units').length }; })()`);
+    const ok = r.fraction.units === 'fraction' && r.fraction.round === '1/16″' && /Finishes at 16″ × 12″ × 1 1\/2″/.test(r.fraction.note) && /about 1 7\/16″/.test(r.fraction.first)
+      && r.decimal.round === '0.01″' && /Finishes at 16″ × 12″ × 1\.5″/.test(r.decimal.note) && /about 1\.44″/.test(r.decimal.first) && !/\d\/\d/.test(r.decimal.note + r.decimal.info)
+      && r.metric.round === '0.5 mm' && /Finishes at 406\.5 mm × 305 mm × 38 mm/.test(r.metric.note) && / mm/.test(r.metric.first) && !/″/.test(r.metric.note + r.metric.first + r.metric.info)
+      && r.cutlistUnits === 0;
     if (!ok) throw new Error(JSON.stringify(r));
+  }],
+  ['rounding is in the board and not only the words: at 1/16 the grid is built from sixteenths and finishes where they put it, and the cut list says the same', async () => {
+    const r = await probe('preset=maple-purpleheart', `(async () => { const pick = (label, value) => { const el = document.querySelector('select[aria-label="' + label + '"]'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(el, value); el.dispatchEvent(new Event('change', { bubbles: true })); }; const wait = (ms) => new Promise((r) => setTimeout(r, ms)); const read = () => ({ note: document.querySelector('.card.target .note').textContent, fit: document.querySelector('.step.first .fit-note')?.textContent ?? '', info: document.querySelector('.overlay.info').innerText }); const sixteenth = read(); pick('Round to', '0'); await wait(900); const exact = read(); pick('Round to', '0.125'); await wait(900); const eighth = read(); [...document.querySelectorAll('.tabs button')].find((b) => b.textContent === 'Cut list and steps').click(); await wait(400); const list = document.querySelector('.cutlist').innerText; return { sixteenth, exact, eighth, list: list.slice(0, 1500) }; })()`);
+    /** Every inch length in a text is a whole number of `den`ths. */
+    const onGrid = (text, den) => [...text.matchAll(/(\d+ \d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)″/g)].every(([, n]) => { const [a, b] = n.split(' '); const part = (t) => (t.includes('/') ? +t.split('/')[0] / +t.split('/')[1] : +t); const v = (part(a) + (b ? part(b) : 0)) * den; return Math.abs(v - Math.round(v)) < 1e-6; });
+    const ok = onGrid(r.sixteenth.note + r.sixteenth.fit + r.sixteenth.info, 16) && !/\d\.\d/.test(r.sixteenth.note + r.sixteenth.fit)
+      && /Finishes at 16″ × 12″/.test(r.exact.note) && /Hard maple 0\.9\d+″ wide/.test(r.exact.fit)
+      && onGrid(r.eighth.note + r.eighth.fit + r.eighth.info, 8) && onGrid(r.list.split('Rough extra')[0], 8) && r.eighth.note !== r.exact.note;
+    if (!ok) throw new Error(JSON.stringify(r));
+  }],
+  ['the Target board tile lists every design and changes the board to the one picked at the same size, and holds the grain switch', async () => {
+    const r = await probe('preset=brick', `(async () => { const pick = (label, value) => { const el = document.querySelector('select[aria-label="' + label + '"]'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(el, value); el.dispatchEvent(new Event('change', { bubbles: true })); }; const wait = (ms) => new Promise((r) => setTimeout(r, ms)); const sel = () => document.querySelector('.card.board-pick select[aria-label="Design"]'); const before = { value: sel().value, options: [...sel().options].map((o) => o.textContent), grain: !!document.querySelector('.card.board-pick .grain-switch'), heads: [...document.querySelectorAll('.side .card h3')].slice(0, 2).map((h) => h.textContent), note: document.querySelector('.card.target .note').textContent }; pick('Design', 'checkerboard'); await wait(1200); return { before, after: { value: sel().value, name: document.title.replace(' - Cutting Boards', ''), note: document.querySelector('.card.target .note').textContent, broken: document.querySelectorAll('.step.broken').length, round: document.querySelector('select[aria-label="Round to"]').value } }; })()`);
+    const ok = r.before.value === 'brick' && r.before.options.length === 11 && r.before.options.includes('3D Board') && r.before.options.at(-1) === 'Double border' && r.before.grain
+      && r.before.heads.join('|').toLowerCase() === 'target board|dimensions'
+      && r.after.value === 'checkerboard' && r.after.name === 'Black walnut and hard maple checkerboard' && !r.after.broken && r.after.round === '0.0625'
+      && /Finishes at/.test(r.after.note);
+    if (!ok) throw new Error(JSON.stringify(r));
+  }],
+  ['a strip thinner than the minimum under Dimensions is flagged on the step that mills it', async () => {
+    const r = await probe('preset=maple-purpleheart', `(async () => { const wait = (ms) => new Promise((r) => setTimeout(r, ms)); const before = document.querySelectorAll('.step.first .warning').length; const field = [...document.querySelectorAll('.card.target .field, .card.target label')].find((f) => /Thinnest strip/.test(f.textContent)).querySelector('input'); const was = field.value; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, '1/4'); field.dispatchEvent(new Event('input', { bubbles: true })); await wait(1500); return { before, was, warning: document.querySelector('.step.first .warning')?.textContent ?? '' }; })()`);
+    if (r.before !== 0 || r.was !== '1/8' || !/Thinner than the 1\/4″ minimum: Purpleheart at 1\/8″/.test(r.warning)) throw new Error(JSON.stringify(r));
   }],
   ['the print preview page is as tall as its text, and the preview scrolls to reach the end of it', async () => {
     const r = await probe('preset=brick&preview', `(() => { const sheet = document.querySelector('.print-sheet'), view = document.querySelector('.preview'); const last = sheet.querySelector('.cutlist ol li:last-child').getBoundingClientRect(); const page = sheet.getBoundingClientRect(); return { spill: sheet.scrollHeight - sheet.clientHeight, lastInside: last.bottom <= page.bottom + 1, scrolls: view.scrollHeight > view.clientHeight + 1 && getComputedStyle(view).overflowY === 'auto', window: innerHeight, page: Math.round(page.height) }; })()`);
@@ -340,7 +357,7 @@ const checks = [
       `const first = { crumbs: [...document.querySelectorAll('.crumbs li')].map((e) => e.textContent), grains: document.querySelectorAll('.wizard-types').length }; document.querySelector('.modal footer button.primary').click()`,
       `({ first, labels: [...document.querySelectorAll('.wizard-examples strong')].map((e) => e.textContent), blurbs: [...document.querySelectorAll('.wizard-examples span')].map((e) => e.textContent), options: document.querySelectorAll('.modal select').length })`, 3500), WIZARD);
     const ok = r.first.crumbs.join('|') === '1. Size|2. Design' && r.first.grains === 0
-      && r.labels.length === 10 && new Set(r.labels).size === 10 && r.blurbs.length === 10 && ![...r.labels, ...r.blurbs].some((t) => /(end|edge|long)[ -]grain/i.test(t))
+      && r.labels.length === 11 && new Set(r.labels).size === 11 && r.blurbs.length === 11 && r.labels.includes('3D Board') && ![...r.labels, ...r.blurbs].some((t) => /(end|edge|long)[ -]grain/i.test(t))
       && r.labels.at(-2) === 'Chess board' && r.labels.at(-1) === 'Double border' && r.labels.slice(0, 5).join('|') === 'Single wood|Stripes|Stripes in a border|Grid|Checkerboard' && r.options === 0;
     if (!ok) throw new Error(JSON.stringify(r));
   }],
@@ -355,6 +372,24 @@ const checks = [
       `const card = [...document.querySelectorAll('.wizard-examples button')].find((b) => b.querySelector('strong').textContent === 'Double border'); const picture = !!card.querySelector('img')?.src.startsWith('data:image/png'); card.click()`,
       `({ picture, wizard: !!document.querySelector('.modal'), name: document.title.replace(' - Cutting Boards', ''), broken: document.querySelectorAll('.step.broken').length })`, 800), examples(11));
     if (!r.picture || r.wizard || r.name !== 'Hard maple, black walnut and white oak double border' || r.broken) throw new Error(JSON.stringify(r));
+  }],
+  ['picking the 3D board opens tumbling blocks: a picture on its card, strips ripped with the blade tilted for its first step, the size asked for, and both grains on offer', async () => {
+    const r = await probe('wizard=designs', later(
+      `const card = [...document.querySelectorAll('.wizard-examples button')].find((b) => b.querySelector('strong').textContent === '3D Board'); const picture = !!card.querySelector('img')?.src.startsWith('data:image/png'); const size = card.querySelector('small').textContent; card.click()`,
+      `({ picture, size, wizard: !!document.querySelector('.modal'), name: document.title.replace(' - Cutting Boards', ''), first: document.querySelector('.step.first header strong').textContent, note: document.querySelector('.step.first .note').textContent, woods: document.querySelectorAll('.step.first .strip-row select').length, on: document.querySelector('.grain-switch button.on')?.textContent, edge: [...document.querySelectorAll('.grain-switch button')].find((b) => b.textContent === 'Edge grain').disabled, steps: [...document.querySelectorAll('.steps .step:not(.touch) header strong')].map((t) => t.textContent), info: document.querySelector('.overlay.info').innerText, broken: document.querySelectorAll('.step.broken').length, warnings: document.querySelectorAll('.step .warning').length })`, 800), examples(11));
+    const ok = r.picture && !r.wizard && r.name === 'Hard maple, black walnut and cherry 3D blocks' && r.first === 'Rip the strips' && /blade tilted 30°.* \d+ of each wood make \d+ hexagonal logs?, cut into the \d+ pieces of the block/.test(r.note)
+      && r.woods === 3 && r.on === 'End grain' && !r.edge && r.steps.join('|') === 'Bevel rip|Glue up|Cross cut|Turn to end grain|Glue up|Trim|Flatten' && !r.broken && !r.warnings && /× 12″ ×/.test(r.size) && r.info.includes(r.size.replace('Finishes at ', '').split(' × ').slice(0, 2).join(' × '));
+    if (!ok) throw new Error(JSON.stringify(r));
+  }],
+  ['the grain switch turns the 3D board into its other recipe, made from flat strips cut and flipped twice: the same size and design, nothing smaller than a slice', async () => {
+    const r = await probe('preset=tumbling-blocks', later(
+      `const read = () => ({ on: document.querySelector('.grain-switch button.on')?.textContent, design: document.querySelector('select[aria-label="Design"]').value, steps: [...document.querySelectorAll('.steps .step:not(.touch) header strong')].map((t) => t.textContent), fields: [...document.querySelectorAll('.step.first .row span')].map((e) => e.textContent).filter(Boolean), note: document.querySelector('.step.first .note').textContent, size: document.querySelector('.card.target .note').textContent, name: document.title, broken: document.querySelectorAll('.step.broken').length, warnings: document.querySelectorAll('.step .warning').length }); const before = read(); [...document.querySelectorAll('.grain-switch button')].find((b) => b.textContent === 'Edge grain').click()`,
+      `({ before, after: read() })`, 1500));
+    const ok = r.before.on === 'End grain' && r.after.on === 'Edge grain' && r.after.design === 'tumbling-blocks' && r.after.name === r.before.name
+      && r.after.steps.join('|') === 'Glue up|Flatten|Cross cut|Flip|Offset|Glue up|Flatten|Trim|Rip the panel|Flip|Glue up|Trim|Flatten' && r.after.fields.includes('Strip width') && !r.before.fields.includes('Strip width')
+      && /Flat strips, ripped square, in the order left, top, right, top/.test(r.after.note) && r.after.size === r.before.size && /16″ × 12″ × 1 1\/2″/.test(r.after.size)
+      && !r.after.broken && !r.after.warnings;
+    if (!ok) throw new Error(JSON.stringify(r));
   }],
   ['the app icon files exist', async () => {
     const missing = ['assets/icon.ico', 'assets/icon.png', 'public/icon.png'].filter((f) => !existsSync(join(root, f)));

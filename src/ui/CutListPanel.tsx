@@ -12,25 +12,19 @@ interface Props {
   onChange?: (d: Design) => void;
   /** False leaves out the written order of operations, for a sheet that shows it with pictures instead. */
   steps?: boolean;
-  /** Which units every length is written in. */
+  /** How every length is written: the design's notation and rounding, chosen in the Dimensions tile. */
   units: Units;
-  /** Present on screen, where the units can be chosen; absent on the print sheet, which follows the choice. */
-  onUnits?: (u: Units) => void;
 }
 
 /**
  * Finished size against the target, the stock to mill, and (unless `steps` is false) the numbered
- * order of operations, in inches, millimetres or both. Used on screen and in the print sheet.
+ * order of operations, every length written the way the design's Dimensions ask. Used on screen
+ * and in the print sheet.
  */
-export function CutListPanel({ design, cutList, species, onChange, steps = true, units, onUnits }: Props) {
+export function CutListPanel({ design, cutList, species, onChange, steps = true, units }: Props) {
   const u = sensible(units);
   /** A length in the chosen units. */
   const len = (v: number) => showLength(v, u);
-  /** Turn one unit on or off; turning the last one off turns the other on, so there is always one. */
-  const toggle = (which: keyof Units) => {
-    const next = { ...u, [which]: !u[which] };
-    onUnits?.(next.imperial || next.metric ? next : { imperial: !u.imperial, metric: !u.metric });
-  };
   const [fx, fy, fz] = cutList.finished;
   const long = Math.max(fx, fz), short = Math.min(fx, fz);
   const tLong = Math.max(design.target.length, design.target.width), tShort = Math.min(design.target.length, design.target.width);
@@ -41,13 +35,6 @@ export function CutListPanel({ design, cutList, species, onChange, steps = true,
   };
   return (
     <div className="cutlist">
-      {onUnits && (
-        <div className="units" role="group" aria-label="Units">
-          <span>Units</span>
-          <label className="check"><input type="checkbox" checked={u.imperial} onChange={() => toggle('imperial')} />Imperial (inches)</label>
-          <label className="check"><input type="checkbox" checked={u.metric} onChange={() => toggle('metric')} />Metric (mm)</label>
-        </div>
-      )}
       <h3>Finished board</h3>
       <table>
         <tbody>

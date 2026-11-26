@@ -1,5 +1,6 @@
+import { roundTo } from './fractions';
 import { newId } from './ids';
-import type { Design, Layup, Step, StripSpec } from './types';
+import type { Design, Dimensions, Layup, Step, StripSpec } from './types';
 
 /**
  * How many steps every starter design begins with: rip the strips, then glue them up. They are
@@ -49,11 +50,19 @@ export function isLocked(strip: StripSpec): boolean {
   return strip.locked ?? (!!strip.spacer || strip.width < 0.375);
 }
 
-/** The strips at the widths they are milled to: those that are not locked take the fit's scale. */
-export function milledStrips(layup: Pick<Layup, 'strips' | 'scale'>): StripSpec[] {
+/** The strips at the widths they are milled to: those that are not locked take the fit's scale, and all are rounded to `grid` when the design rounds its sizes. */
+export function milledStrips(layup: Pick<Layup, 'strips' | 'scale'>, grid = 0): StripSpec[] {
   const scale = layup.scale ?? 1;
-  return scale === 1 ? layup.strips : layup.strips.map((s) => (isLocked(s) ? s : { ...s, width: s.width * scale }));
+  if (scale === 1 && !grid) return layup.strips;
+  return layup.strips.map((s) => ({ ...s, width: roundTo(isLocked(s) ? s.width : s.width * scale, grid) }));
 }
+
+/** What a new board starts with: fractions to the nearest 1/16 inch, and nothing thinner than 1/8. */
+export const DEFAULT_DIMENSIONS: Dimensions = { notation: 'fraction', rounding: 1 / 16, minWidth: 1 / 8 };
+
+/** A design's dimension settings; one saved before there were any writes fractions, rounds nothing and has no minimum. */
+export const dimensionsOf = (design: Pick<Design, 'dimensions'>): Dimensions =>
+  design.dimensions ?? { notation: 'fraction', rounding: 0, minWidth: 0 };
 
 /** The design with its sizes as asked for: without what a fit added to land on the target. */
 export function unfitted<D extends Pick<Design, 'steps'>>(design: D): D {
@@ -72,15 +81,24 @@ export interface Sizing {
   alongOn: 'thickness' | 'crosscut' | null;
   /** The width of the first cross cut, which marks the cross cuts `along` applies to. */
   cut: number;
+  /** The step every size is rounded to where it is used, or 0 for none: the design's rounding. */
+  grid: number;
 }
 
 /** Sizes used exactly as asked for. */
-export const AS_ASKED: Sizing = { scale: 1, along: 0, alongOn: null, cut: 0 };
+export const AS_ASKED: Sizing = { scale: 1, along: 0, alongOn: null, cut: 0, grid: 0 };
+
+/** A size with the fit's `along` added, rounded to the design's step: what the strips' thickness or the cross cut becomes. */
+export const withAlong = (size: number, sizing: Sizing): number => roundTo(size + sizing.along, sizing.grid);
 
 /** The sizing of a design: see `Sizing`. */
-export function sizingOf(design: Pick<Design, 'steps'>): Sizing {
+export function sizingOf(design: Pick<Design, 'steps' | 'dimensions'>): Sizing {
   const layup = layupOf(design);
   const cut = design.steps.find((s) => s.type === 'crosscut') as Extract<Step, { type: 'crosscut' }> | undefined;
   const stood = design.steps.some((s) => s.type === 'turn');
-  return { scale: layup.scale ?? 1, along: layup.along ?? 0, alongOn: stood ? 'thickness' : cut ? 'crosscut' : null, cut: cut?.width ?? 0 };
+  return {
+    scale: layup.scale ?? 1, along: layup.along ?? 0, alongOn: stood ? 'thickness' : cut ? 'crosscut' : null, cut: cut?.width ?? 0,
+    // A face-grain 3D board's sizes are fixed by the 60° of its diamonds and are not rounded: see blocksFlat.ts.
+    grid: layup.blocks?.flat ? 0 : dimensionsOf(design).rounding,
+  };
 }

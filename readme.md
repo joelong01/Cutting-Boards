@@ -59,9 +59,25 @@ blue **Show the board ›** bar along the bottom goes back to the board.
 - **Grain switch.** **End grain / Edge grain** in the Target board card turns the open board
   round, keeping its woods, pattern and size: end to edge takes out the turn step and mills the
   stock to the board's thickness; edge to end cuts and stands the slices up. Greyed out for
-  basket weave and chevron, which cannot be turned round.
-- **Target board.** The size to build, and the size the recipe finishes at. It stays at the top
-  of the side panel while the steps scroll under it.
+  basket weave and chevron, which cannot be turned round. On the 3D board it swaps the whole
+  recipe for the other one.
+- **Target board.** The first tile: which design the board is, in a dropdown of every design on
+  offer, and the grain switch. Picking another design changes the open board to it at the same
+  size (Ctrl+Z brings the old one back).
+- **Dimensions.** The second tile, which stays at the top of the side panel while the steps
+  scroll under it: the size to build and the size the recipe finishes at, plus three settings
+  saved with the design.
+  - **Units**: inches as fractions, inches as decimals, or millimetres, like the modes of a
+    caliper. Every length in the window, the cut list, the instructions and the printed sheet is
+    written that way. Lengths are still typed in inches.
+  - **Round to**: 1/64 to 1/8 inch, 0.001 to 0.01 inch, or 0.1 to 1 mm, or Exact. Every size is
+    rounded to it where it is used, so the board drawn is built from the sizes the instructions
+    give, and "Finishes at" is where those sizes really land. A coarse step moves the board off
+    its target, visibly. A size smaller than one step (a saw kerf, a 1/16 inch flattening pass)
+    is kept as it is, and a trim is not rounded: it is sawn to the size it leaves. New boards
+    start at 1/16 inch.
+  - **Thinnest strip**: the thinnest the planer or sander can work, 1/8 inch to start with. A
+    step that mills anything thinner is flagged, and strip widths cannot be typed below it.
 - **Strips.** Step 1, "Mill strips for first glue-up": species, width, order, a repeat count, and
   "end with first strip" for a symmetric panel. Lengths accept shop fractions (`1 1/8`, `3/4`);
   Up/Down nudges by 1/16.
@@ -119,10 +135,8 @@ blue **Show the board ›** bar along the bottom goes back to the board.
   0 (a router guided by straight rails) its outside corners take the bit's radius and its inside
   corners stay sharp.
 - **Cut list and steps.** Stock to mill by species, board feet, yield, finished size against the
-  target, and numbered instructions. **Units** at the top of the tab ticks Imperial, Metric or
-  both: with both, every length reads `1 1/2″ (38.1 mm)`, and board feet are joined by cubic
-  metres. The printed sheet and PDF follow the same choice, which is remembered. The design is
-  still entered in inches, and the Design tab and the 3D view still show inches.
+  target, and numbered instructions, every length written and rounded the way the Dimensions
+  tile says. The printed sheet and PDF follow it too.
 - **Names.** A design names itself from its woods and pattern ("Hard maple and black walnut grid")
   and keeps that up to date as the woods change, until you save it or give it a name of your own
   with **Save as**. The name is shown in the window's title bar.
@@ -152,13 +166,48 @@ up after the first cross cut ("Turn to end grain"). The **End grain / Edge grain
 Target board card puts that step in or takes it out of the open board, and swaps the stock
 thickness with the cross-cut width so the blocks stay square (`src/model/grain.ts`); a board
 with no cross cut gets one, with a turn and a glue-up. Basket weave (two panels) and chevron
-(angled cuts) cannot be switched.
+(angled cuts) cannot be switched. The 3D board has a recipe for each grain and switches between them.
 Picking a design opens it for
 editing. A design is a pattern, not a grain: its name and description say nothing of which
 grain is on top, and each is listed once (single wood is one design, not one for each grain). The
-same eight starting designs are listed under **New** at their default sizes: single wood, stripes,
-stripes in a border, grid, checkerboard, brick, basket weave and chevron. Each opens in the grain
-it is usually made in, and the switch on the board changes it.
+same nine starting designs are listed under **New** at their default sizes: single wood, stripes,
+stripes in a border, grid, checkerboard, brick, basket weave, chevron and the 3D board. Each opens
+in the grain it is usually made in, and the switch on the board changes it.
+
+**The 3D board** (tumbling blocks) is diamonds in three woods, three round every point, that read
+as stacked cubes. No row of straight cuts through a striped panel makes that, so its strips are
+not square (`src/model/blocks.ts`). Its steps are the ordinary ones:
+
+1. **Rip the strips**: one square board of each wood, 24 1/2″ long for a 16 × 12 board.
+2. **Bevel rip**: each board ripped with the blade tilted 30° into three strips, every one a
+   diamond in cross-section.
+3. **Glue up**: one strip of each wood into each hexagonal log.
+4. **Cross cut** the logs into pieces as long as the board is thick, plus the flattening.
+5. **Turn to end grain**: stand the pieces up.
+6. **Glue up** the pieces into a block, packed like honeycomb. Its top is the pattern.
+7. **Trim** the board out of the ragged block, and **Flatten**.
+
+The thickness of the boards the strips are ripped from sets the size of the blocks. Holding the
+board's size counts the pieces again and sets how many strips there are and how long.
+
+That is the end-grain recipe. The grain switch changes it to the other one: the same design with
+face grain on top, made entirely from strips (`src/model/blocksFlat.ts`). Nothing smaller than a
+slice of a panel is handled, and every step is an ordinary one:
+
+1. **Rip the strips**, square: the two face woods one width, the top wood about half that.
+   **Glue up** in the order left, top, right, top, repeated, and **Flatten**.
+2. **Cross cut** the panel 30° off square into slices.
+3. **Flip** every other slice face down and **Offset** it half a repeat, then **Glue up** and
+   **Flatten**: a zigzag panel.
+4. **Trim**, then **Rip the panel** into strips, each cut along the middle of a top-wood band.
+5. **Flip** every other strip face down and **Glue up**: the half-diamonds meet as whole ones.
+6. **Trim** to size and **Flatten**.
+
+The fit sets every size from the face strips' width and the target, and finds the stock by
+running the recipe: the slices from the two ends of the angled cut are short and are sawn off.
+Its sizes are not rounded, since they follow from the 60° of the diamonds.
+
+In either recipe each step is one operation at the bench, with its own picture and instruction.
 
 ## How it models wood
 
@@ -228,8 +277,8 @@ grains, a line per stage. A change to how the recipe is run must leave every lin
 ## Checks
 
 ```powershell
-npm test                                   # 399 tests of the model: the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
-npm run smoke                              # builds, then 38 checks of the real window: the grain switch, 3D view, wizard, print preview, edge tags, add step, accent strips, removing strips and woods, pinned target size, hiding the panel, save and open
+npm test                                   # 447 tests of the model: dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
+npm run smoke                              # builds, then 43 checks of the real window: the Target board and Dimensions tiles, the grain switch, 3D view, wizard, print preview, edge tags, add step, accent strips, removing strips and woods, pinned target size, hiding the panel, save and open
 node scripts/run.mjs --selftest            # save, list, read and delete a design through the app
 node scripts/run.mjs --screenshot=out.png --query=preset=brick   # render one frame and exit
 ```
@@ -253,7 +302,10 @@ reachable there as `window.boardScene`.
 
 - **Wood colours are approximations** picked by eye, and the grain is generated, not photographed.
 - **Strip sizes in the cut list are finished sizes.** Jointing and planing allowances are yours.
-- **3D-illusion boards** (tumbling blocks, the "woven tube" look) need bevel cuts and separate
-  sub-assemblies glued together. Neither exists yet.
+- **The 3D board** is tumbling blocks only. The other 3D illusions (the "woven tube" look) are
+  not here. Its trim off the ragged block comes out in odd decimals; the size it trims to is
+  what matters.
 - **Auto trim** squares the two long edges only. Ends are trimmed by the amounts you enter.
-- Inches only.
+- Lengths are typed in inches whatever the units shown.
+- With rounding on, a held board finishes near its target, not on it: the fit finds the exact
+  sizes and rounds them, and does not yet look for a different count of strips that would land closer.

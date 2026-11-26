@@ -33,7 +33,7 @@ const SIZES = [
 describe('the same pattern in the other grain', () => {
   it('knows which grain each starter design is', () => {
     const end = PRESETS.filter((p) => grainOf(p.make()) === 'end').map((p) => p.key);
-    expect(end).toEqual(['single-end-grain', 'maple-purpleheart', 'checkerboard', 'brick', 'basket-weave']);
+    expect(end).toEqual(['single-end-grain', 'maple-purpleheart', 'checkerboard', 'brick', 'basket-weave', 'tumbling-blocks']);
   });
 
   it('turns round every starter design but basket weave (several panels) and chevron (angled cuts)', () => {

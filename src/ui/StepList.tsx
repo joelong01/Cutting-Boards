@@ -1,14 +1,14 @@
 import { useState, type ReactNode } from 'react';
 import { accentStrips, patternPeriod, withAccentStrips } from '../model/accent';
-import { inches } from '../model/fractions';
 import { OPENING_STEPS } from '../model/design';
-import { FINISH_STEPS, SAND_TITLE, STEP_TITLES, stepFits, stepNeeds } from '../model/pipeline';
+import { FINISH_STEPS, SAND_TITLE, STEP_TITLES, stepFits, stepNeeds, stepTitle } from '../model/pipeline';
 import { finishOf } from '../model/finish';
 import { speciesById } from '../model/species';
 import { insertStep, newStep } from '../model/presets';
 import { newId } from '../model/presets';
 import type { AccentStrip, Design, Finish, FinishPart, PatternStrip, Species, Stage, Step, StepType, StripSpec } from '../model/types';
 import { Int, Len, SelectorEditor, SpeciesSelect } from './inputs';
+import { useShow } from './show';
 
 interface Props {
   design: Design;
@@ -35,8 +35,6 @@ const ADDABLE: { type: StepType; hint: string }[] = [
   { type: 'combine', hint: 'Bring back the slices set aside and put a new slice after each' },
 ];
 
-/** A stage's size as length x width x thickness. */
-const sizeText = (s: Stage) => `${inches(s.size[0])} × ${inches(s.size[2])} × ${inches(s.size[1])}`;
 
 /**
  * The recipe from step 2 on as a list of cards: one per step and one for Finish, each with its
@@ -44,6 +42,9 @@ const sizeText = (s: Stage) => `${inches(s.size[0])} × ${inches(s.size[2])} × 
  * the strips, is the LayupEditor card above this list.
  */
 export function StepList({ design, stages, species, selected, onSelect, onChange }: Props) {
+  const { len: inches, text } = useShow();
+  /** A stage's size as length x width x thickness. */
+  const sizeText = (s: Stage) => `${inches(s.size[0])} × ${inches(s.size[2])} × ${inches(s.size[1])}`;
   /** Change some fields of one step. */
   const setStep = (id: string, patch: Partial<Step>) =>
     onChange({ ...design, steps: design.steps.map((s) => (s.id === id ? ({ ...s, ...patch } as Step) : s)) });
@@ -96,7 +97,7 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
         </header>
         {/* A click on a field or its label is for that field; one on the space around them selects the card. */}
         {on && <div className="params" onClick={(e) => (e.target as HTMLElement).closest('input, select, button, label') && e.stopPropagation()} onFocus={() => st && selected < at && onSelect(at)}>{fields}</div>}
-        {st?.warning && <p className="warning">{st.warning}</p>}
+        {st?.warning && <p className="warning">{text(st.warning)}</p>}
       </div>
     );
   };
@@ -122,7 +123,7 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
           <div key={step.id} className={`step${selected === i ? ' selected' : ''}${st.error ? ' broken' : ''}`} onClick={() => onSelect(i)}>
             <header>
               <em>{i + 1}</em>
-              <strong>{STEP_TITLES[step.type]}</strong>
+              <strong>{stepTitle(step)}</strong>
               <span className="icons" onClick={(e) => e.stopPropagation()} style={pinned ? { display: 'none' } : undefined}>
                 <button title="Move earlier" disabled={i <= OPENING_STEPS} onClick={() => move(i, -1)}>↑</button>
                 <button title="Move later" disabled={i === design.steps.length - 1} onClick={() => move(i, 1)}>↓</button>
@@ -136,11 +137,14 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
               </span>
             </header>
             <div className="params" onClick={(e) => e.stopPropagation()} onFocus={() => onSelect(i)}>
-              {step.type === 'rip' && (
+              {step.type === 'rip' && !step.tilt && (
                 <div className="row">
                   <Len label="Strip width" value={step.width} min={0.125} onChange={(width) => setStep(step.id, { width })} />
                   <Len label="Kerf" value={step.kerf} onChange={(kerf) => setStep(step.id, { kerf })} />
                 </div>
+              )}
+              {step.type === 'rip' && !!step.tilt && (
+                <p className="note">Blade tilted {step.tilt}°. The strips come out about {inches(step.width)} on every side, which follows from the thickness of the boards.</p>
               )}
               {step.type === 'crosscut' && (
                 <div className="row">
@@ -400,8 +404,8 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
                 </div>
               )}
             </div>
-            {st.error && <p className="error">{st.error}</p>}
-            {st.warning && <p className="warning">{st.warning}</p>}
+            {st.error && <p className="error">{text(st.error)}</p>}
+            {st.warning && <p className="warning">{text(st.warning)}</p>}
             {!st.error && (
               <p className="result">
                 {st.kind === 'slices' ? `${st.slices.length} slices · ` : ''}{sizeText(st)}{st.aside ? ` · ${st.aside.length} slices set aside` : ''}

@@ -1,3 +1,5 @@
+import { isBlocks } from './blocks';
+import { turnedBlocks } from './blocksFlat';
 import { OPENING_STEPS, layupOf, unfitted, withLayup } from './design';
 import { fitThickness, fitToTarget } from './fit';
 import { newId } from './ids';
@@ -6,7 +8,7 @@ import type { Design, Step } from './types';
 /** Which face of the wood ends up on top of the finished board. */
 export type Grain = 'end' | 'edge';
 
-/** The grain a design's recipe puts on top: end grain if any step turns slices up on end. */
+/** The grain a design's recipe puts on top: end grain if any step turns slices up on end. A 3D board's two recipes do and do not. */
 export function grainOf(design: Design): Grain {
   return design.steps.some((s) => s.type === 'turn') ? 'end' : 'edge';
 }
@@ -29,11 +31,14 @@ const flatOff = (s: Step) => (s.type === 'flatten' ? s.top + s.bottom : 0);
  *
  * Either way the sizes are only a starting point: fit the result to its target, and its thickness
  * with `fitThickness`, before using it. Returns null for recipes this does not understand: ones
- * built from several panels (basket weave), ones that turn only some slices, and angled cuts,
- * whose slices would stand up at a slant.
+ * built from several panels (basket weave), ones that turn only some slices, angled cuts,
+ * whose slices would stand up at a slant. A 3D board is turned by swapping its whole recipe for
+ * the other one (`turnedBlocks`).
  */
 export function convertGrain(asFitted: Design, to: Grain): Design | null {
   if (grainOf(asFitted) === to) return asFitted;
+  // A 3D board has a recipe of its own for each grain: lengths of log on end, or flat diamond tiles.
+  if (isBlocks(asFitted)) return turnedBlocks(asFitted, to === 'edge');
   // Work from the sizes asked for: what the last fit added belongs to the board as it was.
   const design = unfitted(asFitted);
   const steps = design.steps;

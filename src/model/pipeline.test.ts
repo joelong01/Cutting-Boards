@@ -672,6 +672,7 @@ describe('designs name themselves from their woods', () => {
       brick: 'Teak brick',
       'basket-weave': 'Black walnut, hard maple and cherry basket weave',
       chevron: 'Four-wood chevron',
+      'tumbling-blocks': 'Hard maple, black walnut and cherry 3D blocks',
     });
   });
 

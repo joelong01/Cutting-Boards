@@ -43,3 +43,13 @@ export function formatLength(v: number): string {
 
 /** A length formatted for display with the inch mark. */
 export const inches = (v: number): string => `${formatLength(v)}″`;
+
+/**
+ * A length rounded to the nearest multiple of `step`, or left alone when there is no step. A
+ * length smaller than one step is left alone too: a saw kerf or a 1/16 inch flattening pass is
+ * what it is however coarsely the rest is measured, and nothing is rounded away to zero.
+ */
+export function roundTo(v: number, step: number | undefined): number {
+  if (!step || !(step > 0) || Math.abs(v) < step - 1e-9) return v;
+  return Math.round(v / step + 1e-9) * step;
+}

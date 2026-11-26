@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fitThickness, fitToTarget } from '../model/fit';
-import { inches } from '../model/fractions';
 import { run } from '../model/pipeline';
-import { CHESS_SQUARES, chessBoard, designs, doubleBorder, doubleBorderCount } from '../model/presets';
+import { catalog, type Offer } from '../model/presets';
 import type { Design, Stage } from '../model/types';
 import { Len } from './inputs';
+import { useShow } from './show';
 
 interface Props {
   /** Starting size, normally the current design's target. */
@@ -24,40 +23,16 @@ const COMMON_SIZES: { label: string; size: Design['target'] }[] = [
   { label: 'Butcher block', size: { length: 20, width: 16, thickness: 2 } },
 ];
 
-/** One design the wizard offers on its last page, before it is built and drawn. */
-interface Candidate {
-  key: string;
-  label: string;
-  blurb: string;
-  make: () => Design;
-}
-
-interface Example extends Candidate {
+/** One design the wizard offers on its last page, built and drawn. */
+interface Example extends Offer {
   design: Design;
   final: Stage;
   image: string;
 }
 
-/** A design resized to the wanted board: length and width by stock, then thickness. */
-function sized(base: Design, target: Design['target']): Design {
-  return fitThickness(fitToTarget({ ...base, target }));
-}
-
 /** Whether two board sizes are the same, so the matching common-size button can be highlighted. */
 const sameSize = (a: Design['target'], b: Design['target']) =>
   Math.abs(a.length - b.length) < 1e-6 && Math.abs(a.width - b.width) < 1e-6 && Math.abs(a.thickness - b.thickness) < 1e-6;
-
-/** A finished stage's size as length x width x thickness, longer side first. */
-const sizeText = (s: Stage) =>
-  `${inches(Math.max(s.size[0], s.size[2]))} × ${inches(Math.min(s.size[0], s.size[2]))} × ${inches(s.size[1])}`;
-
-/** The woods and sizes a chess board and a double border board start with; all can be changed once the board is open. */
-const CHESS = { dark: 'walnut', light: 'maple' };
-const DOUBLE = { block: 1.5, line: 0.125, field: 'maple', inner: 'walnut', outer: 'white-oak', spacer: 'poplar' };
-
-/** The square that makes an eight-square chess board as wide as the board asked for, to the nearest 1/8 inch. */
-const chessSquare = (target: Design['target']) =>
-  Math.max(0.5, Math.round(Math.min(target.length, target.width)) / CHESS_SQUARES);
 
 /**
  * Two-page dialog for starting a board. The first page asks for its size; the second offers every
@@ -72,27 +47,11 @@ export function BoardWizard({ initial, startAtDesigns, snapshot, onCreate, onClo
   const [page, setPage] = useState<1 | 2>(startAtDesigns ? 2 : 1);
   const [examples, setExamples] = useState<Example[]>([]);
 
-  const candidates = useMemo<Candidate[]>(() => {
-    const blocks = {
-      along: doubleBorderCount(target.length, DOUBLE.block, DOUBLE.line),
-      across: doubleBorderCount(target.width, DOUBLE.block, DOUBLE.line),
-    };
-    return [
-      ...designs().map((p) => ({ key: p.key, label: p.label, blurb: p.blurb, make: () => sized(p.make(), target) })),
-      {
-        key: 'chess',
-        label: 'Chess board',
-        blurb: 'For playing on: exactly eight squares each way, so the board is square, as wide as the width asked for.',
-        make: () => chessBoard({ ...CHESS, square: chessSquare(target), thickness: target.thickness, grain: 'end' }),
-      },
-      {
-        key: 'double',
-        label: 'Double border',
-        blurb: 'Maple blocks, each ringed with walnut, in a white oak grid. Three glue-ups: strips with a cheap spacer in them, then slices turned on end with a three-strip stack between them, then the panel sawn through each spacer and the oak glued into the kerfs.',
-        make: () => doubleBorder({ ...DOUBLE, ...blocks, thickness: target.thickness, grain: 'end' }),
-      },
-    ];
-  }, [target]);
+  const { len: inches } = useShow();
+  /** A finished stage's size as length x width x thickness, longer side first. */
+  const sizeText = (st: Stage) =>
+    `${inches(Math.max(st.size[0], st.size[2]))} × ${inches(Math.min(st.size[0], st.size[2]))} × ${inches(st.size[1])}`;
+  const candidates = useMemo(() => catalog(target), [target]);
 
   // Sizing and drawing an example takes a moment, so add them one per tick: the page paints
   // first and each card appears as it is ready, instead of the dialog freezing until all are done.

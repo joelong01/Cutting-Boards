@@ -1,8 +1,9 @@
-import { EMPTY, act, failed, type Action, type Names } from './actions';
-import { AS_ASKED, milledStrips, sizingOf, type Sizing } from './design';
+import { BEVEL_TITLE, EMPTY, act, failed, type Action, type Names } from './actions';
+import { AS_ASKED, dimensionsOf, milledStrips, sizingOf, withAlong, type Sizing } from './design';
+import { inches, roundTo } from './fractions';
 import { finishOf } from './finish';
 import { newId } from './ids';
-import type { Design, Finish, FinishPart, Stage, Step, StockLine } from './types';
+import type { AccentStrip, Design, Finish, FinishPart, PatternStrip, Stage, Step, StockLine, StripSpec } from './types';
 
 export { describeSelector, expandStrips, matches } from './actions';
 
@@ -30,11 +31,15 @@ const EVERY_OTHER = { mode: 'every', n: 2, offset: 1 } as const;
 const STEPS: { [K in Step['type']]: StepDef<K> } = {
   strips: {
     title: 'Rip the strips', needs: 'nothing',
-    actions: (s, z) => [{ type: 'rip', strips: milledStrips(s), thickness: s.thickness + (z.alongOn === 'thickness' ? z.along : 0), length: s.length, repeat: s.repeat, closeWithFirst: s.closeWithFirst }],
+    actions: (s, z) => [{ type: 'rip', strips: milledStrips(s, z.grid), thickness: z.alongOn === 'thickness' ? withAlong(s.thickness, z) : s.thickness, length: s.length, repeat: s.repeat, closeWithFirst: s.closeWithFirst,
+      // The face-grain 3D board starts from ordinary strips; only the end-grain one's first step is its own.
+      blocks: s.blocks?.flat ? undefined : s.blocks,
+    }],
     start: () => ({ strips: [{ id: newId(), species: 'maple', width: 1.5 }], thickness: 1.25, length: 18, repeat: 8, closeWithFirst: false }),
   },
-  crosscut: { title: 'Cross cut', needs: 'panel', actions: (s, z) => [{ type: 'crosscut', width: s.width + (z.alongOn === 'crosscut' && Math.abs(s.width - z.cut) < 1e-9 ? z.along : 0), kerf: s.kerf, angle: s.angle }], start: () => ({ width: 1.25, kerf: 0.125, angle: 0 }) },
-  rip: { title: 'Rip the panel', needs: 'panel', actions: (s) => [{ type: 'ripPanel', width: s.width, kerf: s.kerf }], start: () => ({ width: 1.25, kerf: 0.125 }) },
+  crosscut: { title: 'Cross cut', needs: 'panel', actions: (s, z) => [{ type: 'crosscut', width: z.alongOn === 'crosscut' && Math.abs(s.width - z.cut) < 1e-9 ? withAlong(s.width, z) : s.width, kerf: s.kerf, angle: s.angle }], start: () => ({ width: 1.25, kerf: 0.125, angle: 0 }) },
+  // Loose boards are ripped only on an end-grain 3D board, with the blade tilted; the action refuses any others.
+  rip: { title: 'Rip the panel', needs: 'panel', orStrips: true, actions: (s) => [{ type: 'ripPanel', width: s.width, kerf: s.kerf, tilt: s.tilt }], start: () => ({ width: 1.25, kerf: 0.125 }) },
   // Standing the slices up is what makes a board end grain: a quarter turn about each one's length.
   turn: { title: 'Turn to end grain', needs: 'slices', actions: (s) => [{ type: 'rotate', axis: 'z', angle: s.angle ?? 90, sel: s.sel }], start: () => ({ sel: { mode: 'all' } }) },
   flip: { title: 'Flip', needs: 'slices', actions: (s) => [{ type: 'rotate', axis: s.how === 'end' ? 'y' : 'z', angle: 180, sel: s.sel }], start: () => ({ sel: EVERY_OTHER, how: 'end' }) },
@@ -76,9 +81,47 @@ export function newStep(type: Step['type']): Step {
   return { ...STEPS[type].start(), id: newId(), type } as Step;
 }
 
+/** What a step is called in the list and in the view: its type's name, except a rip with the blade tilted. */
+export const stepTitle = (step: Step): string => (step.type === 'rip' && step.tilt ? BEVEL_TITLE : STEPS[step.type].title);
+
 /** The primitive actions that carry out a step, in order, at the sizes the design's fit gives (as asked for, unless given). */
 export function actionsOf(step: Step, sizing: Sizing = AS_ASKED): Action[] {
-  return (STEPS[step.type] as StepDef<Step['type']>).actions(step, sizing);
+  return (STEPS[step.type] as StepDef<Step['type']>).actions(step, sizing).map((a) => rounded(a, sizing.grid));
+}
+
+/**
+ * An action with every length in it rounded to `grid`, the design's rounding step, so that the
+ * board is built from the sizes the instructions give and not from finer ones. Lengths smaller
+ * than a step are kept (see `roundTo`). A trim is left alone: it is sawn to the size it leaves,
+ * not by measuring what comes off. Angles and counts are not lengths.
+ */
+function rounded(a: Action, grid: number): Action {
+  if (!(grid > 0)) return a;
+  const r = (v: number) => roundTo(v, grid);
+  /** A strip of a glue-up, with its faces. */
+  const strip = <S extends StripSpec | PatternStrip>(st: S): S => ({ ...st, width: r(st.width), ...(st.faces ? { faces: { ...st.faces, thickness: r(st.faces.thickness) } } : {}) });
+  /** One strip of an inserted stack, with the panel it is cut from when it has one. */
+  const accent = <T extends AccentStrip>(t: T): T => ({
+    ...t, thickness: r(t.thickness),
+    ...(t.pattern ? { pattern: t.pattern.map(strip) } : {}),
+    ...(t.offset !== undefined ? { offset: r(t.offset) } : {}),
+  });
+  switch (a.type) {
+    case 'rip':
+      return { ...a, strips: a.strips.map(strip), thickness: r(a.thickness), ...(a.length !== undefined ? { length: r(a.length) } : {}), ...(a.extra !== undefined ? { extra: r(a.extra) } : {}) };
+    case 'crosscut': case 'ripPanel': return { ...a, width: r(a.width), kerf: r(a.kerf) };
+    case 'shift': return { ...a, amount: r(a.amount) };
+    case 'flatten': return { ...a, top: r(a.top), bottom: r(a.bottom) };
+    case 'addStrips':
+      return { ...a, spec: { ...accent(a.spec), ...(a.spec.more ? { more: a.spec.more.map(accent) } : {}), ...(a.spec.stagger !== undefined ? { stagger: r(a.spec.stagger) } : {}) } };
+    case 'border': return { ...a, spec: { ...a.spec, width: r(a.spec.width), line: r(a.spec.line), block: r(a.spec.block) } };
+    case 'roundCorners': case 'roundOver': return { ...a, radius: r(a.radius) };
+    case 'chamfer': return { ...a, size: r(a.size) };
+    case 'groove': return { ...a, inset: r(a.inset), width: r(a.width), depth: r(a.depth), cornerRadius: r(a.cornerRadius) };
+    case 'grooveTemplate':
+      return { ...a, stripWidth: r(a.stripWidth), thickness: r(a.thickness), groove: { ...a.groove, inset: r(a.groove.inset), width: r(a.groove.width), depth: r(a.groove.depth), cornerRadius: r(a.groove.cornerRadius) } };
+    default: return a;
+  }
 }
 
 /**
@@ -139,12 +182,16 @@ function follow(prev: Stage, title: string, needs: Stage['kind'] | 'nothing', or
 /**
  * Run one step on the previous stage and return the new stage. Never throws: a step that cannot
  * run returns a stage with an error. Slices set aside are carried through every step untouched,
- * until "Interleave the slices" uses them up.
+ * until "Interleave the slices" uses them up, and what marks the work as a 3D board's (`block`)
+ * is carried the same way until its pieces are glued into the block.
  */
 export function applyStep(prev: Stage, step: Step, names: Names, sizing: Sizing = AS_ASKED): Stage {
   const def = STEPS[step.type];
-  const out = follow(prev, def.title, def.needs, !!def.orStrips, actionsOf(step, sizing), names);
+  const out = follow(prev, stepTitle(step), def.needs, !!def.orStrips, actionsOf(step, sizing), names);
   if (prev.aside && !out.aside && (step.type !== 'combine' || out.error)) out.aside = prev.aside;
+  if (step.note && !out.error) out.summary = `${out.summary} ${step.note}`.trim();
+  // A 3D board's pieces stay marked as such until they are glued into its block.
+  if (prev.block && !('block' in out)) out.block = prev.block;
   return out;
 }
 
@@ -160,12 +207,13 @@ export function run(design: Design, names: Names = (id) => id): Stage[] {
   // A design always has something to show, even one with no steps at all.
   if (!stages.length) stages.push(failed(EMPTY, STEPS.strips.title, 'This design has no steps. Start a new board.'));
   warnUnflattened(design, stages);
+  warnTooThin(design, stages, names);
   const last = stages[stages.length - 1];
   if (last.kind === 'panel' && !last.error) {
     const finish = finishOf(design);
     // The template is for the groove: without a groove there is nothing to make one for.
     const touches = FINISH_STEPS.filter((t) => finish[t.part].on && (t.part !== 'template' || finish.groove.on));
-    for (const t of touches) stages.push(perform(stages[stages.length - 1], [t.action(finish)], t.title, names));
+    for (const t of touches) stages.push(perform(stages[stages.length - 1], [rounded(t.action(finish), sizing.grid)], t.title, names));
     if (touches.length) stages.push(perform(stages[stages.length - 1], [{ type: 'sand' }], SAND_TITLE, names));
   }
   return stages;
@@ -186,7 +234,8 @@ function warnUnflattened(design: Design, stages: Stage[]) {
     if (step.type === 'flatten') flat = true;
     // A border is a glue-up too: it never goes on perfectly level with the faces.
     else if (step.type === 'glue' || step.type === 'frame' || step.type === 'panel') flat = false;
-    else if ((step.type === 'crosscut' || step.type === 'rip') && !flat && !stage.warning) {
+    // The logs of a 3D board are cut into pieces as they are: there is no face to flatten on them.
+    else if ((step.type === 'crosscut' || step.type === 'rip') && !flat && !stage.warning && !stage.block) {
       stage.warning = 'This panel is cut straight from the glue-up. Add a Flatten step before it and mill the strips thicker to allow for it.';
     }
     if (step.type === 'crosscut' || step.type === 'rip') flat = false;
@@ -194,6 +243,25 @@ function warnUnflattened(design: Design, stages: Stage[]) {
   const last = stages[stages.length - 1];
   if (!flat && !last.error && !last.warning && last.kind === 'panel') {
     last.warning = 'The finished board is never flattened. Add a Flatten step at the end and allow thickness for it.';
+  }
+}
+
+/**
+ * Add a warning to each step that mills a piece thinner than the design's minimum: the thinnest
+ * the planer or sander can work. It reads the stock each stage asks for, so it covers the strips,
+ * a second panel and inserted accent strips alike. Existing warnings are kept, and a step with an
+ * error is left alone.
+ */
+function warnTooThin(design: Design, stages: Stage[], names: Names) {
+  const min = dimensionsOf(design).minWidth;
+  if (!(min > 0)) return;
+  for (const stage of stages) {
+    if (stage.error) continue;
+    const thin = (stage.stock ?? []).filter((l) => Math.min(l.thickness, l.width) < min - 1e-9);
+    if (!thin.length) continue;
+    const what = [...new Set(thin.map((l) => `${names(l.species)} at ${inches(Math.min(l.thickness, l.width))}`))];
+    const text = `Thinner than the ${inches(min)} minimum: ${what.join(', ')}. Make ${what.length > 1 ? 'them' : 'it'} at least that, or lower the minimum under Dimensions.`;
+    stage.warning = stage.warning ? `${stage.warning} ${text}` : text;
   }
 }
 

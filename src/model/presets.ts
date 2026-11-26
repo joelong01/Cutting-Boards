@@ -1,5 +1,7 @@
+import { blockRecipe, reblock } from './blocks';
 import { makeDesign, type Parts } from './design';
 import { DEFAULT_FINISH } from './finish';
+import { fitThickness, fitToTarget } from './fit';
 import { withAutoName } from './naming';
 import { BUILTIN_SPECIES } from './species';
 import type { Design, Selector, Step, StripSpec } from './types';
@@ -237,6 +239,25 @@ const STARTERS: (Omit<Preset, 'make'> & { make: () => Parts | Design })[] = [
       ),
       customSpecies: [],
     }),
+  },
+  {
+    key: 'tumbling-blocks',
+    style: '3D blocks',
+    label: '3D Board',
+    blurb: 'Tumbling blocks: diamonds in three woods that read as stacked cubes. Made from lengths of hexagonal log stood on end, or in the other grain from flat strips cut and flipped twice.',
+    // The counts, the cuts and the trim start as placeholders: `reblock` sets them from the target.
+    make: () => {
+      const recipe = blockRecipe([{ species: 'maple' }, { species: 'walnut' }, { species: 'cherry' }], 1.25);
+      return reblock({
+        version: 2,
+        name: '3D blocks',
+        target: { length: 16, width: 12, thickness: 1.5 },
+        // The groove is set in from the edges by the amount asked for: this pattern has no rows of glue lines to line it up with.
+        finish: { ...DEFAULT_FINISH, groove: { ...DEFAULT_FINISH.groove, align: false } },
+        steps: [{ ...recipe.layup, id: newId(), type: 'strips' }, ...recipe.steps],
+        customSpecies: [],
+      });
+    },
   },
 ];
 
@@ -529,4 +550,61 @@ export function basketWeave(o: BasketWeaveOptions = {}): Design {
     ),
     customSpecies: [],
   }), BUILTIN_SPECIES);
+}
+
+/** One design a board can be started from or changed to, sized to a target when it is made. */
+export interface Offer {
+  key: string;
+  label: string;
+  blurb: string;
+  /** The pattern as designs made from it carry it (`Design.style`), which is how an open design is matched to its offer. */
+  style: string;
+  make: () => Design;
+}
+
+/** The woods and sizes a chess board and a double border board start with; all can be changed once the board is open. */
+const CHESS = { dark: 'walnut', light: 'maple' };
+const DOUBLE = { block: 1.5, line: 0.125, field: 'maple', inner: 'walnut', outer: 'white-oak', spacer: 'poplar' };
+
+/** The square that makes an eight-square chess board as wide as the board asked for, to the nearest 1/8 inch. */
+const chessSquare = (target: Design['target']) => Math.max(0.5, Math.round(Math.min(target.length, target.width)) / CHESS_SQUARES);
+
+/** A design resized to the wanted board: length and width by stock, then thickness. */
+const sized = (base: Design, target: Design['target']): Design => fitThickness(fitToTarget({ ...base, target }));
+
+/**
+ * Every design on offer, each made at `target` or as near as its pattern allows: the starters,
+ * each once, then the chess board (eight squares each way, as wide as the board asked for) and
+ * the double border board (a whole number of blocks, the nearest to the size). The board wizard
+ * shows them as cards and the Target board tile lists them.
+ */
+export function catalog(target: Design['target']): Offer[] {
+  const blocks = {
+    along: doubleBorderCount(target.length, DOUBLE.block, DOUBLE.line),
+    across: doubleBorderCount(target.width, DOUBLE.block, DOUBLE.line),
+  };
+  return [
+    ...designs().map((p) => ({ key: p.key, label: p.label, blurb: p.blurb, style: p.style, make: () => sized(p.make(), target) })),
+    {
+      key: 'chess', label: 'Chess board', style: 'chess board',
+      blurb: 'For playing on: exactly eight squares each way, so the board is square, as wide as the width asked for.',
+      make: () => chessBoard({ ...CHESS, square: chessSquare(target), thickness: target.thickness, grain: 'end' }),
+    },
+    {
+      key: 'double', label: 'Double border', style: 'double border',
+      blurb: 'Maple blocks, each ringed with walnut, in a white oak grid. Three glue-ups: strips with a cheap spacer in them, then slices turned on end with a three-strip stack between them, then the panel sawn through each spacer and the oak glued into the kerfs.',
+      make: () => doubleBorder({ ...DOUBLE, ...blocks, thickness: target.thickness, grain: 'end' }),
+    },
+  ];
+}
+
+/**
+ * Which offer an open design was made from, by its pattern, or null for one that matches none
+ * (an older file, or a pattern of the user's own). A starter that is another in the other grain
+ * counts as that other: the grain is a switch, not a design.
+ */
+export function offerOf(design: Pick<Design, 'style'>): string | null {
+  const preset = PRESETS.find((p) => p.style === design.style);
+  if (preset) return preset.twin ? PRESETS.find((q) => !q.twin && preset.label.startsWith(q.label))?.key ?? null : preset.key;
+  return design.style === 'chess board' ? 'chess' : design.style === 'double border' ? 'double' : null;
 }

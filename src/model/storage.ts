@@ -44,6 +44,7 @@ export function validateDesign(raw: unknown): Design {
     target: d.target ?? { length: 16, width: 12, thickness: 1.25 },
     autoFit: d.autoFit !== false,
     allowance: d.allowance,
+    dimensions: d.dimensions,
     finish: d.finish,
     steps: d.steps!,
     customSpecies: Array.isArray(d.customSpecies) ? d.customSpecies : [],

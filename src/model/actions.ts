@@ -2,6 +2,7 @@ import {
   bbox, box, boxCenter, boxSize, clipAxis, rotateY, rotateZ, toOrigin, translate, volume,
 } from './geometry';
 import { accentStrips, patternPeriod } from './accent';
+import { blockBoards, blockLogs, blockRows, blockSide, blockStrips, boardWidth } from './blocks';
 import { NO_FINISH, finishPanel } from './finish';
 import { inches } from './fractions';
 import type { AccentStrip, Finish, FinishPart, Layup, Piece, Selector, Slice, Stage, Step, StockLine, StripSpec } from './types';
@@ -25,9 +26,10 @@ export type Action =
    * `repeat` times (and closed with its first strip again, with `closeWithFirst`), each strip
    * `thickness` thick and `length` long. With slices set aside and no `repeat` or `length`, the
    * strips are sized to them: enough to make a panel as wide as those slices are long plus
-   * `extra`, and long enough to cross cut one slice for each gap between them.
+   * `extra`, and long enough to cross cut one slice for each gap between them. With `blocks` the
+   * strips are the three woods of a 3D board, ripped to a diamond section (see `diamondStrips`).
    */
-  | { type: 'rip'; strips: StripSpec[]; thickness: number; length?: number; repeat?: number; closeWithFirst?: boolean; extra?: number }
+  | { type: 'rip'; strips: StripSpec[]; thickness: number; length?: number; repeat?: number; closeWithFirst?: boolean; extra?: number; blocks?: Layup['blocks'] }
   /** Put the loose slices to one side, in order, leaving the bench clear. */
   | { type: 'setAside' }
   /** Bring back the slices set aside and put one of the slices on the bench after each. */
@@ -53,7 +55,7 @@ export type Action =
   /** Take `top` and `bottom` off the faces of a panel. */
   | { type: 'flatten'; top: number; bottom: number }
   /** Saw a panel lengthways into strips `width` wide, and turn them to lie across the bench as slices. */
-  | { type: 'ripPanel'; width: number; kerf: number }
+  | { type: 'ripPanel'; width: number; kerf: number; tilt?: number }
   /** Round the four corners of the finished panel, seen from above, to `radius`. */
   | { type: 'roundCorners'; radius: number }
   /** Cut a 45° chamfer `size` wide round the bottom edges. */
@@ -233,6 +235,45 @@ const SECOND_KERF = 0.125, SECOND_TRIM = 0.25;
 
 
 /**
+ * The first step of an end-grain 3D board (the face-grain one starts from ordinary strips): one
+ * board of each wood, milled square and wide enough to rip `repeat` diamond strips from (see
+ * `bevelRip`). The stage carries `block`, so that the steps after it know what they are working
+ * on, and the stock is one line for each wood.
+ */
+function diamondStrips(prev: Stage, a: Extract<Action, { type: 'rip' }>, names: Names): Stage {
+  const title = TITLES.rip;
+  const woods = a.strips.slice(0, 3).map((st) => st.species);
+  const { along, across } = a.blocks!;
+  const length = a.length ?? 0, logs = Math.floor(a.repeat ?? 1);
+  if (woods.length < 3) return failed(prev, title, 'A 3D board needs three woods, one for each face of its blocks.');
+  if (!(a.thickness > 0) || !(length > 0)) return failed(prev, title, 'The strips need a thickness and a length greater than zero.');
+  if (!(logs >= 1 && along >= 1 && across >= 1) || along * across > MAX_SLICES || logs > MAX_SLICES) return failed(prev, title, 'That is too many blocks. Rip the strips from thicker boards.');
+  const list = woods.map(names);
+  // End grain on top: one board of each wood, milled square, wide enough to rip its strips from.
+  const width = boardWidth(blockSide(a.thickness), logs);
+  const stock: StockLine[] = woods.map((species) => ({ species, count: 1, thickness: a.thickness, width, length, use: `Ripped at 30° into ${logs} diamond strip${logs > 1 ? 's' : ''}` }));
+  return stage('strips', blockBoards(woods, a.thickness, width, length, tone).map((piece) => ({ pieces: [piece] })), title,
+    `Mill a board of each wood ${inches(a.thickness)} thick, ${inches(width)} wide and ${inches(length)} long: ${list.slice(0, -1).join(', ')} and ${list.at(-1)}. `
+    + 'Plane all three to the same thickness in one session: it sets the size of the diamonds.',
+    { stock, block: { woods, thickness: a.thickness, along, across, count: logs } });
+}
+
+/**
+ * Rip the boards of an end-grain 3D board into its strips, with the blade tilted 30°, so each is
+ * a diamond in cross-section. The stage shows the strips lying side by side as they come off the
+ * saw, one slice a strip, and marks the work as ripped so that it can be glued into logs.
+ */
+function bevelRip(prev: Stage, a: Extract<Action, { type: 'ripPanel' }>, title: string): Stage {
+  const { woods, thickness, count = 1 } = prev.block!;
+  const side = blockSide(thickness);
+  return stage('strips', blockStrips(woods, thickness, prev.size[0], count, tone).map((piece) => ({ pieces: [piece] })), title,
+    `Tilt the table saw blade ${a.tilt}° and rip ${count} strip${count > 1 ? 's' : ''} from each board, every one a diamond in cross-section: `
+    + `the two sawn faces slope at 60° and are as wide as the top and bottom, about ${inches(Math.round(side * 32) / 32)}. `
+    + 'Test the setup on scrap first: three strips must close into a hexagon with no gap.',
+    { block: { ...prev.block!, ripped: true } });
+}
+
+/**
  * Rip and mill the strips for a glue-up, and lay them out in order. On a clear bench with nothing
  * set aside these are the strips of the first glue-up: the pattern repeated as asked. With slices
  * set aside they are for a second panel, and left to size themselves there are enough, added in
@@ -243,6 +284,7 @@ const SECOND_KERF = 0.125, SECOND_TRIM = 0.25;
 function rip(prev: Stage, a: Extract<Action, { type: 'rip' }>, names: Names): Stage {
   const title = TITLES.rip;
   const aside = prev.aside;
+  if (!aside && a.blocks) return diamondStrips(prev, a, names);
   if (!aside) {
     const strips = expandStrips({ strips: a.strips, repeat: a.repeat ?? 1, closeWithFirst: !!a.closeWithFirst });
     const built = buildStrips(strips, a.length ?? 0, a.thickness, names, 'First glue-up');
@@ -361,9 +403,13 @@ function crosscut(prev: Stage, step: Extract<Action, { type: 'crosscut' }>): Sta
     });
   }
   if (!slices.length) return failed(prev, title, 'The panel is shorter than one slice.');
-  let summary = `Cross cut the panel into ${slices.length} slices, each ${inches(step.width)} wide`
-    + (step.angle ? `, with the blade at ${step.angle}° to square` : '')
-    + ` (kerf ${inches(kerf)}).`;
+  // The logs of a 3D board lie side by side and are cut one at a time, each into this many pieces.
+  const logs = prev.block ? Math.round(prev.slices[0].pieces.length / 3) : 0;
+  let summary = logs
+    ? `Cross cut each log into ${slices.length} pieces ${inches(step.width)} long, ${logs * slices.length} in all (kerf ${inches(kerf)}). Use a stop block so they are all the same length.`
+    : `Cross cut the panel into ${slices.length} slices, each ${inches(step.width)} wide`
+      + (step.angle ? `, with the blade at ${step.angle}° to square` : '')
+      + ` (kerf ${inches(kerf)}).`;
   if (offcut > 1e-6) summary += ` The last ${inches(offcut)} is an offcut.`;
   if (dropped) summary += ` ${dropped} short corner piece${dropped > 1 ? 's are' : ' is'} waste.`;
   return stage('slices', slices, title, summary);
@@ -665,13 +711,18 @@ function rotate(prev: Stage, a: Extract<Action, { type: 'rotate' }>): Stage {
     : a.axis === 'y' && a.angle === 180 ? 'Turn end for end:'
       : a.axis === 'z' && a.angle === 180 ? 'Flip face down:'
         : `Turn ${a.angle}° ${a.axis === 'z' ? 'about its length' : 'on the bench'}:`;
-  return arrange(prev, a.sel, title, verb, (pieces) => {
+  const out = arrange(prev, a.sel, title, verb, (pieces) => {
     const c = boxCenter(bbox(pieces));
     return {
       pieces: a.axis === 'y' ? rotateY(pieces, angle, c) : rotateZ(pieces, angle, c),
       motion: { axis: a.axis, angle, shift: 0 },
     };
   });
+  // The pieces of a 3D board are short lengths of log, not slices: say what is done to them.
+  if (prev.block && !out.error && a.axis === 'z' && a.angle === 90 && a.sel.mode === 'all') {
+    out.summary = 'Stand every piece on end, so its hexagon of three woods is on top.';
+  }
+  return out;
 }
 
 /** Slide the chosen slices along their length. */
@@ -689,9 +740,20 @@ function shift(prev: Stage, a: Extract<Action, { type: 'shift' }>): Stage {
 function glue(prev: Stage): Stage {
   if (prev.kind === 'strips') {
     const pieces = prev.slices.flatMap((s) => s.pieces);
+    if (prev.block && !prev.block.ripped) {
+      return failed(prev, TITLES.glue, 'The boards are ripped into strips first. Add "Rip the panel" with the blade tilted before this.');
+    }
+    if (prev.block) {
+      // The strips of a 3D board: three, one of each wood, make each hexagonal log.
+      const logs = Math.max(1, Math.round(prev.slices.length / 3));
+      return stage('panel', [{ pieces: blockLogs(prev.block.woods, prev.block.thickness, prev.size[0], logs, tone) }], TITLES.glue,
+        `Glue one strip of each wood into a hexagonal log, ${logs} log${logs > 1 ? 's' : ''}, with the woods in the same order round every one. `
+        + 'Bind each with tape or a band clamp while the glue sets. The logs are not glued to each other.');
+    }
     return stage('panel', [{ pieces }], TITLES.glue,
       `Glue them edge to edge in order into a panel ${inches(boxSize(bbox(pieces))[2])} wide.`);
   }
+  if (prev.block) return glueBlock(prev);
   const laid = layout(prev.slices);
   const heights = laid.map((s) => boxSize(bbox(s.pieces))[1]);
   const hint = trimHintFor(laid);
@@ -704,6 +766,29 @@ function glue(prev: Stage): Stage {
     st.warning = `Slices differ in height by ${inches(Math.max(...heights) - Math.min(...heights))}; flatten after glue-up.`;
   }
   return st;
+}
+
+/**
+ * Glue the pieces of a 3D board, standing on end, into its block: `along` in each of `across`
+ * rows, every other row moved over half a piece, which is honeycomb. The pieces on the bench are
+ * the cut-up logs; the block is drawn from the pieces it needs, and any more are spares.
+ */
+function glueBlock(prev: Stage): Stage {
+  const { woods, thickness, along, across } = prev.block!;
+  const need = along * across;
+  // Every piece of a log is three diamonds.
+  const have = Math.floor(prev.slices.reduce((n, sl) => n + sl.pieces.length, 0) / 3);
+  if (have < need) {
+    return failed(prev, TITLES.glue, `The block needs ${need} pieces and there are only ${have}. Make the strips longer or rip more of them.`);
+  }
+  const height = boxSize(bbox(prev.slices[0].pieces))[1];
+  const pieces = blockRows(woods, thickness, height, along, across, tone).flat();
+  const size = boxSize(bbox(pieces));
+  return stage('panel', [{ pieces }], TITLES.glue,
+    `Glue the pieces standing on end into a block, ${across} rows of ${along}: every piece the same way round, and every other row moved over half a piece so the points of one row fit the hollows of the next. `
+    + `Glue up a row at a time, then the rows. The block is about ${inches(Math.round(size[0] * 8) / 8)} × ${inches(Math.round(size[2] * 8) / 8)} with ragged edges, and its top is the pattern.`
+    + (have > need ? ` The ${have - need} piece${have - need > 1 ? 's' : ''} left over ${have - need > 1 ? 'are spares' : 'is a spare'}.` : ''),
+    { block: undefined });
 }
 
 /** Saw a panel's long edges and ends straight. `auto` starts from what the last glue-up left whole. */
@@ -753,13 +838,21 @@ function flatten(prev: Stage, step: Extract<Action, { type: 'flatten' }>): Stage
     { trimHint: prev.trimHint });
 }
 
+/** What a rip with the blade tilted is called. */
+export const BEVEL_TITLE = 'Bevel rip';
+
 /**
  * Saw a panel lengthways into strips: turn it a quarter turn so the saw runs along the grain, cut
  * it as a cross cut would, and leave the strips lying across the bench, where every later action
  * treats them as slices.
  */
 function ripPanel(prev: Stage, a: Extract<Action, { type: 'ripPanel' }>): Stage {
-  const title = TITLES.ripPanel;
+  const title = a.tilt ? BEVEL_TITLE : TITLES.ripPanel;
+  if (prev.kind === 'strips') {
+    // Loose boards are ripped only on an end-grain 3D board, into its diamond strips.
+    return a.tilt && prev.block && !prev.block.ripped ? bevelRip(prev, a, title)
+      : failed(prev, title, 'This needs a glued panel. Add a "Glue up" step before it.');
+  }
   if (!(a.width > 0)) return failed(prev, title, 'Strip width must be greater than zero.');
   const kerf = Math.max(0, a.kerf);
   if (prev.size[2] / (a.width + kerf) > MAX_SLICES) return failed(prev, title, `That would make more than ${MAX_SLICES} strips.`);

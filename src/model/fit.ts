@@ -1,4 +1,6 @@
-import { isLocked, layupOf, sizingOf, unfitted, withLayup } from './design';
+import { isBlocks, reblock } from './blocks';
+import { fitFlatBlocks } from './blocksFlat';
+import { dimensionsOf, isLocked, layupOf, sizingOf, unfitted, withLayup } from './design';
 import { NO_FINISH } from './finish';
 import { run } from './pipeline';
 import type { Design } from './types';
@@ -63,9 +65,23 @@ function axesOf(design: Design, base: readonly number[]): { repeatAxis: 0 | 2; l
  * `orientation` is the design whose proportions decide which way the board lies: whether the
  * strips run along the target length or across it. Pass the design as it was before an edit, so
  * that an edit which makes the unfitted panel very wide does not turn the board round.
+ *
+ * With rounding on (`Design.dimensions`), every size is rounded to its step where it is used, so
+ * each can be set on a machine, and the board finishes within a little of the target, not on it.
+ *
+ * A 3D board is fitted its own way (`reblock`): its board is sawn out of a block of logs, so the
+ * fit counts the logs and sets the trim, and no size gives way.
  */
 export function fitToTarget(design: Design, orientation: Design = design): Design {
-  return exactly(fitCounts(unfitted(design), unfitted(orientation)));
+  if (isBlocks(design)) return layupOf(design).blocks?.flat ? fitFlatBlocks(design) : reblock(design);
+  const grid = dimensionsOf(design).rounding;
+  if (!(grid > 0)) return exactly(fitCounts(unfitted(design), unfitted(orientation)));
+  // A design that rounds its sizes is fitted as if it did not, which finds the exact answer, and
+  // is then built from that answer rounded: its stock is a whole number of steps long, and the
+  // board finishes as near its target as sizes on that step allow.
+  const plain = (d: Design): Design => ({ ...unfitted(d), dimensions: { ...dimensionsOf(d), rounding: 0 } });
+  const fitted = exactly(fitCounts(plain(design), plain(orientation)));
+  return withLayup({ ...fitted, dimensions: design.dimensions }, { length: Math.ceil(layupOf(fitted).length / grid - 1e-6) * grid });
 }
 
 /** Whether a recipe's sizes can give way without breaking its pattern. */
@@ -218,7 +234,7 @@ export function withAutoFit(prev: Design, next: Design): Design {
   if (next.autoFit === false) return next;
   // Which steps are the very same objects as before: all of them, or all but the strips.
   const alike = (from: number) => prev.steps.length === next.steps.length && prev.steps.every((s, i) => i < from || s === next.steps[i]);
-  const same = alike(0) && prev.target === next.target && prev.autoFit !== false;
+  const same = alike(0) && prev.target === next.target && prev.autoFit !== false && dimensionsOf(prev).rounding === dimensionsOf(next).rounding;
   // The board keeps lying the way it did before the edit; only a change to the steps after the
   // strips can turn it.
   return same ? next : fitToTarget(next, alike(1) ? prev : next);

@@ -75,6 +75,21 @@ export interface Stage {
   /** Set on the stage of a finishing step: which touch it is. */
   finish?: FinishPart | 'sand';
   /**
+   * Carried by the stages of a 3D board from its strips until its pieces are glued into the
+   * block: the three woods, the thickness of the boards the strips were ripped from, and how many
+   * pieces the block has along and across. Gluing up and cross cutting read it to know that the
+   * strips make logs and the pieces make a honeycomb, not a flat panel. `thickness` is that of
+   * the boards its strips are ripped from, which is the height of a diamond. Only the end-grain
+   * board has one: the face-grain board is made by ordinary steps on ordinary strips.
+   */
+  block?: {
+    woods: string[]; thickness: number; along: number; across: number;
+    /** How many strips each board of an end-grain board is ripped into. */
+    count?: number;
+    /** True once those boards have been ripped into their diamond strips, which is when they can be glued into logs. */
+    ripped?: boolean;
+  };
+  /**
    * Carried by a panel once finishing has started: the panel as it was before any finishing cut,
    * and the touches applied so far. Each further touch is cut from that panel together with the
    * ones before it, because they depend on each other: the roundover must clear the chamfer, the
@@ -126,6 +141,25 @@ export interface Layup {
    */
   scale?: number;
   along?: number;
+  /**
+   * Set on a 3D board (tumbling blocks; see blocks.ts). Its first three `strips` are then its
+   * three woods, one for each face of the blocks, and each strip is ripped with the blade tilted
+   * to a diamond cross-section. `thickness` is that of the boards they are ripped from, which
+   * sets the size of the blocks; `repeat` is how many strips of each wood there are, which is how
+   * many hexagonal logs they make; `length` is how long they are. The block the cut-up logs are
+   * glued into has `along` pieces in each of `across` rows. The strips' widths are not used.
+   */
+  blocks?: {
+    along: number;
+    across: number;
+    /**
+     * True for the board with face grain on top, which is made from flat strips by ordinary
+     * steps (see blocksFlat.ts). Its `strips` are then four, the pattern that repeats across its
+     * first panel: left face, top, right face, top. `along` and `across` count its slices and
+     * its rows, and it is only the fit that reads any of this.
+     */
+    flat?: boolean;
+  };
 }
 
 export type Selector =
@@ -163,12 +197,23 @@ export interface PatternStrip {
 // On an insert step, `pattern` and `offset` belong to its first strip (see AccentStrip), and
 // `stagger` slides the patterned strips of every other gap that far along, so two rows of a
 // pattern can alternate.
-export type Step =
+export type Step = StepKind & {
+  /** Something to add to this step's instruction that its sizes do not say: what to line a cut up with, say. */
+  note?: string;
+};
+
+/** A step by what it does; see `Step`. */
+export type StepKind =
   /** Rip and mill the strips the board starts from. Always the first step. */
   | ({ id: string; type: 'strips' } & Layup)
   | { id: string; type: 'crosscut'; width: number; kerf: number; angle: number }
-  /** Saw a glued panel lengthways into strips `width` wide. They are then worked as slices. */
-  | { id: string; type: 'rip'; width: number; kerf: number }
+  /**
+   * Saw a glued panel lengthways into strips `width` wide. They are then worked as slices. With
+   * `tilt` the blade leans that many degrees and the work is the loose boards of an end-grain 3D
+   * board: each is ripped into strips with a diamond cross-section, whose size follows from the
+   * boards' thickness, so `width` only records it.
+   */
+  | { id: string; type: 'rip'; width: number; kerf: number; tilt?: number }
   /** Stand the chosen slices up on end: a turn of `angle` degrees about each one's length, a quarter turn (90) unless given. */
   | { id: string; type: 'turn'; sel: Selector; angle?: number }
   | { id: string; type: 'flip'; sel: Selector; how: 'end' | 'face' }
@@ -234,6 +279,16 @@ export interface Allowance {
   length: number;
 }
 
+/** How lengths are written: fractions of an inch, decimal inches, or millimetres. */
+export type Notation = 'fraction' | 'decimal' | 'metric';
+
+/** See `Design.dimensions`. */
+export interface Dimensions {
+  notation: Notation;
+  rounding: number;
+  minWidth: number;
+}
+
 export interface Design {
   version: 2;
   name: string;
@@ -256,6 +311,15 @@ export interface Design {
    * defaults in cutlist.ts.
    */
   allowance?: Allowance;
+  /**
+   * How the board's sizes are written and how fine they are worked. `notation` is fractions of an
+   * inch, decimal inches or millimetres, like the modes of a caliper. `rounding` is a step in
+   * inches (0 for none): every length shown is rounded to it, and the board is built from the
+   * rounded sizes, so what is read is what is cut and the board drawn is the one that results.
+   * `minWidth` is the thinnest strip the planer or sander can work; anything thinner is flagged.
+   * Absent means fractions, no rounding and no minimum, which is how designs were before this.
+   */
+  dimensions?: Dimensions;
   /** Juice groove, chamfer, rounded corners and rounded top edge. Absent means the defaults in finish.ts: all on. */
   finish?: Finish;
   /** Everything done to the wood, in order, starting with ripping the strips. */

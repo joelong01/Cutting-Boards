@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildCutList } from './model/cutlist';
 import { fitToTarget, withAutoFit } from './model/fit';
-import { inches } from './model/fractions';
 import { convertGrain, grainOf, withGrain, type Grain } from './model/grain';
 import { withAutoName } from './model/naming';
-import { layupOf } from './model/design';
+import { DEFAULT_DIMENSIONS, dimensionsOf, layupOf } from './model/design';
 import { matches, pieceCount, run } from './model/pipeline';
-import { PRESETS, defaultDesign, designs } from './model/presets';
+import { PRESETS, catalog, defaultDesign, designs, offerOf } from './model/presets';
 import { allSpecies, speciesById } from './model/species';
 import {
   desktop, download, exportDesign, fileSafe, library as store, loadCurrent, saveCurrent, validateDesign, type LibraryEntry,
 } from './model/storage';
-import type { Design, Selector, Stage, Step } from './model/types';
+import type { Design, Dimensions, Notation, Selector, Stage, Step } from './model/types';
 import { BoardWizard } from './ui/BoardWizard';
 import { CutListPanel } from './ui/CutListPanel';
-import { IMPERIAL, sensible, showSize, showText, type Units } from './model/units';
+import { ROUNDINGS, showLength, showSize, showText, unitsOf, usualRounding } from './model/units';
+import { UnitsContext } from './ui/show';
 import { Icon } from './ui/icons';
 import { LayupEditor } from './ui/LayupEditor';
 import { StepList } from './ui/StepList';
@@ -25,15 +25,22 @@ const params = new URLSearchParams(location.search);
 
 /** The design to open with: the preset named in the URL, else the one left open last time, else the default. */
 /**
- * A design as it should open: fitted to its target when it holds its board size, and named from
- * its woods when the app still owns its name.
+ * A design as it should open: with dimension settings (the usual ones, if it was saved before
+ * there were any), fitted to its target when it holds its board size, and named from its woods
+ * when the app still owns its name.
  */
-const held = (d: Design): Design => withAutoName(d.autoFit === false ? d : fitToTarget(d), allSpecies(d));
+const held = (d: Design): Design => {
+  const set = d.dimensions ? d : { ...d, dimensions: DEFAULT_DIMENSIONS };
+  return withAutoName(set.autoFit === false ? set : fitToTarget(set), allSpecies(set));
+};
 
 function initialDesign(): Design {
   const key = params.get('preset');
   const preset = key && PRESETS.find((p) => p.key === key);
-  return held(preset ? preset.make() : loadCurrent() ?? defaultDesign());
+  const made = preset ? preset.make() : loadCurrent() ?? defaultDesign();
+  // `rounding=0` opens the board with exact sizes, for checks of the fit itself.
+  const rounding = params.get('rounding');
+  return held(rounding === null ? made : { ...made, dimensions: { ...DEFAULT_DIMENSIONS, ...made.dimensions, rounding: Number(rounding) || 0 } });
 }
 
 const SIDE_KEY = 'cutting-boards.side-width.v1';
@@ -65,18 +72,6 @@ function savedSideHidden(): boolean {
     // No storage; fall through to the screen width.
   }
   return window.innerWidth < NARROW;
-}
-
-const UNITS_KEY = 'cutting-boards.units.v1';
-
-/** The units the cut list was last shown in; inches when nothing sensible is saved. */
-function savedUnits(): Units {
-  try {
-    const v = JSON.parse(localStorage.getItem(UNITS_KEY) ?? 'null');
-    return v ? sensible({ imperial: v.imperial === true, metric: v.metric === true }) : IMPERIAL;
-  } catch {
-    return IMPERIAL;
-  }
 }
 
 interface History {
@@ -112,7 +107,8 @@ export function App() {
   const species = useMemo(() => allSpecies(design), [design.customSpecies]); // eslint-disable-line react-hooks/exhaustive-deps
   const stages = useMemo(
     () => run(design, (id) => speciesById(species, id).name),
-    [design.steps, design.finish, species], // eslint-disable-line react-hooks/exhaustive-deps
+    // The dimensions are in the list because the board is built from the rounded sizes and flags strips under the minimum.
+    [design.steps, design.finish, design.dimensions, species], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const cutList = useMemo(() => buildCutList(stages, design), [stages, design.allowance]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -129,16 +125,6 @@ export function App() {
   const [menu, setMenu] = useState<'new' | 'open' | 'export' | null>(null);
   const wizardParam = params.get('wizard');
   const [wizard, setWizard] = useState(wizardParam !== null);
-  const [units, setUnits] = useState(savedUnits);
-  /** Show the cut list and instructions in these units, and remember the choice for next time. */
-  const chooseUnits = (u: Units) => {
-    setUnits(u);
-    try {
-      localStorage.setItem(UNITS_KEY, JSON.stringify(u));
-    } catch {
-      // No storage: the choice lasts until the window closes.
-    }
-  };
   const [message, setMessage] = useState<string | null>(null);
   const [sheet, setSheet] = useState<string[]>([]);
   const [preview, setPreview] = useState(params.get('preview') !== null);
@@ -257,7 +243,8 @@ export function App() {
   /** Open a design, discarding undo history and showing its finished stage. fromLibrary marks it as already saved under its name. */
   const load = (d: Design, fromLibrary = false) => {
     savedAs.current = fromLibrary ? d.name : null;
-    setHistory({ past: [], now: held(d), future: [] });
+    // A board started here keeps the notation, rounding and minimum already in use; one opened from a file keeps its own.
+    setHistory({ past: [], now: held(fromLibrary || d.dimensions ? d : { ...d, dimensions: design.dimensions }), future: [] });
     setSelected(9999);
     setMenu(null);
     setPlaying(false);
@@ -362,8 +349,18 @@ export function App() {
 
   const final = stages[stages.length - 1];
   const errors = stages.filter((s) => s.error).length;
+  // Every length in the window is written the way the design's Dimensions say.
+  const units = unitsOf(design);
+  const dims = dimensionsOf(design);
+  /** A length written that way. */
+  const inches = (v: number) => showLength(v, units);
+  /** Change some of the design's dimension settings. */
+  const setDims = (patch: Partial<Dimensions>) => setDesign({ ...design, dimensions: { ...dims, ...patch } });
+  const offers = catalog(design.target);
+  const offer = offerOf(design);
 
   return (
+    <UnitsContext.Provider value={units}>
     <div
       className={sideHidden ? 'app side-hidden' : 'app'}
       style={{ gridTemplateColumns: sideHidden ? '0 0 1fr' : `${Math.min(sideWidth, clampSide(sideWidth))}px 7px 1fr` }}
@@ -492,13 +489,26 @@ export function App() {
         </nav>
         {tab === 'design' ? (
           <>
-            <section className="card target">
+            <section className="card board-pick">
               <h3>Target board</h3>
-              <div className="row">
-                <Len label="Length" value={design.target.length} min={1} onChange={(length) => setDesign({ ...design, target: { ...design.target, length } })} />
-                <Len label="Width" value={design.target.width} min={1} onChange={(width) => setDesign({ ...design, target: { ...design.target, width } })} />
-                <Len label="Thickness" value={design.target.thickness} min={0.125} onChange={(thickness) => setDesign({ ...design, target: { ...design.target, thickness } })} />
-              </div>
+              <label className="field">
+                <span>Design</span>
+                <select
+                  aria-label="Design"
+                  value={offer ?? ''}
+                  title="Change the board to another design at the same size. Its strips and steps are replaced; Ctrl+Z brings the old board back."
+                  onChange={(e) => {
+                    const pick = offers.find((o) => o.key === e.target.value);
+                    if (!pick) return;
+                    setDesign({ ...pick.make(), dimensions: design.dimensions });
+                    setSelected(9999);
+                    setMessage(`Now ${pick.label}. Ctrl+Z brings the old board back.`);
+                  }}
+                >
+                  {!offer && <option value="">Your own design</option>}
+                  {offers.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+                </select>
+              </label>
               <div className="grain-switch" role="group" aria-label="Grain on top">
                 {(['end', 'edge'] as Grain[]).map((g) => {
                   // Only whether it can be turned round, which is cheap; the refit runs on the click.
@@ -524,6 +534,53 @@ export function App() {
                   );
                 })}
               </div>
+            </section>
+            <section className="card target">
+              <h3>Dimensions</h3>
+              <div className="row">
+                <Len label="Length" value={design.target.length} min={1} onChange={(length) => setDesign({ ...design, target: { ...design.target, length } })} />
+                <Len label="Width" value={design.target.width} min={1} onChange={(width) => setDesign({ ...design, target: { ...design.target, width } })} />
+                <Len label="Thickness" value={design.target.thickness} min={0.125} onChange={(thickness) => setDesign({ ...design, target: { ...design.target, thickness } })} />
+              </div>
+              <div className="row">
+                <label className="field">
+                  <span>Units</span>
+                  <select
+                    aria-label="Units"
+                    value={dims.notation}
+                    title="How every length is written, like the modes of a caliper. Lengths are still typed in inches."
+                    onChange={(e) => {
+                      const notation = e.target.value as Notation;
+                      // The step follows the notation: 1/16 inch, a hundredth of an inch, half a millimetre.
+                      setDims({ notation, rounding: dims.rounding > 0 ? usualRounding(notation) : 0 });
+                    }}
+                  >
+                    <option value="fraction">Inches, fractions</option>
+                    <option value="decimal">Inches, decimal</option>
+                    <option value="metric">Millimetres</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Round to</span>
+                  <select
+                    aria-label="Round to"
+                    value={String(dims.rounding)}
+                    title="Every size is rounded to this, in the instructions and in the board drawn, so what you read is what you can cut. A coarse step moves the finished size off the target."
+                    onChange={(e) => setDims({ rounding: Number(e.target.value) })}
+                  >
+                    <option value="0">Exact</option>
+                    {ROUNDINGS[dims.notation].map((r) => <option key={r.label} value={String(r.step)}>{r.label}</option>)}
+                    {dims.rounding > 0 && !ROUNDINGS[dims.notation].some((r) => Math.abs(r.step - dims.rounding) < 1e-9) && <option value={String(dims.rounding)}>{inches(dims.rounding)}</option>}
+                  </select>
+                </label>
+                <Len
+                  label="Thinnest strip"
+                  value={dims.minWidth}
+                  min={0}
+                  title="The thinnest strip your planer or sander can work. Anything thinner in the recipe is flagged. 0 turns the check off."
+                  onChange={(minWidth) => setDims({ minWidth })}
+                />
+              </div>
               <label className="check" title="When on, changing strip sizes or steps changes how many strips and how much stock you need, not how big the board is.">
                 <input type="checkbox" checked={design.autoFit !== false} onChange={(e) => setDesign({ ...design, autoFit: e.target.checked })} />
                 Keep the board at this size
@@ -543,11 +600,11 @@ export function App() {
                 </p>
               </div>
             </section>
-            <LayupEditor design={design} species={species} onChange={setDesign} onNotice={setMessage} selected={index === 0} onSelect={() => setSelected(0)} />
+            <LayupEditor warning={stages[0]?.error ? undefined : stages[0]?.warning} design={design} species={species} onChange={setDesign} onNotice={setMessage} selected={index === 0} onSelect={() => setSelected(0)} />
             <StepList design={design} stages={stages} species={species} selected={index} onSelect={setSelected} onChange={setDesign} />
           </>
         ) : (
-          <CutListPanel design={design} cutList={cutList} species={species} onChange={setDesign} units={units} onUnits={chooseUnits} />
+          <CutListPanel design={design} cutList={cutList} species={species} onChange={setDesign} units={units} />
         )}
       </aside>
 
@@ -605,7 +662,7 @@ export function App() {
           <strong>{index + 1}. {stage.title}</strong>
           <span>{inches(stage.size[0])} × {inches(stage.size[2])} × {inches(stage.size[1])} thick</span>
           <span>{stage.kind === 'slices' ? `${stage.slices.length} loose slices, ` : stage.kind === 'strips' ? `${stage.slices.length} loose strips, ` : ''}{pieceCount(stage)} pieces</span>
-          {stage.error && <span className="error">{stage.error}</span>}
+          {stage.error && <span className="error">{showText(stage.error, units)}</span>}
           {/* Selecting a step shows the board as that step leaves it, which looks as if the later steps were lost. */}
           {!playing && index < stages.length - 1 && (
             <span className="not-final">
@@ -613,7 +670,7 @@ export function App() {
               <button onClick={() => setSelected(stages.length - 1)}>Show finished board</button>
             </span>
           )}
-          {stage.warning && <span className="warning">{stage.warning}</span>}
+          {stage.warning && <span className="warning">{showText(stage.warning, units)}</span>}
         </div>
         <div className="overlay tools">
           <button onClick={() => viewport.current?.view('iso')}>3D</button>
@@ -645,7 +702,7 @@ export function App() {
             ))}
           </span>
         </div>
-        {stage.summary && <div className="overlay caption">{stage.summary}</div>}
+        {stage.summary && <div className="overlay caption">{showText(stage.summary, units)}</div>}
         {message && <div className="overlay toast">{message}</div>}
       </main>
 
@@ -720,5 +777,6 @@ export function App() {
         </div>
       </div>
     </div>
+    </UnitsContext.Provider>
   );
 }
