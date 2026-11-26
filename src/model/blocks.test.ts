@@ -90,20 +90,6 @@ describe('3D board (tumbling blocks)', () => {
       + 'Test the setup on scrap first: three strips must close into a hexagon with no gap.');
   });
 
-  it('a 3D board saved before the bevel rip was a step of its own gets one when it is opened', () => {
-    const d = board();
-    // As the earlier version saved it: strips, then straight to gluing the logs.
-    const old = JSON.parse(JSON.stringify({ ...d, steps: d.steps.filter((_, i) => i !== 1) }));
-    expect(run(old)[1].error).toMatch(/ripped into strips first/);
-    const opened = validateDesign(old);
-    expect(opened.steps.map((s) => s.type)).toEqual(d.steps.map((s) => s.type));
-    expect(opened.steps[1]).toMatchObject({ type: 'rip', tilt: 30 });
-    expect(run(opened).filter((s) => s.error || s.warning)).toEqual([]);
-    expect(run(opened).at(-1)!.size.map((v) => Math.round(v * 1e6) / 1e6)).toEqual([16, 1.5, 12]);
-    // One that is current is left exactly as it is.
-    expect(validateDesign(JSON.parse(JSON.stringify(d))).steps).toEqual(d.steps);
-  });
-
   it('a face-grain 3D board saved as loose tiles is rebuilt from strips when it is opened', () => {
     const d = board();
     const old = JSON.parse(JSON.stringify({

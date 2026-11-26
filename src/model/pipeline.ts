@@ -75,10 +75,11 @@ const STEPS: { [K in Step['type']]: StepDef<K> } = {
   panel: {
     title: 'Start another panel', needs: 'slices',
     // Three operations at most: mill the pieces (the slices go aside), glue faces onto any planks that take them, glue the panel.
-    actions: (s) => {
+    actions: (s, z) => {
       const faced = s.strips.some((st) => st.faces && st.faces.thickness > 0 && 2 * st.faces.thickness < s.thickness);
       return [
-        { type: 'rip', strips: s.strips, thickness: s.thickness, extra: s.extra, repeat: s.repeat, length: s.length, second: true, loose: faced },
+        // The kerf goes with it: a panel that sizes itself has to be long enough for the cuts to come.
+        { type: 'rip', strips: s.strips, thickness: s.thickness, extra: s.extra, repeat: s.repeat, length: s.length, second: true, loose: faced, kerf: z.kerf },
         ...(faced ? [{ type: 'glueFaces' } as const] : []),
         { type: 'glue' },
       ];
@@ -140,14 +141,15 @@ function rounded(a: Action, grid: number): Action {
   });
   switch (a.type) {
     case 'rip':
-      return { ...a, strips: a.strips.map(strip), thickness: r(a.thickness), ...(a.length !== undefined ? { length: r(a.length) } : {}), ...(a.extra !== undefined ? { extra: r(a.extra) } : {}) };
+      return { ...a, strips: a.strips.map(strip), thickness: r(a.thickness), ...(a.length !== undefined ? { length: r(a.length) } : {}), ...(a.extra !== undefined ? { extra: r(a.extra) } : {}), ...(a.kerf !== undefined ? { kerf: r(a.kerf) } : {}) };
     case 'crosscut': return { ...a, width: r(a.width), kerf: r(a.kerf), ...(a.blade !== undefined ? { blade: r(a.blade) } : {}) };
     case 'ripPanel': return { ...a, width: r(a.width), kerf: r(a.kerf) };
     case 'shift': return { ...a, amount: r(a.amount) };
     case 'flatten': return { ...a, top: r(a.top), bottom: r(a.bottom) };
     case 'millAccents': case 'addStrips':
       return { ...a, spec: { ...accent(a.spec), ...(a.spec.more ? { more: a.spec.more.map(accent) } : {}), ...(a.spec.stagger !== undefined ? { stagger: r(a.spec.stagger) } : {}) } };
-    case 'millBorder': return { ...a, spec: { ...a.spec, width: r(a.spec.width), line: r(a.spec.line), block: r(a.spec.block) } };
+    // The border's own stock follows from the board's size, so the action is told the step to mill it on.
+    case 'millBorder': return { ...a, grid, spec: { ...a.spec, width: r(a.spec.width), line: r(a.spec.line), block: r(a.spec.block) } };
     case 'roundCorners': case 'roundOver': return { ...a, radius: r(a.radius) };
     case 'chamfer': return { ...a, size: r(a.size) };
     case 'addFeet': return { ...a, diameter: r(a.diameter), height: r(a.height), inset: r(a.inset) };

@@ -1,7 +1,6 @@
 import { blockRecipe, blockSide, reblock } from './blocks';
 import { dimensionsOf, layupOf, withLayup } from './design';
 import { NO_FINISH } from './finish';
-import { roundTo } from './fractions';
 import { bbox } from './geometry';
 import { newId } from './ids';
 import { runSteps } from './pipeline';
@@ -92,10 +91,20 @@ export function turnedBlocks(design: Design, flat: boolean): Design {
 }
 
 /**
+ * The steps, after the first, of the end-grain 3D board as earlier versions saved it: first with
+ * no bevel rip, then with one, both gluing loose lengths of log into the block.
+ */
+const LEGACY_END_GRAIN = [
+  'glue,crosscut,turn,glue,trim,flatten',
+  'rip,glue,crosscut,turn,glue,trim,flatten',
+];
+
+/**
  * A 3D board as this version makes it. One saved by an earlier version has a recipe the engine no
  * longer runs: an end-grain one glued loose lengths of log, where it now slices a row of logs,
  * and a face-grain one was loose tiles. Either is given the current recipe with the same woods
- * and diamonds. Any other design, and a 3D board already current, is returned as it is.
+ * and diamonds. A recipe is recognised as old only by being exactly one of those: a current
+ * board with steps of the user's own is left alone. Any other design, and a 3D board already current, is returned as it is.
  */
 export function currentBlocks(design: Design): Design {
   const layup = layupOf(design);
@@ -103,11 +112,12 @@ export function currentBlocks(design: Design): Design {
   if (layup.blocks.flat) {
     return layup.strips.length >= 4 ? design : fitFlatBlocks({ ...design, steps: flatRecipe(layup.strips, layup.strips[0]?.width ?? 1.25) });
   }
-  // The end-grain recipe as it is now: boards, a bevel rip, logs, a row, slices slid to nest.
-  const recipe = blockRecipe(layup.strips, layup.thickness);
-  const current = design.steps.slice(1).map((st) => st.type).join() === recipe.steps.map((st) => st.type).join()
-    && design.steps.some((st) => st.type === 'rip' && st.tilt);
-  return current ? design : reblock({ ...design, steps: [design.steps[0], ...recipe.steps] });
+  // Only the two end-grain recipes earlier versions saved are replaced, recognised by their exact
+  // steps. Anything else is the current recipe, or one the user has changed: a step added, moved
+  // or taken out is theirs to keep, not a sign of an old file.
+  const steps = design.steps.slice(1).map((st) => st.type).join();
+  if (!LEGACY_END_GRAIN.includes(steps)) return design;
+  return reblock({ ...design, steps: [design.steps[0], ...blockRecipe(layup.strips, layup.thickness).steps] });
 }
 
 /** What a board's first step makes: ordinary strips, the three boards of an end-grain 3D board, or the flat strips of a face-grain one. */
@@ -232,11 +242,12 @@ export function fitFlatBlocks(design: Design): Design {
   const cutAt = nth(steps, 'crosscut', 0), shiftAt = nth(steps, 'shift', 0), ripAt = nth(steps, 'rip', 0);
   const glueAt = nth(steps, 'glue', 1), trimAt = nth(steps, 'trim', 0), lastTrimAt = nth(steps, 'trim', 1);
   if ([cutAt, shiftAt, ripAt, glueAt, trimAt, lastTrimAt].some((i) => i < 0)) return design;
-  const grid = dimensionsOf(design).rounding;
   const width = layup.strips[0].width, s = blockSide(width);
   const rip = steps[ripAt] as Extract<Step, { type: 'rip' }>;
   const kerf = Math.max(0, dimensionsOf(design).kerf ?? rip.kerf), row = 1.5 * s;
-  const thickness = design.target.thickness + steps.reduce((t, st) => t + (st.type === 'flatten' ? roundTo(st.top, grid) + roundTo(st.bottom, grid) : 0), 0);
+  // This board's sizes are not rounded where they are used (see `sizingOf`), its flattening
+  // passes included, so what they take off is allowed for as typed.
+  const thickness = design.target.thickness + steps.reduce((t, st) => t + (st.type === 'flatten' ? st.top + st.bottom : 0), 0);
   const rows = Math.max(2, Math.ceil(design.target.length / row - 1e-9));
   const columns = Math.max(2, Math.ceil(design.target.width / width - 1e-9));
   const strips = layup.strips.map((st, i) => ({ ...st, width: i % 2 ? topWidth(s, kerf) : width }));

@@ -349,7 +349,7 @@ grains, a line per stage. A change to how the recipe is run must leave every lin
 ## Checks
 
 ```powershell
-npm test                                   # 511 tests of the model: what each pattern must look like, building every design from Custom, feet, one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
+npm test                                   # 516 tests of the model: the defects a review found, what each pattern must look like, building every design from Custom, feet, one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
 npm run smoke                              # builds, then 50 checks of the real window: About, Custom, feet, the wizard list, the Target board and Dimensions tiles, the grain switch, 3D view, wizard, print preview, edge tags, add step, accent strips, removing strips and woods, pinned target size, hiding the panel, save and open
 node scripts/run.mjs --selftest            # save, list, read and delete a design through the app
 node scripts/run.mjs --screenshot=out.png --query=preset=brick   # render one frame and exit

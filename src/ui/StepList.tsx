@@ -50,7 +50,7 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
   const { len: inches, text } = useShow();
   /** The blade's tilt for a rip: 0 is a square cut, and 30 rips the boards of a 3D board into diamond strips. */
   const tiltField = (step: Extract<Step, { type: 'rip' }>) => (
-    <label className="field" title="How far the blade leans from upright. 0 is a square rip. 30° rips the boards of a 3D board into strips with a diamond cross-section.">
+    <label className="field" title="How far the blade leans from upright. 0 is a square rip. 30° rips the boards of a 3D board into strips with a diamond cross-section; no other tilt makes diamonds that close into a hexagon.">
       <span>Blade tilt °</span>
       <input className="int" type="number" min={0} max={45} step={5} value={step.tilt ?? 0} onChange={(e) => setStep(step.id, { tilt: Number(e.target.value) || undefined })} />
     </label>
