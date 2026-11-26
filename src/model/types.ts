@@ -50,8 +50,12 @@ export interface StockLine {
 }
 
 export interface Stage {
-  /** A panel is one glued-up slab (a single slice). Slices are loose strips in order along X. */
-  kind: 'panel' | 'slices';
+  /**
+   * A panel is one glued-up slab (a single slice). Slices are loose pieces in order along X, as a
+   * cross cut leaves them. Strips are the blanks ripped for a glue-up, one slice each, lying side
+   * by side across Z in the order they will be glued.
+   */
+  kind: 'panel' | 'slices' | 'strips';
   slices: Slice[];
   size: Vec3;
   title: string;
@@ -68,12 +72,31 @@ export interface Stage {
    * back. They are drawn beside the work.
    */
   aside?: Slice[];
+  /** Set on the stage of a finishing step: which touch it is. */
+  finish?: FinishPart | 'sand';
+  /**
+   * Carried by a panel once finishing has started: the panel as it was before any finishing cut,
+   * and the touches applied so far. Each further touch is cut from that panel together with the
+   * ones before it, because they depend on each other: the roundover must clear the chamfer, the
+   * groove must clear the roundover, and all three follow the rounded corners.
+   */
+  finishing?: { pieces: Piece[]; size: Vec3; applied: Finish };
 }
+
+/** The finishing touches, in the order they are done. */
+export type FinishPart = 'corners' | 'chamfer' | 'roundover' | 'template' | 'groove';
 
 export interface StripSpec {
   id: string;
   species: string;
+  /** The width asked for. A strip that is not locked is milled a little under this when the board is held to its target size. */
   width: number;
+  /**
+   * True for a strip that keeps exactly the width asked for when the board is fitted to its
+   * target; false for one that gives way. Absent, a strip under 3/8 inch (an accent line) and a
+   * spacer are locked and the rest are not.
+   */
+  locked?: boolean;
   /**
    * True for a strip that only holds a place: a later cut saws it out, so none of it is in the
    * finished board and any cheap wood will do. It is milled and glued like the rest, but its
@@ -94,6 +117,15 @@ export interface Layup {
   repeat: number;
   /** Add the first strip once more at the end so the panel is symmetric. */
   closeWithFirst: boolean;
+  /**
+   * Set by fitting the board to its target, never typed. `scale` multiplies the width of every
+   * strip that is not locked, so the board comes out exactly the target width. `along` is added,
+   * in inches, to whichever size sets the length of a block along the board, so it comes out
+   * exactly the target length: the strips' thickness when the slices are stood on end, the cross
+   * cut's width when they are not. Absent means the sizes are used as asked for.
+   */
+  scale?: number;
+  along?: number;
 }
 
 export type Selector =
@@ -132,8 +164,13 @@ export interface PatternStrip {
 // `stagger` slides the patterned strips of every other gap that far along, so two rows of a
 // pattern can alternate.
 export type Step =
+  /** Rip and mill the strips the board starts from. Always the first step. */
+  | ({ id: string; type: 'strips' } & Layup)
   | { id: string; type: 'crosscut'; width: number; kerf: number; angle: number }
-  | { id: string; type: 'turn'; sel: Selector }
+  /** Saw a glued panel lengthways into strips `width` wide. They are then worked as slices. */
+  | { id: string; type: 'rip'; width: number; kerf: number }
+  /** Stand the chosen slices up on end: a turn of `angle` degrees about each one's length, a quarter turn (90) unless given. */
+  | { id: string; type: 'turn'; sel: Selector; angle?: number }
   | { id: string; type: 'flip'; sel: Selector; how: 'end' | 'face' }
   | { id: string; type: 'shift'; sel: Selector; amount: number }
   | { id: string; type: 'insert'; species: string; thickness: number; every: number; more?: AccentStrip[]; ends?: boolean; pattern?: AccentStrip['pattern']; offset?: number; stagger?: number }
@@ -182,6 +219,13 @@ export interface Finish {
   corners: { on: boolean; radius: number };
   /** The top edges rounded over, all the way round. */
   roundover: { on: boolean; radius: number };
+  /**
+   * A template stuck to the top for the router to rest on and run round while it cuts the juice
+   * groove: a frame of strips `stripWidth` wide and `thickness` thick, inside the groove, whose
+   * outside edge the bit's bearing follows. It is a step only when the groove is on. Absent in
+   * designs saved before there was one, which is the same as off.
+   */
+  template?: { on: boolean; stripWidth: number; thickness: number };
 }
 
 export interface Allowance {
@@ -191,7 +235,7 @@ export interface Allowance {
 }
 
 export interface Design {
-  version: 1;
+  version: 2;
   name: string;
   /** The pattern, in the words used in the name: "grid", "checkerboard", "brick". */
   style?: string;
@@ -214,7 +258,7 @@ export interface Design {
   allowance?: Allowance;
   /** Juice groove, chamfer, rounded corners and rounded top edge. Absent means the defaults in finish.ts: all on. */
   finish?: Finish;
-  layup: Layup;
+  /** Everything done to the wood, in order, starting with ripping the strips. */
   steps: Step[];
   customSpecies: Species[];
 }

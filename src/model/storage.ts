@@ -23,16 +23,21 @@ const CURRENT_KEY = 'cutting-boards.current.v1';
 
 export const desktop: BoardsApi | undefined = typeof window !== 'undefined' ? window.boards : undefined;
 
-/** Throws with a readable message when the object is not a design this version can open. */
+/**
+ * Throws with a readable message when the object is not a design this version can open. Designs
+ * saved before ripping the strips was a step (version 1) are not converted: they are refused.
+ */
 export function validateDesign(raw: unknown): Design {
   const d = raw as Partial<Design> | null;
   if (!d || typeof d !== 'object') throw new Error('Not a design file.');
-  if (d.version !== 1) throw new Error(`Unsupported design version: ${String(d.version)}.`);
-  if (!d.layup || !Array.isArray(d.layup.strips) || !Array.isArray(d.steps)) {
-    throw new Error('The design is missing its layup or steps.');
+  if ((d.version as number) === 1) throw new Error('This design was saved by an older version of Cutting Boards and cannot be opened. Start it again from New.');
+  if (d.version !== 2) throw new Error(`Unsupported design version: ${String(d.version)}.`);
+  const first = Array.isArray(d.steps) ? d.steps[0] : undefined;
+  if (!first || first.type !== 'strips' || !Array.isArray(first.strips)) {
+    throw new Error('The design is missing its first step, the strips.');
   }
   return {
-    version: 1,
+    version: 2,
     name: typeof d.name === 'string' && d.name ? d.name : 'Untitled board',
     style: typeof d.style === 'string' ? d.style : undefined,
     autoName: typeof d.autoName === 'boolean' ? d.autoName : undefined,
@@ -40,13 +45,11 @@ export function validateDesign(raw: unknown): Design {
     autoFit: d.autoFit !== false,
     allowance: d.allowance,
     finish: d.finish,
-    layup: d.layup,
-    steps: d.steps,
+    steps: d.steps!,
     customSpecies: Array.isArray(d.customSpecies) ? d.customSpecies : [],
   };
 }
 
-/** A design name reduced to characters safe in a file name. */
 export const fileSafe = (name: string) => name.trim().replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'board';
 /** The file name a design saves under. */
 const fileFor = (design: Design) => `${fileSafe(design.name)}.board.json`;

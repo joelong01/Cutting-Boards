@@ -1,4 +1,5 @@
 import { accentStrips } from './accent';
+import { layupOf } from './design';
 import { speciesById } from './species';
 import type { Design, Species } from './types';
 
@@ -35,9 +36,9 @@ export function isAutoNamed(design: Pick<Design, 'autoName' | 'name'>): boolean 
  * any wood that appears only in a second panel or an "Insert accent strips" step. Spacer strips are left
  * out: they are sawn away, so their wood is not in the board.
  */
-export function woodsOf(design: Pick<Design, 'layup' | 'steps'>): string[] {
+export function woodsOf(design: Pick<Design, 'steps'>): string[] {
   const width = new Map<string, number>();
-  for (const s of design.layup.strips) if (!s.spacer) width.set(s.species, (width.get(s.species) ?? 0) + s.width);
+  for (const s of layupOf(design).strips) if (!s.spacer) width.set(s.species, (width.get(s.species) ?? 0) + s.width);
   const woods = [...width].sort((a, b) => b[1] - a[1]).map(([id]) => id);
   for (const step of design.steps) {
     if (step.type === 'panel') {
@@ -57,7 +58,7 @@ export function woodsOf(design: Pick<Design, 'layup' | 'steps'>): string[] {
  * A name that says what the board is made of and what pattern it is, such as "Hard maple and
  * black walnut grid". Up to three woods are named; more than that are counted ("Four-wood chevron").
  */
-export function autoName(design: Pick<Design, 'layup' | 'steps' | 'style' | 'name'>, species: Species[]): string {
+export function autoName(design: Pick<Design, 'steps' | 'style' | 'name'>, species: Species[]): string {
   const style = styleOf(design) ?? 'board';
   const names = woodsOf(design).map((id) => speciesById(species, id).name.toLowerCase());
   let woods: string;

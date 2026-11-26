@@ -228,8 +228,8 @@ export class BoardScene {
   /** Show a stage. With `from`, animate the step that produced it. */
   show(stage: Stage, from: Stage | null) {
     this.anim = null;
-    if (from && from.kind === 'slices' && stage.kind === 'panel') {
-      // Glue-up: close the gaps on the loose slices, then swap in the glued panel.
+    if (from && from.kind !== 'panel' && stage.kind === 'panel') {
+      // Glue-up: close the gaps on the loose slices or strips, then swap in the glued panel.
       this.build(from);
       this.gapMul = 1;
       this.motionT = 1;
@@ -464,6 +464,12 @@ export class BoardScene {
     return s.sizeX + (s.kind === 'slices' ? (s.nodes.length - 1) * this.gap * mul : 0);
   }
 
+  /** How much wider than the wood itself loose strips are on screen: the gaps between them. Zero for anything else. */
+  private spreadZ(mul = this.gapMul): number {
+    const s = this.shown;
+    return s && s.kind === 'strips' ? (s.nodes.length - 1) * this.gap * mul : 0;
+  }
+
   /**
    * Position every slice for this frame: centred on the origin, spread by the gap, and part-way
    * through its move while a step is animating. Also puts the edge tags just outside the middle
@@ -480,12 +486,14 @@ export class BoardScene {
       this.tags.endA.position.set(-s.sizeX / 2 - out, y, 0);
       this.tags.endB.position.set(s.sizeX / 2 + out, y, 0);
     }
+    // Slices lie apart along the board, strips across it; a panel has no gaps.
     const gap = s.kind === 'slices' ? this.gap * this.gapMul : 0;
-    this.root.position.set(-this.totalX() / 2, 0, -s.centerZ);
+    const gapZ = s.kind === 'strips' ? this.gap * this.gapMul : 0;
+    this.root.position.set(-this.totalX() / 2, 0, -s.centerZ - this.spreadZ() / 2);
     const t = this.motionT;
     const m = new THREE.Matrix4(), r = new THREE.Matrix4(), back = new THREE.Matrix4();
     s.nodes.forEach((n, i) => {
-      n.group.matrix.makeTranslation(i * gap, 0, 0);
+      n.group.matrix.makeTranslation(i * gap, 0, i * gapZ);
       if (n.motion && t < 1) {
         // Play the move backwards from where the slice ended up: undo the unfinished part.
         const angle = (t - 1) * n.motion.angle;
@@ -513,7 +521,7 @@ export class BoardScene {
     if (!this.autoFit) return;
     // With slices set aside, frame the work and them together.
     const target = new THREE.Vector3(0, s.sizeY / 2, s.asideDepth / 2);
-    const radius = 0.5 * Math.hypot(Math.max(this.totalX(1), s.asideX), s.sizeY, s.sizeZ + s.asideDepth);
+    const radius = 0.5 * Math.hypot(Math.max(this.totalX(1), s.asideX), s.sizeY, s.sizeZ + this.spreadZ(1) + s.asideDepth);
     const vFov = (this.camera.fov * Math.PI) / 180;
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
     const dist = (radius / Math.sin(Math.min(vFov, hFov) / 2)) * 1.08;

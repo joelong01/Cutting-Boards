@@ -4,8 +4,9 @@ import { fitToTarget, withAutoFit } from './model/fit';
 import { inches } from './model/fractions';
 import { convertGrain, grainOf, withGrain, type Grain } from './model/grain';
 import { withAutoName } from './model/naming';
+import { layupOf } from './model/design';
 import { matches, pieceCount, run } from './model/pipeline';
-import { PRESETS, defaultDesign } from './model/presets';
+import { PRESETS, defaultDesign, designs } from './model/presets';
 import { allSpecies, speciesById } from './model/species';
 import {
   desktop, download, exportDesign, fileSafe, library as store, loadCurrent, saveCurrent, validateDesign, type LibraryEntry,
@@ -111,7 +112,7 @@ export function App() {
   const species = useMemo(() => allSpecies(design), [design.customSpecies]); // eslint-disable-line react-hooks/exhaustive-deps
   const stages = useMemo(
     () => run(design, (id) => speciesById(species, id).name),
-    [design.layup, design.steps, design.finish, species], // eslint-disable-line react-hooks/exhaustive-deps
+    [design.steps, design.finish, species], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const cutList = useMemo(() => buildCutList(stages, design), [stages, design.allowance]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -234,7 +235,7 @@ export function App() {
   }, [undo, redo, stages.length]);
 
   // The step that produced the stage on screen; its selection is outlined and clickable.
-  const step: Step | undefined = index > 0 ? design.steps[index - 1] : undefined;
+  const step: Step | undefined = design.steps[index];
   const sel: Selector | null = step && 'sel' in step ? step.sel : null;
   const stage = stages[index];
   const highlights = useMemo(
@@ -383,7 +384,7 @@ export function App() {
                 }}
               ><strong>Board wizard…</strong><small>Choose a size and end or edge grain, then pick from the designs.</small></button>
               <hr />
-              {PRESETS.map((p) => (
+              {designs().map((p) => (
                 <button key={p.key} onClick={() => load(p.make())}>
                   <strong>{p.label}</strong><small>{p.blurb}</small>
                 </button>
@@ -534,7 +535,7 @@ export function App() {
                   onClick={() => {
                     const fitted = fitToTarget(design);
                     setDesign(fitted);
-                    setMessage(fitted === design ? 'Already fits.' : `Now ${fitted.layup.repeat} repeats from ${inches(fitted.layup.length)} stock.`);
+                    setMessage(fitted === design ? 'Already fits.' : `Now ${layupOf(fitted).repeat} repeats from ${inches(layupOf(fitted).length)} stock.`);
                   }}
                 >Fit stock to target</button>
                 <p className="note">
@@ -598,12 +599,12 @@ export function App() {
       <main className="stage">
         <Viewport ref={viewport} stage={stage} from={from} species={species} gap={gap} lines={lines} highlights={highlights} onPick={onPick}
           // A Trim step names the sides it cuts, so the view names them too while one is selected.
-          edgeLabels={index > 0 && design.steps[index - 1]?.type === 'trim'}
+          edgeLabels={step?.type === 'trim'}
         />
         <div className="overlay info">
           <strong>{index + 1}. {stage.title}</strong>
           <span>{inches(stage.size[0])} × {inches(stage.size[2])} × {inches(stage.size[1])} thick</span>
-          <span>{stage.kind === 'slices' ? `${stage.slices.length} loose slices, ` : ''}{pieceCount(stage)} pieces</span>
+          <span>{stage.kind === 'slices' ? `${stage.slices.length} loose slices, ` : stage.kind === 'strips' ? `${stage.slices.length} loose strips, ` : ''}{pieceCount(stage)} pieces</span>
           {stage.error && <span className="error">{stage.error}</span>}
           {/* Selecting a step shows the board as that step leaves it, which looks as if the later steps were lost. */}
           {!playing && index < stages.length - 1 && (
@@ -675,7 +676,7 @@ export function App() {
       {wizard && (
         <BoardWizard
           initial={design.target}
-          startType={wizardParam === 'end' || wizardParam === 'edge' ? wizardParam : undefined}
+          startAtDesigns={wizardParam === 'designs'}
           snapshot={(s) => viewport.current?.snapshot(s, [560, 340]) ?? ''}
           onClose={() => setWizard(false)}
           onCreate={(d) => {

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isLocked, layupOf, milledStrips, sizingOf, withLayup } from '../model/design';
 import { inches } from '../model/fractions';
 import { changeStrip } from '../model/link';
 import { expandStrips } from '../model/pipeline';
@@ -25,12 +26,23 @@ interface Props {
  * the 3D view; editing the strips leaves the view where it is.
  */
 export function LayupEditor({ design, species, onChange, onNotice, selected, onSelect }: Props) {
-  const { layup } = design;
-  /** Change some layup fields, leaving the rest of the design alone. */
-  const set = (patch: Partial<Layup>) => onChange({ ...design, layup: { ...layup, ...patch } });
+  const layup = layupOf(design);
+  /** Change some of the first step's settings, leaving the rest of the design alone. */
+  const set = (patch: Partial<Layup>) => onChange(withLayup(design, patch));
   // While the board size is held, the repeat count and stock length are worked out, not typed.
   const held = design.autoFit !== false;
-  const strips = expandStrips(layup);
+  // The preview and the sizes in the note are the strips as milled, which a fit may have narrowed.
+  const strips = expandStrips({ ...layup, strips: milledStrips(layup) });
+  const sizing = sizingOf(design);
+  const milled = milledStrips(layup);
+  /** What the fit changed from the sizes asked for, in words, or nothing when it changed nothing. */
+  const fitNote = [
+    Math.abs(sizing.scale - 1) > 1e-6
+      ? `To finish at the target size, mill ${layup.strips.map((s, i) => (isLocked(s) ? '' : `${speciesById(species, s.species).name} ${inches(milled[i].width)} wide`)).filter((t, i, all) => t && all.indexOf(t) === i).join(', ')}.`
+      : '',
+    sizing.alongOn === 'thickness' && Math.abs(sizing.along) > 1e-6 ? `Mill the strips ${inches(layup.thickness + sizing.along)} thick.` : '',
+    sizing.alongOn === 'crosscut' && Math.abs(sizing.along) > 1e-6 ? `Cross cut the slices ${inches(sizing.cut + sizing.along)} wide.` : '',
+  ].filter(Boolean).join(' ');
   const width = strips.reduce((w, s) => w + s.width, 0);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
@@ -60,7 +72,7 @@ export function LayupEditor({ design, species, onChange, onNotice, selected, onS
 
   return (
     <section className={`step first${selected ? ' selected' : ''}`}>
-      <header onClick={onSelect} title="Show the first glue-up"><em>1</em><strong>Mill strips for first glue-up</strong></header>
+      <header onClick={onSelect} title="Show the strips, ripped and ready to glue"><em>1</em><strong>Rip the strips</strong></header>
       <div className="row">
         <Len
           label="Stock length"
@@ -138,6 +150,7 @@ export function LayupEditor({ design, species, onChange, onNotice, selected, onS
         ))}
       </div>
       <p className="note">{strips.length} strips make a panel {inches(width)} wide × {inches(layup.length)} long.</p>
+      {fitNote && <p className="note fit-note">{fitNote}</p>}
     </section>
   );
 }

@@ -33,12 +33,15 @@ export function Len({ value, onChange, min = 0, label, title, disabled }: LenPro
     if (typed === null || Math.abs(typed - value) > 1e-9) setText(formatLength(value));
     setBad(false);
   }, [value]);
-  // After a pause in typing, take up what is there if it is a valid length that differs.
+  // After a pause in typing, take up what is there if it is a valid length that differs, and mark
+  // the field if it is not a length at all. Typing again clears the mark.
   useEffect(() => {
     const timer = setTimeout(() => {
       const now = live.current;
       const v = parseLength(now.text);
       if (v !== null && v >= min && Math.abs(v - now.value) > 1e-9) now.onChange(v);
+      // Text that is not a length is marked, so it is plain why the board did not change.
+      else if ((v === null || v < min) && now.text.trim()) setBad(true);
     }, TYPING_PAUSE);
     return () => clearTimeout(timer);
   }, [text, min]);
@@ -58,7 +61,10 @@ export function Len({ value, onChange, min = 0, label, title, disabled }: LenPro
       <input
         value={text}
         disabled={disabled}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          setBad(false);
+        }}
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur();

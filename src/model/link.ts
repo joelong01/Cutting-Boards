@@ -1,4 +1,5 @@
 import { accentStrips, withAccentStrips } from './accent';
+import { layupOf, withLayup } from './design';
 import type { Design, StripSpec } from './types';
 
 export interface StripChange {
@@ -24,11 +25,11 @@ export interface StripChange {
  * strip and a border follow a change of wood, by the same rule, but never a change of width.
  */
 export function changeStrip(design: Design, stripId: string, patch: Partial<Pick<StripSpec, 'species' | 'width'>>): StripChange {
-  const before = design.layup.strips.find((s) => s.id === stripId);
+  const before = layupOf(design).strips.find((s) => s.id === stripId);
   const followed = { species: false, width: false };
   if (!before) return { design, followed };
   const after = { ...before, ...patch };
-  const strips = design.layup.strips.map((s) => (s.id === stripId ? after : s));
+  const strips = layupOf(design).strips.map((s) => (s.id === stripId ? after : s));
   const oldWoodStillUsed = strips.some((s) => s.species === before.species);
   const steps = design.steps.map((step) => {
     // A border in a wood that is swapped out of the strips follows it too.
@@ -78,5 +79,5 @@ export function changeStrip(design: Design, stripId: string, patch: Partial<Pick
     });
     return changed ? withAccentStrips(step, accents) : step;
   });
-  return { design: { ...design, layup: { ...design.layup, strips }, steps }, followed };
+  return { design: withLayup({ ...design, steps }, { strips }), followed };
 }

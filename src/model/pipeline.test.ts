@@ -8,7 +8,9 @@ import { buildCutList, DEFAULT_ALLOWANCE } from './cutlist';
 import { autoName, isAutoNamed, withAutoName, woodsOf } from './naming';
 import { PRESETS } from './presets';
 import { BUILTIN_SPECIES } from './species';
-import { pieceCount, run } from './pipeline';
+import { layupOf, unfitted, withLayup } from './design';
+import { pieceCount } from './pipeline';
+import { run } from './test-helpers';
 import type { Design, Piece, Stage, Vec3 } from './types';
 
 /** Total wood volume in a stage. */
@@ -88,7 +90,7 @@ describe('presets', () => {
     // 14 1/2 stock trims to 14, and the border makes it exactly 16. A coarse search used to land
     // a hair above 14 1/2 and round up to 14 3/4, finishing at 16 1/4.
     const fitted = fitToTarget({ ...preset('edge-grain-border'), autoFit: true });
-    expect(fitted.layup.length).toBe(14.5);
+    expect(layupOf(fitted).length).toBe(14.5);
     expect(run(fitted).at(-1)!.size[0]).toBeCloseTo(16, 9);
   });
 
@@ -162,7 +164,7 @@ describe('changing the wood, not the board', () => {
   const held = () => fitToTarget({ ...preset('maple-purpleheart'), target: { length: 16, width: 12, thickness: 1.125 }, autoFit: true });
   /** The same design with its first strip (the maple) set to a new width. */
   const widen = (d: Design, width: number): Design =>
-    ({ ...d, layup: { ...d.layup, strips: d.layup.strips.map((s, i) => (i === 0 ? { ...s, width } : s)) } });
+    (withLayup(d, { strips: layupOf(d).strips.map((s, i) => (i === 0 ? { ...s, width } : s)) }));
 
   it('a wider strip changes the strip count, not the board', () => {
     const before = held();
@@ -173,7 +175,7 @@ describe('changing the wood, not the board', () => {
     expect(f.short).toBeLessThan(12 + 1.625);
     expect(f.long).toBeGreaterThanOrEqual(16 - 1e-9);
     expect(f.long).toBeLessThan(16 + 1.125);
-    expect(after.layup.repeat).toBeLessThan(before.layup.repeat);
+    expect(layupOf(after).repeat).toBeLessThan(layupOf(before).repeat);
   });
 
   it('without the hold, the same change makes the board bigger', () => {
@@ -193,7 +195,7 @@ describe('changing the wood, not the board', () => {
 
   it('thicker stock changes how many slices are cut, not the board length', () => {
     const before = held();
-    const after = withAutoFit(before, { ...before, layup: { ...before.layup, thickness: 1.625 } });
+    const after = withAutoFit(before, withLayup(before, { thickness: 1.625 }));
     const f = finished(after);
     // Each slice now adds 1 1/2 plus a 1/8 accent strip to the length.
     expect(f.long).toBeGreaterThanOrEqual(16 - 1e-9);
@@ -209,7 +211,7 @@ describe('changing the wood, not the board', () => {
     expect(a.long).toBeCloseTo(b.long, 9);
     expect(a.short).toBeCloseTo(b.short, 9);
     expect(a.thick).toBeCloseTo(b.thick + 0.75, 9);
-    expect(after.layup.length).toBeGreaterThan(before.layup.length);
+    expect(layupOf(after).length).toBeGreaterThan(layupOf(before).length);
   });
 
   it('the picture is drawn from the same stage whose size is reported', () => {
@@ -257,7 +259,7 @@ describe('accent strips follow the strip they match', () => {
 
   it('widening the accent strip widens the lines both ways', () => {
     const d = preset('maple-purpleheart');
-    const { design, followed } = changeStrip(d, d.layup.strips[1].id, { width: 0.25 });
+    const { design, followed } = changeStrip(d, layupOf(d).strips[1].id, { width: 0.25 });
     expect(followed).toEqual({ species: false, width: true });
     expect(insert(design).thickness).toBe(0.25);
     expect(accentSizes(design, 'purpleheart')).toEqual({ inserted: [0.25], strips: [0.25] });
@@ -265,7 +267,7 @@ describe('accent strips follow the strip they match', () => {
 
   it('changing the accent wood changes the lines both ways', () => {
     const d = preset('maple-purpleheart');
-    const { design, followed } = changeStrip(d, d.layup.strips[1].id, { species: 'walnut' });
+    const { design, followed } = changeStrip(d, layupOf(d).strips[1].id, { species: 'walnut' });
     expect(followed).toEqual({ species: true, width: false });
     expect(accentSizes(design, 'purpleheart')).toEqual({ inserted: [], strips: [] });
     expect(accentSizes(design, 'walnut')).toEqual({ inserted: [0.125], strips: [0.125] });
@@ -273,7 +275,7 @@ describe('accent strips follow the strip they match', () => {
 
   it('changing the block strip leaves the accent strips alone', () => {
     const d = preset('maple-purpleheart');
-    const { design, followed } = changeStrip(d, d.layup.strips[0].id, { width: 1.5 });
+    const { design, followed } = changeStrip(d, layupOf(d).strips[0].id, { width: 1.5 });
     expect(followed).toEqual({ species: false, width: false });
     expect(insert(design)).toEqual(insert(d));
   });
@@ -281,15 +283,15 @@ describe('accent strips follow the strip they match', () => {
   it('an accent step set to another thickness on purpose is not overwritten', () => {
     const base = preset('maple-purpleheart');
     const d = { ...base, steps: base.steps.map((s) => (s.type === 'insert' ? { ...s, thickness: 0.5 } : s)) };
-    const { design, followed } = changeStrip(d, d.layup.strips[1].id, { width: 0.25 });
+    const { design, followed } = changeStrip(d, layupOf(d).strips[1].id, { width: 0.25 });
     expect(followed.width).toBe(false);
     expect(insert(design).thickness).toBe(0.5);
   });
 
   it('the wood does not follow while another strip still uses the old wood', () => {
     const base = preset('maple-purpleheart');
-    const d = { ...base, layup: { ...base.layup, strips: [...base.layup.strips, { id: 'extra', species: 'purpleheart', width: 0.5 }] } };
-    const { design, followed } = changeStrip(d, d.layup.strips[1].id, { species: 'walnut' });
+    const d = withLayup(base, { strips: [...layupOf(base).strips, { id: 'extra', species: 'purpleheart', width: 0.5 }] });
+    const { design, followed } = changeStrip(d, layupOf(d).strips[1].id, { species: 'walnut' });
     expect(followed.species).toBe(false);
     expect(insert(design).species).toBe('purpleheart');
   });
@@ -306,20 +308,20 @@ describe('room to flatten and mill', () => {
     expect(stages[0].size[1]).toBeCloseTo(1.125, 9);
     expect(stages[0].stock![0].thickness).toBeCloseTo(1.125, 9);
     expect(titled(stages, 'Flatten').size[1]).toBeCloseTo(1, 9);
-    expect(titled(stages, 'Trim').size[0]).toBeCloseTo(d.layup.length - 0.5, 9);
+    expect(titled(stages, 'Trim').size[0]).toBeCloseTo(layupOf(d).length - 0.5, 9);
     // The last flattening takes the 1 1/4 slices down to the 1 1/8 board.
     expect(titled(stages, 'Flatten', 1).size[1]).toBeCloseTo(1.125, 9);
   });
 
   it('warns when a glue-up is cross cut with no flattening', () => {
     const base = preset('maple-purpleheart');
-    const d = { ...base, steps: base.steps.filter((s, i) => !(s.type === 'flatten' && i === 0)) };
+    const d = { ...base, steps: base.steps.filter((s, i) => !(s.type === 'flatten' && i === 2)) };
     expect(titled(run(d), 'Cross cut').warning).toMatch(/Flatten step/);
   });
 
   it('a warning on a step shows up in the order of operations', () => {
     const base = preset('maple-purpleheart');
-    const d = { ...base, steps: base.steps.filter((s, i) => !(s.type === 'flatten' && i === 0)) };
+    const d = { ...base, steps: base.steps.filter((s, i) => !(s.type === 'flatten' && i === 2)) };
     const cut = buildCutList(run(d), d).operations.find((o) => o.title === 'Cross cut')!;
     expect(cut.warning).toMatch(/Flatten step/);
     expect(buildCutList(run(base), base).operations.every((o) => !o.warning)).toBe(true);
@@ -619,7 +621,9 @@ describe('lining the groove up with the pattern', () => {
 
   it('on 1 1/2 blocks the groove sits in the middle of the outer row, the same on both sides', () => {
     const base = preset('maple-purpleheart');
-    const d = fitToTarget(changeStrip(base, base.layup.strips[0].id, { width: 1.5 }).design);
+    // The right number of blocks for the board, at exactly the 1 1/2 asked for: the fit's narrowing
+    // of them to land on the target is left off, since the numbers below are for 1 1/2 blocks.
+    const d = unfitted(fitToTarget(changeStrip(base, layupOf(base).strips[0].id, { width: 1.5 }).design));
     const last = run(grooved(d)).at(-1)!;
     const cut = cutAcross(last);
     const Z = last.size[2];
@@ -633,7 +637,7 @@ describe('lining the groove up with the pattern', () => {
 
   it('with aligning off the groove goes exactly where asked', () => {
     const base = preset('maple-purpleheart');
-    const d = fitToTarget(changeStrip(base, base.layup.strips[0].id, { width: 1.5 }).design);
+    const d = fitToTarget(changeStrip(base, layupOf(base).strips[0].id, { width: 1.5 }).design);
     const g = grooved(d);
     const last = run({ ...g, finish: { ...g.finish!, groove: { ...g.finish!.groove, align: false } } }).at(-1)!;
     const low = cutAcross(last).filter((z) => z < last.size[2] / 2);
@@ -673,14 +677,14 @@ describe('designs name themselves from their woods', () => {
 
   it('changing the accent wood renames the board', () => {
     const d = preset('maple-purpleheart');
-    const changed = changeStrip(d, d.layup.strips[1].id, { species: 'walnut' }).design;
+    const changed = changeStrip(d, layupOf(d).strips[1].id, { species: 'walnut' }).design;
     expect(withAutoName(changed, BUILTIN_SPECIES).name).toBe('Hard maple and black walnut grid');
   });
 
   it('a board left over from before, still under its old starter name, is renamed too', () => {
     const d: Design = { ...preset('maple-purpleheart'), name: 'Maple blocks, purpleheart grid', style: undefined, autoName: undefined };
     expect(isAutoNamed(d)).toBe(true);
-    const changed = changeStrip(d, d.layup.strips[1].id, { species: 'walnut' }).design;
+    const changed = changeStrip(d, layupOf(d).strips[1].id, { species: 'walnut' }).design;
     const renamed = withAutoName(changed, BUILTIN_SPECIES);
     expect(renamed.name).toBe('Hard maple and black walnut grid');
     expect(renamed.style).toBe('grid');
@@ -689,7 +693,7 @@ describe('designs name themselves from their woods', () => {
 
   it('a name the user typed is never changed', () => {
     const d: Design = { ...preset('maple-purpleheart'), name: "Pat's birthday board", autoName: false };
-    const changed = changeStrip(d, d.layup.strips[1].id, { species: 'walnut' }).design;
+    const changed = changeStrip(d, layupOf(d).strips[1].id, { species: 'walnut' }).design;
     expect(withAutoName(changed, BUILTIN_SPECIES)).toBe(changed);
     const old: Design = { ...d, autoName: undefined, style: undefined };
     expect(isAutoNamed(old)).toBe(false);
@@ -711,7 +715,7 @@ describe('designs name themselves from their woods', () => {
 describe('adding a step in the middle of a recipe', () => {
   it('accent strips can go between the offset and the glue-up of a brick board', () => {
     const d = preset('brick');
-    const at = d.steps.findIndex((s) => s.type === 'glue');
+    const at = d.steps.map((s) => s.type).lastIndexOf('glue');
     const withStrips: Design = {
       ...d,
       steps: [...d.steps.slice(0, at), { id: 'accent', type: 'insert', species: 'walnut', thickness: 0.125, every: 1 }, ...d.steps.slice(at)],

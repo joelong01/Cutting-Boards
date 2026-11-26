@@ -8,7 +8,9 @@ import { woodsOf } from './naming';
 import { NO_FINISH } from './finish';
 import { fitThickness, fitToTarget } from './fit';
 import { bbox, volume } from './geometry';
-import { describeSelector, expandStrips, matches, run, stepNeeds } from './pipeline';
+import { layupOf, makeDesign, withLayup } from './design';
+import { describeSelector, expandStrips, matches, stepNeeds } from './pipeline';
+import { run } from './test-helpers';
 import { CHESS_SQUARES, PRESETS, basketWeave, chessBoard, doubleBorder, doubleBorderCount, insertStep, newStep } from './presets';
 import { allSpecies, speciesById } from './species';
 import { fileSafe, validateDesign } from './storage';
@@ -21,7 +23,7 @@ const preset = (key: string): Design => ({ ...PRESETS.find((p) => p.key === key)
 /** A step without its id. Written out per member: Omit on the union itself would keep only the shared fields. */
 type StepSpec = Step extends infer S ? (S extends Step ? Omit<S, 'id'> : never) : never;
 /** A two-strip panel, maple then walnut across its width, with the given steps: small enough to reason about by hand. */
-const twoStrip = (...steps: StepSpec[]): Design => ({
+const twoStrip = (...steps: StepSpec[]): Design => makeDesign({
   version: 1,
   name: 'Two strip',
   target: { length: 6, width: 2, thickness: 1 },
@@ -139,7 +141,7 @@ describe('each kind of step', () => {
   it('changing a first glue-up strip carries to every matching strip in an accent stack, and its woods are named', () => {
     const d = twoStrip(CUT, { type: 'insert', species: 'cherry', thickness: 0.125, every: 1, more: [{ species: 'walnut', thickness: 1 }, { species: 'walnut', thickness: 0.5 }] });
     const { design, followed } = changeStrip(d, 'b', { width: 0.75 });
-    const step = design.steps[1] as Extract<Step, { type: 'insert' }>;
+    const step = design.steps.find((x) => x.type === 'insert') as Extract<Step, { type: 'insert' }>;
     // The walnut strip that was as thick as layup strip b followed it; the other walnut and the cherry did not.
     expect(followed.width).toBe(true);
     expect(accentStrips(step).map((a) => a.thickness)).toEqual([0.125, 0.75, 0.5]);
@@ -245,13 +247,13 @@ describe('each kind of step', () => {
 
   it('swapping a wood out of the first glue-up swaps it in the second panel, its plank faces and the border', () => {
     const d = { ...basketWeave(), finish: NO_FINISH };
-    const walnut = d.layup.strips.find((st) => st.species === 'walnut')!;
+    const walnut = layupOf(d).strips.find((st) => st.species === 'walnut')!;
     const { design, followed } = changeStrip(d, walnut.id, { species: 'wenge' });
     expect(followed.species).toBe(true);
     expect(JSON.stringify(design.steps)).not.toMatch(/walnut/);
     expect(run(design).some((st) => st.slices.some((sl) => sl.pieces.some((p) => p.species === 'walnut')))).toBe(false);
     // The cherry lines are in two strips; changing one leaves cherry in use, so nothing follows.
-    const cherry = d.layup.strips.find((st) => st.species === 'cherry')!;
+    const cherry = layupOf(d).strips.find((st) => st.species === 'cherry')!;
     expect(changeStrip(d, cherry.id, { species: 'padauk' }).followed.species).toBe(false);
   });
 
@@ -293,7 +295,7 @@ describe('each kind of step', () => {
 
   it('a strip faced both sides is three layers through the panel\'s thickness, in the first glue-up too', () => {
     const d = twoStrip();
-    const faced = run({ ...d, layup: { ...d.layup, strips: [{ id: 'a', species: 'walnut', width: 1, faces: { species: 'cherry', thickness: 0.25 } }, { id: 'b', species: 'maple', width: 1 }] } })[0];
+    const faced = run(withLayup(d, { strips: [{ id: 'a', species: 'walnut', width: 1, faces: { species: 'cherry', thickness: 0.25 } }, { id: 'b', species: 'maple', width: 1 }] }))[0];
     expect(faced.slices[0].pieces.map((p) => [p.species, +(bbox([p]).max[1] - bbox([p]).min[1]).toFixed(4)])).toEqual([['cherry', 0.25], ['walnut', 0.5], ['cherry', 0.25], ['maple', 1]]);
     expect(faced.stock!.map((l) => [l.species, l.count, l.thickness])).toEqual([['walnut', 1, 0.5], ['cherry', 2, 0.25], ['maple', 1, 1]]);
     expect(faced.summary).toMatch(/^First make 1 walnut plank 1\/2″ thick and 1″ wide, with a cherry face 1\/4″ thick glued to both sides/);
@@ -336,8 +338,10 @@ describe('each kind of step', () => {
     const base: Design = {
       ...d,
       autoFit: false,
-      layup: { ...d.layup, strips: [{ id: 'o', species: 'white-oak', width: 2 }, { id: 'w', species: 'walnut', width: 0.125 }] },
-      steps: insertStep(d, d.steps.findIndex((s) => s.type === 'glue'), { id: 'acc', type: 'insert', species: 'walnut', thickness: 0.125, every: 1 }).steps,
+      steps: withLayup(
+        insertStep(d, d.steps.map((s) => s.type).lastIndexOf('glue'), { id: 'acc', type: 'insert', species: 'walnut', thickness: 0.125, every: 1 }),
+        { strips: [{ id: 'o', species: 'white-oak', width: 2 }, { id: 'w', species: 'walnut', width: 0.125 }] },
+      ).steps,
     };
     const extra: Design = { ...base, steps: base.steps.map((s) => (s.type === 'trim' && s.auto ? { ...s, z1: 0.125 } : s)) };
     /** Accent strips of the first glue-up that lie on edge B of the finished board. */
@@ -391,7 +395,7 @@ describe('steps that cannot run say so', () => {
 
   it('every stage is still there after an error, so the step list stays in step', () => {
     const d = twoStrip({ type: 'glue' }, CUT, { type: 'glue' });
-    expect(run(d).length).toBe(1 + d.steps.length);
+    expect(run(d).length).toBe(d.steps.length - 1);
   });
 });
 
@@ -406,7 +410,7 @@ describe('adding steps', () => {
       // Interleaving needs slices set aside and enough new ones cut: a second panel, long enough, cross cut.
       const before = step.type === 'combine' ? [newStep('crosscut'), { ...newStep('panel'), length: 12 } as Step, newStep('crosscut')]
         : stepNeeds(step.type) === 'panel' ? [] : [newStep('crosscut')];
-      const stages = run({ ...twoStrip(), steps: [...before, step] });
+      const stages = run({ ...twoStrip(), steps: [...twoStrip().steps, ...before, step] });
       expect(stages.at(-1)!.error, step.type).toBeUndefined();
     }
   });
@@ -414,10 +418,12 @@ describe('adding steps', () => {
   it('a new step goes straight after the selected stage, or last when the Finish stage is selected', () => {
     const d = twoStrip(CUT, { type: 'glue' });
     const flip = newStep('flip');
-    expect(insertStep(d, 1, flip).steps.map((s) => s.type)).toEqual(['crosscut', 'flip', 'glue']);
-    expect(insertStep(d, 0, flip).steps.map((s) => s.type)).toEqual(['flip', 'crosscut', 'glue']);
-    expect(insertStep(d, 99, flip).steps.map((s) => s.type)).toEqual(['crosscut', 'glue', 'flip']);
-    expect(d.steps.length).toBe(2);
+    // The strips and their glue-up are steps 0 and 1; the cross cut and second glue-up follow.
+    expect(d.steps.map((s) => s.type)).toEqual(['strips', 'glue', 'crosscut', 'glue']);
+    expect(insertStep(d, 3, flip).steps.slice(2).map((s) => s.type)).toEqual(['crosscut', 'flip', 'glue']);
+    expect(insertStep(d, 2, flip).steps.slice(2).map((s) => s.type)).toEqual(['flip', 'crosscut', 'glue']);
+    expect(insertStep(d, 99, flip).steps.slice(2).map((s) => s.type)).toEqual(['crosscut', 'glue', 'flip']);
+    expect(d.steps.length).toBe(4);
   });
 });
 
@@ -426,7 +432,7 @@ describe('design files', () => {
     for (const p of PRESETS) {
       const d = p.make();
       const back = validateDesign(JSON.parse(JSON.stringify(d)));
-      expect(back.layup, p.key).toEqual(d.layup);
+      expect(layupOf(back), p.key).toEqual(layupOf(d));
       expect(back.steps, p.key).toEqual(d.steps);
       expect(back.name).toBe(d.name);
       expect(run(back).at(-1)!.size).toEqual(run(d).at(-1)!.size);
@@ -435,17 +441,20 @@ describe('design files', () => {
 
   it('a file that is not a design is refused with a reason', () => {
     expect(() => validateDesign(null)).toThrow(/Not a design/);
-    expect(() => validateDesign({ version: 2, layup: { strips: [] }, steps: [] })).toThrow(/version/);
-    expect(() => validateDesign({ version: 1, steps: [] })).toThrow(/layup or steps/);
+    expect(() => validateDesign({ version: 3, steps: [] })).toThrow(/version/);
+    expect(() => validateDesign({ version: 2, steps: [] })).toThrow(/first step, the strips/);
+    expect(() => validateDesign({ version: 2, steps: [{ id: 'g', type: 'glue' }] })).toThrow(/first step, the strips/);
+    // A design from before ripping was a step is refused, not converted.
+    expect(() => validateDesign({ version: 1, layup: { strips: [] }, steps: [] })).toThrow(/older version/);
   });
 
   it('an old or sparse file gets the defaults: a name, a target, held size, no custom woods', () => {
-    const d = validateDesign({ version: 1, layup: { strips: [] }, steps: [] });
+    const d = validateDesign({ version: 2, steps: [{ id: 's', type: 'strips', strips: [] }] });
     expect(d.name).toBe('Untitled board');
     expect(d.target).toEqual({ length: 16, width: 12, thickness: 1.25 });
     expect(d.autoFit).toBe(true);
     expect(d.customSpecies).toEqual([]);
-    expect(validateDesign({ version: 1, layup: { strips: [] }, steps: [], autoFit: false }).autoFit).toBe(false);
+    expect(validateDesign({ version: 2, steps: [{ id: 's', type: 'strips', strips: [] }], autoFit: false }).autoFit).toBe(false);
   });
 
   it('file names are made from the design name with nothing unsafe in them', () => {
@@ -633,7 +642,7 @@ describe('double border board', () => {
 
   it('is three glue-ups, the last cross cut taking a kerf exactly as wide as the border strip', () => {
     const d = doubleBorder({ ...OPTIONS, grain: 'end' });
-    expect(d.steps.filter((s) => s.type === 'glue').length).toBe(2);
+    expect(d.steps.filter((s) => s.type === 'glue').length).toBe(3);
     const cuts = d.steps.filter((s) => s.type === 'crosscut') as Extract<Step, { type: 'crosscut' }>[];
     expect(cuts[1]).toMatchObject({ width: 1.75, kerf: 0.125 });
     expect(d.name).toBe('Hard maple, black walnut and white oak double border');
@@ -642,7 +651,7 @@ describe('double border board', () => {
 
   it('the strip the last cross cut saws out is a cheap spacer: on the cut list, not in the board or its name', () => {
     const d = doubleBorder({ ...OPTIONS, grain: 'end' });
-    expect(d.layup.strips.map((s) => [s.species, s.spacer === true])).toEqual([['walnut', false], ['maple', false], ['walnut', false], ['poplar', true]]);
+    expect(layupOf(d).strips.map((s) => [s.species, s.spacer === true])).toEqual([['walnut', false], ['maple', false], ['walnut', false], ['poplar', true]]);
     const stages = run({ ...d, finish: NO_FINISH });
     // Poplar is milled for the first glue-up, one strip for each block across...
     expect(stages[0].stock!.find((l) => l.species === 'poplar')).toMatchObject({ count: 3, width: 0.125 });
@@ -650,7 +659,7 @@ describe('double border board', () => {
     expect(stages[stages.length - 1].slices[0].pieces.some((p) => p.species === 'poplar')).toBe(false);
     expect(woodsOf(d)).toEqual(['maple', 'walnut', 'white-oak']);
     // Another wood can stand in for it.
-    expect(doubleBorder({ ...OPTIONS, grain: 'end', spacer: 'ash' }).layup.strips[3]).toMatchObject({ species: 'ash', spacer: true });
+    expect(layupOf(doubleBorder({ ...OPTIONS, grain: 'end', spacer: 'ash' })).strips[3]).toMatchObject({ species: 'ash', spacer: true });
   });
 
   it('fits the nearest whole number of blocks to a size', () => {

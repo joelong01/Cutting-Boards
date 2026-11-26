@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildCutList } from './cutlist';
+import { parseLength } from './fractions';
 import { run } from './pipeline';
 import { PRESETS } from './presets';
 import { IMPERIAL, millimetres, sensible, showBoardFeet, showLength, showSize, showText, type Units } from './units';
@@ -39,6 +40,17 @@ describe('units', () => {
     expect(showText(text, IMPERIAL)).toBe(text);
     expect(showText(text, METRIC)).toBe('Cross cut 13 slices 41.3 mm wide with a 3.2 mm kerf at 45°. Slide 50.8 mm over, then 7.6 mm more.');
     expect(showText(text, BOTH)).toBe('Cross cut 13 slices 1 5/8″ (41.3 mm) wide with a 1/8″ (3.2 mm) kerf at 45°. Slide 2″ (50.8 mm) over, then 0.3″ (7.6 mm) more.');
+  });
+
+  it('a length typed with an inch mark is read, whichever mark the keyboard gives', () => {
+    for (const mark of ['"', '″', '”', '“', '′′', "''", ' in', 'in.', '']) {
+      expect(parseLength(`1${mark}`), mark).toBe(1);
+      expect(parseLength(`3/4${mark}`), mark).toBe(0.75);
+      expect(parseLength(`1 1/2${mark}`), mark).toBe(1.5);
+    }
+    // A foot mark is not an inch mark, and words are not lengths.
+    expect(parseLength("1'")).toBeNull();
+    expect(parseLength('one')).toBeNull();
   });
 
   it('with neither unit on falls back to inches', () => {

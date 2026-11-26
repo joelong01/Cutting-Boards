@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { accentStrips, patternPeriod, withAccentStrips } from '../model/accent';
 import { inches } from '../model/fractions';
-import { STEP_TITLES, stepNeeds } from '../model/pipeline';
+import { OPENING_STEPS } from '../model/design';
+import { FINISH_STEPS, SAND_TITLE, STEP_TITLES, stepFits, stepNeeds } from '../model/pipeline';
 import { finishOf } from '../model/finish';
 import { speciesById } from '../model/species';
 import { insertStep, newStep } from '../model/presets';
 import { newId } from '../model/presets';
-import type { AccentStrip, Design, Finish, PatternStrip, Species, Stage, Step, StepType, StripSpec } from '../model/types';
+import type { AccentStrip, Design, Finish, FinishPart, PatternStrip, Species, Stage, Step, StepType, StripSpec } from '../model/types';
 import { Int, Len, SelectorEditor, SpeciesSelect } from './inputs';
 
 interface Props {
@@ -20,6 +21,7 @@ interface Props {
 
 const ADDABLE: { type: StepType; hint: string }[] = [
   { type: 'crosscut', hint: 'Cut the panel into slices, square or at an angle' },
+  { type: 'rip', hint: 'Saw the panel lengthways into strips' },
   { type: 'turn', hint: 'Roll slices 90° so the end grain faces up' },
   { type: 'flip', hint: 'Turn slices end for end, or face down' },
   { type: 'shift', hint: 'Slide slices along their length (brick, steps)' },
@@ -48,50 +50,98 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
   /** Swap step i with its neighbour d places away and keep it selected. */
   const move = (i: number, d: number) => {
     const j = i + d;
-    if (j < 0 || j >= design.steps.length) return;
+    // The strips stay first and the glue-up of them second.
+    if (j < OPENING_STEPS || j >= design.steps.length) return;
     const steps = [...design.steps];
     [steps[i], steps[j]] = [steps[j], steps[i]];
     onChange({ ...design, steps });
-    onSelect(j + 1);
+    onSelect(j);
   };
   // Which patterned strip has its panel open for editing, as "step id:strip number", or null.
   const [openPanel, setOpenPanel] = useState<string | null>(null);
   const finish = finishOf(design);
   /** Change part of the finishing options. */
   const setFinish = (patch: Partial<Finish>) => onChange({ ...design, finish: { ...finish, ...patch } });
-  // The Finish stage, when there is one, follows the last step.
-  const finishIndex = design.steps.length + 1;
-  const finishStage: Stage | undefined = stages[finishIndex];
+  // The finishing steps, when the recipe ends in a panel, follow the last step: one for each
+  // touch that is turned on, then the sanding.
+  const firstFinish = design.steps.length;
+  /** The number of the stage of a finishing step, or -1 when it is off or there is no panel to finish. */
+  const finishAt = (part: Stage['finish']) => stages.findIndex((st, n) => n >= firstFinish && st.finish === part);
+  const anyTouch = finish.groove.on || finish.chamfer.on || finish.corners.on || finish.roundover.on;
+  /**
+   * The card for one finishing touch: a tick to have it or not, and its sizes when it is on. A
+   * touch that is on is a numbered step, and clicking its card shows the board as that cut leaves it.
+   * The board on show always has the touch being worked on. Going into one of its size fields
+   * moves the view to this touch's step when the step on show is an earlier one, which does not
+   * have the cut yet. A later step, or the finished board, already shows it and is left alone:
+   * moving back from there would take the later cuts off the board, as if the groove had been
+   * lost by changing the chamfer.
+   */
+  const touchCard = (part: FinishPart, fields: ReactNode) => {
+    const at = finishAt(part), st = at >= 0 ? stages[at] : undefined;
+    const on = finish[part].on;
+    const title = FINISH_STEPS.find((t) => t.part === part)!.title;
+    return (
+      <div key={part} className={`step touch${st && selected === at ? ' selected' : ''}${on ? '' : ' off'}`} onClick={() => st && onSelect(at)}>
+        <header>
+          {st && <em>{at + 1}</em>}
+          {/* Only the tick turns the touch on and off. The title is outside its label, so clicking
+              the title selects the card like any other step's; a touch that is off has no step to
+              select, so there its title works the tick instead. */}
+          <label className="check" onClick={(e) => e.stopPropagation()}>
+            <input type="checkbox" aria-label={title} checked={on} onChange={(e) => setFinish({ [part]: { ...finish[part], on: e.target.checked } })} />
+            {!st && <strong>{title}</strong>}
+          </label>
+          {st && <strong>{title}</strong>}
+        </header>
+        {/* A click on a field or its label is for that field; one on the space around them selects the card. */}
+        {on && <div className="params" onClick={(e) => (e.target as HTMLElement).closest('input, select, button, label') && e.stopPropagation()} onFocus={() => st && selected < at && onSelect(at)}>{fields}</div>}
+        {st?.warning && <p className="warning">{st.warning}</p>}
+      </div>
+    );
+  };
   // A new step goes straight after the stage that is selected, so a step can be put in the middle
   // of the recipe: an accent strip between the cross cut and the glue-up, say. With the Finish
   // stage selected it goes at the end of the steps.
-  const addAt = Math.min(selected, design.steps.length);
+  // Nothing goes between ripping the strips and gluing them up, so the earliest place is after
+  // the first glue-up. `addAt` is the number of the step the new one follows.
+  const addAt = Math.max(Math.min(OPENING_STEPS, design.steps.length) - 1, Math.min(selected, design.steps.length - 1));
   const addKind = stages[addAt].kind;
-  const addAfter = addAt === 0 ? 'First glue-up' : STEP_TITLES[design.steps[addAt - 1].type];
+  const addAfter = stages[addAt].title;
 
   return (
     <section className="steps">
       {design.steps.map((step, i) => {
-        const st = stages[i + 1];
-        const before = stages[i];
+        // The strips have a card of their own, above this list.
+        if (step.type === 'strips') return null;
+        const st = stages[i];
+        const before = stages[i - 1];
+        // The glue-up of the strips stays where it is; every step after it can be moved or removed.
+        const pinned = i < OPENING_STEPS;
         return (
-          <div key={step.id} className={`step${selected === i + 1 ? ' selected' : ''}${st.error ? ' broken' : ''}`} onClick={() => onSelect(i + 1)}>
+          <div key={step.id} className={`step${selected === i ? ' selected' : ''}${st.error ? ' broken' : ''}`} onClick={() => onSelect(i)}>
             <header>
-              <em>{i + 2}</em>
+              <em>{i + 1}</em>
               <strong>{STEP_TITLES[step.type]}</strong>
-              <span className="icons" onClick={(e) => e.stopPropagation()}>
-                <button title="Move earlier" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
+              <span className="icons" onClick={(e) => e.stopPropagation()} style={pinned ? { display: 'none' } : undefined}>
+                <button title="Move earlier" disabled={i <= OPENING_STEPS} onClick={() => move(i, -1)}>↑</button>
                 <button title="Move later" disabled={i === design.steps.length - 1} onClick={() => move(i, 1)}>↓</button>
                 <button
                   title="Remove step"
                   onClick={() => {
                     onChange({ ...design, steps: design.steps.filter((s) => s.id !== step.id) });
-                    onSelect(Math.min(selected, design.steps.length - 1));
+                    onSelect(Math.min(selected, design.steps.length - 2));
                   }}
                 >✕</button>
               </span>
             </header>
-            <div className="params" onClick={(e) => e.stopPropagation()} onFocus={() => onSelect(i + 1)}>
+            <div className="params" onClick={(e) => e.stopPropagation()} onFocus={() => onSelect(i)}>
+              {step.type === 'rip' && (
+                <div className="row">
+                  <Len label="Strip width" value={step.width} min={0.125} onChange={(width) => setStep(step.id, { width })} />
+                  <Len label="Kerf" value={step.kerf} onChange={(kerf) => setStep(step.id, { kerf })} />
+                </div>
+              )}
               {step.type === 'crosscut' && (
                 <div className="row">
                   <Len label="Slice width" value={step.width} min={0.0625} onChange={(width) => setStep(step.id, { width })} />
@@ -360,83 +410,73 @@ export function StepList({ design, stages, species, selected, onSelect, onChange
           </div>
         );
       })}
-      <div
-        className={`step${finishStage && selected === finishIndex ? ' selected' : ''}`}
-        onClick={() => finishStage && onSelect(finishIndex)}
-      >
-        <header><em>{finishIndex + 1}</em><strong>Finish</strong></header>
-        <div className="params finish" onClick={(e) => e.stopPropagation()}>
-          <label className="check">
-            <input type="checkbox" checked={finish.groove.on} onChange={(e) => setFinish({ groove: { ...finish.groove, on: e.target.checked } })} />
-            Juice groove in the top
-          </label>
-          {finish.groove.on && (
-            <label className="check sub" title="Moves each side of the groove to the nearest place that sits evenly on the pattern: centred in a row of blocks or on an accent line.">
-              <input type="checkbox" checked={finish.groove.align} onChange={(e) => setFinish({ groove: { ...finish.groove, align: e.target.checked } })} />
-              Line the groove up with the pattern
-            </label>
-          )}
-          {finish.groove.on && (
-            <div className="row">
-              <Len label={finish.groove.align ? 'About, from edge' : 'In from edge'} value={finish.groove.inset} onChange={(inset) => setFinish({ groove: { ...finish.groove, inset } })} />
-              <Len label="Width (bit)" value={finish.groove.width} min={0.125} onChange={(width) => setFinish({ groove: { ...finish.groove, width } })} />
-              <Len label="Depth" value={finish.groove.depth} min={0.0625} onChange={(depth) => setFinish({ groove: { ...finish.groove, depth } })} />
-              <Len
-                label="Path corner radius"
-                value={finish.groove.cornerRadius}
-                title="How tightly the centre of the bit turns each corner. 0 is a router guided by straight rails: the outside of the groove's corner takes the bit's own radius and the inside stays sharp."
-                onChange={(cornerRadius) => setFinish({ groove: { ...finish.groove, cornerRadius } })}
-              />
-            </div>
-          )}
-          <label className="check">
-            <input type="checkbox" checked={finish.corners.on} onChange={(e) => setFinish({ corners: { ...finish.corners, on: e.target.checked } })} />
-            Round the corners
-          </label>
-          {finish.corners.on && (
-            <div className="row">
-              <Len label="Corner radius" value={finish.corners.radius} min={0.0625} onChange={(radius) => setFinish({ corners: { ...finish.corners, radius } })} />
-            </div>
-          )}
-          <label className="check">
-            <input type="checkbox" checked={finish.roundover.on} onChange={(e) => setFinish({ roundover: { ...finish.roundover, on: e.target.checked } })} />
-            Round over the top edges
-          </label>
-          {finish.roundover.on && (
-            <div className="row">
-              <Len label="Roundover (bit)" value={finish.roundover.radius} min={0.03125} onChange={(radius) => setFinish({ roundover: { ...finish.roundover, radius } })} />
-            </div>
-          )}
-          <label className="check">
-            <input type="checkbox" checked={finish.chamfer.on} onChange={(e) => setFinish({ chamfer: { ...finish.chamfer, on: e.target.checked } })} />
-            Chamfer the bottom edges
-          </label>
-          {finish.chamfer.on && (
-            <div className="row">
-              <Len label="Chamfer" value={finish.chamfer.size} min={0.0625} onChange={(size) => setFinish({ chamfer: { ...finish.chamfer, size } })} />
-            </div>
-          )}
+      <h3 className="finishing">Finishing</h3>
+      {touchCard('corners', (
+        <div className="row">
+          <Len label="Corner radius" value={finish.corners.radius} min={0.0625} onChange={(radius) => setFinish({ corners: { ...finish.corners, radius } })} />
         </div>
-        {finishStage?.warning && <p className="warning">{finishStage.warning}</p>}
-        {!finishStage && (finish.groove.on || finish.chamfer.on || finish.corners.on || finish.roundover.on) && (
-          <p className="warning">Finishing needs a glued panel: end the steps with a Glue up.</p>
-        )}
-      </div>
+      ))}
+      {touchCard('chamfer', (
+        <div className="row">
+          <Len label="Chamfer" value={finish.chamfer.size} min={0.0625} onChange={(size) => setFinish({ chamfer: { ...finish.chamfer, size } })} />
+        </div>
+      ))}
+      {touchCard('roundover', (
+        <div className="row">
+          <Len label="Roundover (bit)" value={finish.roundover.radius} min={0.03125} onChange={(radius) => setFinish({ roundover: { ...finish.roundover, radius } })} />
+        </div>
+      ))}
+      {finish.groove.on && touchCard('template', (
+        <>
+          <div className="row">
+            <Len label="Strip width" value={finish.template.stripWidth} min={0.5} onChange={(stripWidth) => setFinish({ template: { ...finish.template, stripWidth } })} />
+            <Len label="Thickness" value={finish.template.thickness} min={0.125} onChange={(thickness) => setFinish({ template: { ...finish.template, thickness } })} />
+          </div>
+          <small className="hint">A frame stuck to the top, inside the groove. The router rests on it and the bit's bearing runs round its outside edge.</small>
+        </>
+      ))}
+      {touchCard('groove', (
+        <>
+          <label className="check" title="Moves each side of the groove to the nearest place that sits evenly on the pattern: centred in a row of blocks or on an accent line.">
+            <input type="checkbox" checked={finish.groove.align} onChange={(e) => setFinish({ groove: { ...finish.groove, align: e.target.checked } })} />
+            Line the groove up with the pattern
+          </label>
+          <div className="row">
+            <Len label={finish.groove.align ? 'About, from edge' : 'In from edge'} value={finish.groove.inset} onChange={(inset) => setFinish({ groove: { ...finish.groove, inset } })} />
+            <Len label="Width (bit)" value={finish.groove.width} min={0.125} onChange={(width) => setFinish({ groove: { ...finish.groove, width } })} />
+            <Len label="Depth" value={finish.groove.depth} min={0.0625} onChange={(depth) => setFinish({ groove: { ...finish.groove, depth } })} />
+            <Len
+              label="Path corner radius"
+              value={finish.groove.cornerRadius}
+              title="How tightly the centre of the bit turns each corner. 0 is a router guided by straight rails: the outside of the groove's corner takes the bit's own radius and the inside stays sharp."
+              onChange={(cornerRadius) => setFinish({ groove: { ...finish.groove, cornerRadius } })}
+            />
+          </div>
+        </>
+      ))}
+      {finishAt('sand') >= 0 && (
+        <div className={`step touch${selected === finishAt('sand') ? ' selected' : ''}`} onClick={() => onSelect(finishAt('sand'))}>
+          <header><em>{finishAt('sand') + 1}</em><strong>{SAND_TITLE}</strong></header>
+        </div>
+      )}
+      {anyTouch && finishAt('sand') < 0 && (
+        <p className="warning">Finishing needs a glued panel: end the steps with a Glue up.</p>
+      )}
       <div className="add-step">
         <span>Add a step after {addAt + 1}. {addAfter}</span>
         <div>
           {ADDABLE.map(({ type, hint }) => {
-            const ok = stepNeeds(type) === addKind;
+            const ok = stepFits(type, addKind);
             const needs = stepNeeds(type) === 'panel'
-              ? 'a glued panel: select a First glue-up, Glue up, Trim, Flatten or Add a border step to add it after'
-              : 'loose slices: select a Cross cut, Turn, Flip, Offset, Insert or Interleave step to add it after';
+              ? 'a glued panel: select the First glue-up, or a Glue up, Trim, Flatten or Add a border step, to add it after'
+              : 'loose slices: select a Cross cut, Rip the panel, Turn, Flip, Offset, Insert or Interleave step to add it after';
             return (
               <button
                 key={type}
                 disabled={!ok}
                 title={ok ? hint : `${hint}. Needs ${needs}.`}
                 onClick={() => {
-                  onChange(insertStep(design, addAt, newStep(type)));
+                  onChange(insertStep(design, addAt + 1, newStep(type)));
                   onSelect(addAt + 1);
                 }}
               >{STEP_TITLES[type]}</button>

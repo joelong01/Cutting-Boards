@@ -100,23 +100,46 @@ const checks = [
   }],
   ['the finished board is shown first, with no "later steps" notice and no edge tags', async () => {
     const r = await probe('preset=brick', `({ notice: !!document.querySelector('.not-final'), tags: window.boardScene.tagGroup.visible, heading: document.querySelector('.overlay.info strong').textContent })`);
-    if (r.notice || r.tags || !/Finish/.test(r.heading)) throw new Error(JSON.stringify(r));
+    if (r.notice || r.tags || !/Sand and oil/.test(r.heading)) throw new Error(JSON.stringify(r));
   }],
   ['a Trim step tags the four sides, and Show finished board goes back to the end', async () => {
-    const r = await probe('preset=brick&stage=7', later(
+    const r = await probe('preset=brick&stage=8', later(
       `const before = { tags: window.boardScene.tagGroup.visible, notice: document.querySelector('.not-final')?.textContent ?? '' }; document.querySelector('.not-final button').click()`,
       `({ before, tags: window.boardScene.tagGroup.visible, notice: !!document.querySelector('.not-final'), heading: document.querySelector('.overlay.info strong').textContent })`));
-    if (!r.before.tags || !/step 8 of 10/.test(r.before.notice) || r.tags || r.notice || !/Finish/.test(r.heading)) throw new Error(JSON.stringify(r));
+    if (!r.before.tags || !/step 9 of 15/.test(r.before.notice) || r.tags || r.notice || !/Sand and oil/.test(r.heading)) throw new Error(JSON.stringify(r));
+  }],
+  ['going into the chamfer size keeps the finished board, groove and all, on show; from an earlier step it goes to the chamfer step', async () => {
+    const into = `[...document.querySelectorAll('.step.touch .field')].find((f) => f.querySelector('span')?.textContent === 'Chamfer').querySelector('input').dispatchEvent(new FocusEvent('focusin', { bubbles: true }))`;
+    const seen = `({ heading: document.querySelector('.overlay.info strong').textContent, notice: !!document.querySelector('.not-final') })`;
+    const end = await probe('preset=brick', later(into, seen));
+    const early = await probe('preset=brick&stage=2', later(`const before = ${seen}; ${into}`, `({ before, after: ${seen} })`));
+    if (!/Sand and oil/.test(end.heading) || end.notice || !/Flatten/.test(early.before.heading) || !/Chamfer the bottom edges/.test(early.after.heading)) throw new Error(JSON.stringify({ end, early }));
+  }],
+  ['a finishing card is selected by a click on its title or on the space round its fields, and a click on a field leaves the view alone', async () => {
+    const card = `const card = (t) => [...document.querySelectorAll('.steps .step.touch')].find((c) => c.querySelector('strong').textContent === t); const info = () => document.querySelector('.overlay.info strong').textContent; const hit = (el) => el.dispatchEvent(new MouseEvent('click', { bubbles: true }));`;
+    const r = await probe('preset=brick', later(
+      `${card} const seen = {}; hit(card('Juice groove').querySelector('header > strong')); setTimeout(() => { seen.title = info(); hit(card('Chamfer the bottom edges').querySelector('.params')); }, 300); setTimeout(() => { seen.space = info(); hit(card('Juice groove').querySelector('.params .field input')); }, 600)`,
+      `({ ...seen, field: info(), ticked: card('Juice groove').querySelector('input').checked })`, 1000));
+    if (!/14\. Juice groove/.test(r.title) || !/Chamfer the bottom edges/.test(r.space) || !/Chamfer the bottom edges/.test(r.field) || !r.ticked) throw new Error(JSON.stringify(r));
+  }],
+  ['ticking Juice groove template adds a step before the groove that draws the template on the board and says how to make it', async () => {
+    const r = await probe('preset=brick', later(
+      `const card = (t) => [...document.querySelectorAll('.steps .step.touch')].find((c) => c.querySelector('strong').textContent === t); const titles = () => [...document.querySelectorAll('.steps .step.touch')].map((c) => (c.querySelector('em')?.textContent ?? '-') + ' ' + c.querySelector('strong').textContent); const before = titles(); const drawn = () => Math.max(...window.boardScene.shown.nodes.map((n) => { const g = n.mesh.geometry; g.computeBoundingBox(); return g.boundingBox.max.y - g.boundingBox.min.y; })); const plain = drawn(); card('Juice groove template').querySelector('input').click(); setTimeout(() => card('Juice groove template').querySelector('header > strong').dispatchEvent(new MouseEvent('click', { bubbles: true })), 300)`,
+      `({ before, after: titles(), heading: document.querySelector('.overlay.info strong').textContent, caption: document.querySelector('.overlay.caption').textContent, fields: [...card('Juice groove template').querySelectorAll('.field > span:first-child')].map((e) => e.textContent), plain, drawn: drawn() })`, 1500));
+    const ok = r.before.includes('- Juice groove template') && r.after.includes('14 Juice groove template') && r.after.includes('15 Juice groove')
+      && /14\. Juice groove template/.test(r.heading) && /^Make a template for the router to rest on and run round: a frame/.test(r.caption) && /bearing runs along that outside edge/.test(r.caption)
+      && r.fields.join() === 'Strip width,Thickness' && Math.abs(r.drawn - r.plain - 0.5) < 1e-3;
+    if (!ok) throw new Error(JSON.stringify(r));
   }],
   ['a step that is not a Trim has the notice but no edge tags', async () => {
-    const r = await probe('preset=brick&stage=8', `({ tags: window.boardScene.tagGroup.visible, notice: !!document.querySelector('.not-final') })`);
+    const r = await probe('preset=brick&stage=9', `({ tags: window.boardScene.tagGroup.visible, notice: !!document.querySelector('.not-final') })`);
     if (r.tags || !r.notice) throw new Error(JSON.stringify(r));
   }],
   ['Add a step is on screen without scrolling and adds after the selected step', async () => {
-    const r = await probe('preset=brick&stage=5', later(
+    const r = await probe('preset=brick&stage=6', later(
       `const bar = document.querySelector('.add-step'); const box = bar.getBoundingClientRect(); const title = bar.querySelector('span').textContent; const cards = () => [...document.querySelectorAll('.step strong, .step-card strong, .steps strong')].length; const n = document.querySelectorAll('.overlay.stepper i').length; [...bar.querySelectorAll('button')].find((b) => b.textContent === 'Insert accent strips').click()`,
       `({ title, visible: box.top >= 0 && box.bottom <= window.innerHeight + 1, before: n, after: document.querySelectorAll('.overlay.stepper i').length, heading: document.querySelector('.overlay.info strong').textContent })`));
-    if (!/after 6\. Offset/i.test(r.title) || !r.visible || r.after !== r.before + 1 || !/7\. Insert accent strips/.test(r.heading)) throw new Error(JSON.stringify(r));
+    if (!/after 7\. Offset/i.test(r.title) || !r.visible || r.after !== r.before + 1 || !/8\. Insert accent strips/.test(r.heading)) throw new Error(JSON.stringify(r));
   }],
   ['the target board stays at the top of the side panel when the list is scrolled to the bottom', async () => {
     const r = await probe('preset=brick', later(
@@ -124,11 +147,11 @@ const checks = [
       `({ scrolled: Math.round(side.scrollTop), top: Math.round(document.querySelector('.card.target').getBoundingClientRect().top - side.getBoundingClientRect().top), size: document.querySelector('.card.target .note').textContent, over: document.elementFromPoint(side.getBoundingClientRect().left + 40, side.getBoundingClientRect().top + 30)?.closest('.card.target') !== null })`));
     if (!(r.scrolled > 100) || r.top !== 10 || !r.over || !/Finishes at/.test(r.size)) throw new Error(JSON.stringify(r));
   }],
-  ['the strips card is step 1, "Mill strips for first glue-up", and its heading shows the first glue-up', async () => {
+  ['the strips card is step 1, "Rip the strips", and selecting it shows the loose strips; gluing them up is step 2', async () => {
     const r = await probe('preset=brick', later(
       `const head = document.querySelector('.step.first header'); const label = head.innerText.replace(/\\s+/g, ' '); const numbers = [...document.querySelectorAll('.side .step header em')].map((e) => e.textContent).join(','); head.click()`,
-      `({ label, numbers, selected: document.querySelector('.step.first').classList.contains('selected'), heading: document.querySelector('.overlay.info strong').textContent })`));
-    if (r.label !== '1 Mill strips for first glue-up' || r.numbers !== '1,2,3,4,5,6,7,8,9,10' || !r.selected || !r.heading.startsWith('1. ')) throw new Error(JSON.stringify(r));
+      `({ label, numbers, second: document.querySelector('.steps .step header').innerText.replace(/\\s+/g, ' '), selected: document.querySelector('.step.first').classList.contains('selected'), heading: document.querySelector('.overlay.info strong').textContent, info: document.querySelector('.overlay.info').innerText, kind: window.boardScene.shown.kind, drawn: window.boardScene.shown.nodes.length })`, 900));
+    if (r.label !== '1 Rip the strips' || r.second !== '2 Glue up' || r.numbers !== '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15' || !r.selected || r.heading !== '1. Rip the strips' || !/7 loose strips/.test(r.info) || r.kind !== 'strips' || r.drawn !== 7) throw new Error(JSON.stringify(r));
   }],
   ['an accent step takes a second strip: Add strip puts another row in it and another piece in every gap', async () => {
     const r = await probe('preset=maple-purpleheart&stage=5', later(
@@ -184,28 +207,51 @@ const checks = [
     const r = await probe('preset=basket-weave', later(
       `const titles = [...document.querySelectorAll('.side .step header strong')].map((e) => e.textContent); const card = (name) => [...document.querySelectorAll('.steps .step')].find((c) => c.querySelector('header strong').textContent === name); const info = () => document.querySelector('.overlay.info').innerText; const before = info(); const panel = card('Start another panel'); const page = { strips: panel.querySelectorAll('.panel-strip').length, faced: [...panel.querySelectorAll('.faced input[type=checkbox]')].map((c) => c.checked), auto: [...panel.querySelectorAll('label.check')].at(-1).querySelector('input').checked, aside: panel.querySelector('.result').textContent, border: [...card('Add a border').querySelectorAll('.field > span')].map((e) => e.textContent), addable: [...document.querySelectorAll('.add-step button')].map((b) => b.textContent) }; panel.querySelector('.faced input[type=checkbox]').click()`,
       `({ titles, page, before, after: info(), broken: document.querySelectorAll('.step.broken').length })`, 700));
-    const ok = r.titles.join('|') === 'Mill strips for first glue-up|Flatten|Trim|Cross cut|Turn to end grain|Start another panel|Flatten|Trim|Cross cut|Turn to end grain|Interleave the slices|Offset|Glue up|Flatten|Trim|Add a border|Flatten|Finish'
+    const ok = r.titles.join('|') === 'Rip the strips|Glue up|Flatten|Trim|Cross cut|Turn to end grain|Start another panel|Flatten|Trim|Cross cut|Turn to end grain|Interleave the slices|Offset|Glue up|Flatten|Trim|Add a border|Flatten|Round the corners|Chamfer the bottom edges|Round over the top edges|Juice groove template|Juice groove|Sand and oil'
       && r.page.strips === 4 && r.page.faced.join() === 'true,false,false,false' && r.page.auto && /slices set aside/.test(r.page.aside)
       && r.page.border.includes('Border') && r.page.border.includes('Line inside it')
       && ['Start another panel', 'Interleave the slices', 'Add a border'].every((t) => r.page.addable.includes(t)) && r.before !== r.after && r.broken === 0;
     if (!ok) throw new Error(JSON.stringify(r));
   }],
   ['while the second panel is worked, the 3D view draws the slices set aside beside it', async () => {
-    const r = await probe('preset=basket-weave&stage=8', `({ heading: document.querySelector('.overlay.info strong').textContent, work: window.boardScene.shown.nodes.length, aside: window.boardScene.shown.aside.length, drawn: window.boardScene.shown.aside.every((n) => n.group.parent === window.boardScene.root), past: window.boardScene.shown.asideZ > window.boardScene.shown.sizeZ })`);
-    if (!/^9\. Cross cut/.test(r.heading) || r.aside < 2 || r.work < 1 || !r.drawn || !r.past) throw new Error(JSON.stringify(r));
+    const r = await probe('preset=basket-weave&stage=9', `({ heading: document.querySelector('.overlay.info strong').textContent, work: window.boardScene.shown.nodes.length, aside: window.boardScene.shown.aside.length, drawn: window.boardScene.shown.aside.every((n) => n.group.parent === window.boardScene.root), past: window.boardScene.shown.asideZ > window.boardScene.shown.sizeZ })`);
+    if (!/^10\. Cross cut/.test(r.heading) || r.aside < 2 || r.work < 1 || !r.drawn || !r.past) throw new Error(JSON.stringify(r));
   }],
   ['typing a corner radius of 3/4 and then 1 redraws the board each time, without Enter or leaving the field', async () => {
-    const r = await probe('preset=brick', later(
+    const r = await probe('preset=brick&stage=10', later(
       `const wait = (ms) => new Promise((r) => setTimeout(r, ms)); const field = () => [...document.querySelectorAll('.field')].find((f) => f.querySelector('span')?.textContent === 'Corner radius').querySelector('input'); const caption = () => /to a (.*?) radius/.exec(document.querySelector('.overlay.caption').textContent)?.[1]; const mesh = () => { let sum = 0; for (const node of window.boardScene.shown.nodes) { const p = node.mesh.geometry.attributes.position; for (let i = 0; i < p.count; i++) sum += p.getX(i) + 2 * p.getZ(i); } return Math.round(sum * 100); }; const type = async (v) => { const el = field(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); await wait(1300); return { shown: field().value, caption: caption(), mesh: mesh() }; }; const start = { caption: caption(), mesh: mesh() }; const a = await type('3/4'); const b = await type('1')`,
       `({ start, a, b })`, 50));
     const ok = r.start.caption === '1/2″' && r.a.caption === '3/4″' && r.b.caption === '1″' && r.a.shown === '3/4' && r.b.shown === '1'
       && new Set([r.start.mesh, r.a.mesh, r.b.mesh]).size === 3;
     if (!ok) throw new Error(JSON.stringify(r));
   }],
-  ['the Finish card puts each option on a line of its own, with its fields indented under it', async () => {
-    const r = await probe('preset=brick', `(() => { const card = [...document.querySelectorAll('.steps .step')].at(-1); const box = (e) => e.getBoundingClientRect(); const checks = [...card.querySelectorAll('.params > .check:not(.sub)')].map((e) => ({ top: Math.round(box(e).top), bottom: Math.round(box(e).bottom), left: Math.round(box(e).left) })); const rows = [...card.querySelectorAll('.params > .row')].map((e) => Math.round(box(e).left)); return { title: card.querySelector('header strong').textContent, checks, rows }; })()`);
-    const ok = r.title === 'Finish' && r.checks.length === 4 && r.checks.every((c, i) => i === 0 || c.top >= r.checks[i - 1].bottom)
-      && r.rows.length >= 1 && r.rows.every((x) => x > r.checks[0].left + 10);
+  ['each finishing touch is a card and a step of its own: ticking one off takes its step out, and selecting one shows that cut alone', async () => {
+    const r = await probe('preset=brick', later(
+      `const cards = () => [...document.querySelectorAll('.steps .step.touch')].map((c) => ({ title: c.querySelector('strong').textContent, number: c.querySelector('em')?.textContent ?? '', on: c.querySelector('input')?.checked ?? null, fields: [...c.querySelectorAll('.field > span:first-child')].map((e) => e.textContent) })); const dots = () => document.querySelectorAll('.overlay.stepper i').length; const info = () => document.querySelector('.overlay.info strong').textContent; const caption = () => document.querySelector('.overlay.caption').textContent; const card = (t) => [...document.querySelectorAll('.steps .step.touch')].find((c) => c.querySelector('strong').textContent === t); const before = { cards: cards(), dots: dots() }; card('Chamfer the bottom edges').click(); setTimeout(() => { before.chamfer = { info: info(), caption: caption() }; card('Chamfer the bottom edges').querySelector('input').click(); }, 400)`,
+      `({ before, after: { cards: cards(), dots: dots() } })`, 1200));
+    const b = r.before.cards, a = r.after.cards;
+    const ok = b.map((c) => c.title).join('|') === 'Round the corners|Chamfer the bottom edges|Round over the top edges|Juice groove template|Juice groove|Sand and oil'
+      && b.map((c) => c.number).join() === '11,12,13,,14,15' && b.slice(0, 3).every((c) => c.on === true) && b[4].on === true
+      && b[0].fields.join() === 'Corner radius' && b[1].fields.join() === 'Chamfer' && b[2].fields.join() === 'Roundover (bit)' && b[3].fields.length === 0 && b[3].on === false && b[4].fields.length === 4 && b[5].fields.length === 0
+      && r.before.chamfer.info === '12. Chamfer the bottom edges' && /^Chamfer the bottom edges 1\/4″ at 45°/.test(r.before.chamfer.caption) && !/groove|corners|Sand/.test(r.before.chamfer.caption)
+      // Ticked off: the chamfer keeps its card, without a number or fields, and the steps after it move up one.
+      && a[1].on === false && a[1].number === '' && a[1].fields.length === 0 && a.map((c) => c.number).join() === '11,,12,,13,14' && r.after.dots === r.before.dots - 1;
+    if (!ok) throw new Error(JSON.stringify(r));
+  }],
+  ['Rip the panel is a step that can be added after a glue-up, and leaves strips to work as slices', async () => {
+    const r = await probe('preset=single-edge-grain&stage=1', later(
+      `const bar = document.querySelector('.add-step'); const button = [...bar.querySelectorAll('button')].find((b) => b.textContent === 'Rip the panel'); const enabled = !button.disabled; button.click()`,
+      `({ enabled, heading: document.querySelector('.overlay.info strong').textContent, info: document.querySelector('.overlay.info').innerText, caption: document.querySelector('.overlay.caption').textContent, fields: [...document.querySelectorAll('.steps .step.selected .field > span:first-child')].map((e) => e.textContent) })`, 600));
+    if (!r.enabled || r.heading !== '3. Rip the panel' || !/8 loose slices/.test(r.info) || !/^Rip the panel lengthways into 8 strips, each 1 1\/4″ wide/.test(r.caption) || r.fields.join() !== 'Strip width,Kerf') throw new Error(JSON.stringify(r));
+  }],
+  ['a board finishes at exactly the target size: the grid opens at 16 x 12, says what its strips are milled to, and stays on target in edge grain', async () => {
+    const r = await probe('preset=maple-purpleheart', later(
+      `const note = () => document.querySelector('.card.target .note').textContent; const strips = () => ({ asked: [...document.querySelectorAll('.step.first .strip-row input')].map((i) => i.value).filter((v) => /^[0-9 /.]+$/.test(v)), fit: document.querySelector('.step.first .fit-note')?.textContent ?? '' }); const before = { note: note(), ...strips() }; [...document.querySelectorAll('.grain-switch button')].find((b) => b.textContent === 'Edge grain').click()`,
+      `({ before, after: { note: note(), ...strips() }, broken: document.querySelectorAll('.step.broken').length })`, 1800));
+    const ok = /Finishes at 16″ × 12″ × 1 1\/8″/.test(r.before.note) && /Finishes at 16″ × 12″ × 1 1\/8″/.test(r.after.note)
+      // The widths asked for are still shown; the note gives what the maple is milled to, a little under 1.
+      && r.before.asked.includes('1') && r.before.asked.includes('1/8') && /Hard maple 0\.9\d+″ wide/.test(r.before.fit) && /Mill the strips/.test(r.before.fit)
+      && /Hard maple 0\.9\d+″ wide/.test(r.after.fit) && r.broken === 0;
     if (!ok) throw new Error(JSON.stringify(r));
   }],
   ['the splitter is there and the side panel has a width between its limits', async () => {
@@ -214,7 +260,7 @@ const checks = [
   }],
   ['the Cut list and steps tab lists stock and numbered instructions', async () => {
     const r = await probe('preset=maple-purpleheart&tab=cutlist', `({ text: document.querySelector('.cutlist').innerText })`);
-    if (!/Hard maple/.test(r.text) || !/Purpleheart/.test(r.text) || !/Finish/.test(r.text) || !/board feet|bd ft|bf/i.test(r.text)) throw new Error(r.text.slice(0, 400));
+    if (!/Hard maple/.test(r.text) || !/Purpleheart/.test(r.text) || !/Rip the strips/.test(r.text) || !/Juice groove/.test(r.text) || !/Sand and oil/.test(r.text) || !/board feet|bd ft|bf/i.test(r.text)) throw new Error(r.text.slice(0, 400));
   }],
   ['the cut list has a units choice: Metric adds millimetres beside the inches, and Imperial off leaves millimetres only', async () => {
     const r = await probe('preset=brick&tab=cutlist', later(
@@ -227,6 +273,10 @@ const checks = [
       // Turning the last unit off turns the other on.
       && r.last.join() === 'true,false' && r.saved === '{"imperial":true,"metric":false}';
     if (!ok) throw new Error(JSON.stringify(r));
+  }],
+  ['the print preview page is as tall as its text, and the preview scrolls to reach the end of it', async () => {
+    const r = await probe('preset=brick&preview', `(() => { const sheet = document.querySelector('.print-sheet'), view = document.querySelector('.preview'); const last = sheet.querySelector('.cutlist ol li:last-child').getBoundingClientRect(); const page = sheet.getBoundingClientRect(); return { spill: sheet.scrollHeight - sheet.clientHeight, lastInside: last.bottom <= page.bottom + 1, scrolls: view.scrollHeight > view.clientHeight + 1 && getComputedStyle(view).overflowY === 'auto', window: innerHeight, page: Math.round(page.height) }; })()`);
+    if (r.spill > 1 || !r.lastInside || !r.scrolls || r.page <= r.window) throw new Error(JSON.stringify(r));
   }],
   ['print preview shows the sheet with its Print and Save as PDF buttons', async () => {
     const r = await probe('preset=brick&preview', `({ bar: document.querySelector('.preview-bar')?.innerText ?? '', sheet: document.querySelector('.print-sheet')?.innerText ?? '' })`);
@@ -270,8 +320,9 @@ const checks = [
   }],
   ['the illustrated sheet puts each step picture beside its instruction', async () => {
     const r = await probe('preset=brick&preview&pictures', `({ steps: [...document.querySelectorAll('.print-steps figure')].map((f) => ({ picture: !!f.querySelector('img')?.src.startsWith('data:image/png'), text: f.querySelector('figcaption').innerText })), plainList: !!document.querySelector('.print-sheet .cutlist ol') })`, ALL_PICTURES);
-    const ok = r.steps.length === 10 && r.steps.every((s) => s.picture) && !r.plainList
-      && /4\. Cross cut/.test(r.steps[3].text) && /13 slices/.test(r.steps[3].text) && /10\. Finish/.test(r.steps[9].text);
+    const ok = r.steps.length === 15 && r.steps.every((s) => s.picture) && !r.plainList
+      && /1\. Rip the strips/.test(r.steps[0].text) && /^Mill 7 Teak strips 2″ wide, /m.test(r.steps[0].text) && /2\. Glue up/.test(r.steps[1].text) && /^Glue them edge to edge/m.test(r.steps[1].text)
+      && /5\. Cross cut/.test(r.steps[4].text) && /13 slices/.test(r.steps[4].text) && /11\. Round the corners/.test(r.steps[10].text) && /14\. Juice groove/.test(r.steps[13].text) && /15\. Sand and oil/.test(r.steps[14].text);
     if (!ok) throw new Error(JSON.stringify(r).slice(0, 700));
   }],
   ['the board wizard offers its sizes as a single-select list', async () => {
@@ -280,28 +331,29 @@ const checks = [
       `({ count: radios().length, checked: radios().map((b) => b.getAttribute('aria-checked')) })`), WIZARD);
     if (r.count < 3 || r.checked.filter((c) => c === 'true').length !== 1 || r.checked[2] !== 'true') throw new Error(JSON.stringify(r));
   }],
-  ['the board wizard shows end-grain examples, each with a picture', async () => {
-    const r = await probe('wizard=end', `({ pictures: [...document.querySelectorAll('.wizard-examples img')].filter((i) => i.src.startsWith('data:image/png')).length })`, examples(4));
+  ['the board wizard draws a picture for each design', async () => {
+    const r = await probe('wizard=designs', `({ pictures: [...document.querySelectorAll('.wizard-examples img')].filter((i) => i.src.startsWith('data:image/png')).length })`, examples(4));
     if (r.pictures < 4) throw new Error(JSON.stringify(r));
   }],
-  ['the board wizard has two pages: size with a grain choice, then that grain\'s designs with the chess and double border boards among them', async () => {
+  ['the board wizard has two pages, size then design: each design is offered once, and no name or description says which grain', async () => {
     const r = await probe('wizard', later(
-      `const grains = () => [...document.querySelectorAll('.wizard-types [role=radio]')]; const first = { crumbs: [...document.querySelectorAll('.crumbs li')].map((e) => e.textContent), grains: grains().map((b) => b.querySelector('strong').textContent), checked: grains().map((b) => b.getAttribute('aria-checked')) }; grains()[1].click(); setTimeout(() => document.querySelector('.modal footer button.primary').click(), 100)`,
-      `({ first, labels: [...document.querySelectorAll('.wizard-examples strong')].map((e) => e.textContent), options: document.querySelectorAll('.modal select').length })`, 2500), WIZARD);
-    const ok = r.first.crumbs.join('|') === '1. Size and grain|2. Design' && r.first.grains.join('|') === 'End grain|Edge grain' && r.first.checked.join() === 'true,false'
-      && r.labels.length >= 3 && r.labels.at(-2) === 'Face-grain chess board' && r.labels.at(-1) === 'Face-grain double border' && r.options === 0;
+      `const first = { crumbs: [...document.querySelectorAll('.crumbs li')].map((e) => e.textContent), grains: document.querySelectorAll('.wizard-types').length }; document.querySelector('.modal footer button.primary').click()`,
+      `({ first, labels: [...document.querySelectorAll('.wizard-examples strong')].map((e) => e.textContent), blurbs: [...document.querySelectorAll('.wizard-examples span')].map((e) => e.textContent), options: document.querySelectorAll('.modal select').length })`, 3500), WIZARD);
+    const ok = r.first.crumbs.join('|') === '1. Size|2. Design' && r.first.grains === 0
+      && r.labels.length === 10 && new Set(r.labels).size === 10 && r.blurbs.length === 10 && ![...r.labels, ...r.blurbs].some((t) => /(end|edge|long)[ -]grain/i.test(t))
+      && r.labels.at(-2) === 'Chess board' && r.labels.at(-1) === 'Double border' && r.labels.slice(0, 5).join('|') === 'Single wood|Stripes|Stripes in a border|Grid|Checkerboard' && r.options === 0;
     if (!ok) throw new Error(JSON.stringify(r));
   }],
   ['picking the chess board opens it like any other design: eight squares as wide as the board asked for, named for its woods', async () => {
-    const r = await probe('wizard=end', later(
-      `const card = [...document.querySelectorAll('.wizard-examples button')].find((b) => /chess/.test(b.textContent)); const size = card.querySelector('small').textContent; card.click()`,
-      `({ size, wizard: !!document.querySelector('.modal'), name: document.title.replace(' - Cutting Boards', ''), info: document.querySelector('.overlay.info').innerText, broken: document.querySelectorAll('.step.broken').length })`, 800), examples(7));
+    const r = await probe('wizard=designs', later(
+      `const card = [...document.querySelectorAll('.wizard-examples button')].find((b) => b.querySelector('strong').textContent === 'Chess board'); const size = card.querySelector('small').textContent; card.click()`,
+      `({ size, wizard: !!document.querySelector('.modal'), name: document.title.replace(' - Cutting Boards', ''), info: document.querySelector('.overlay.info').innerText, broken: document.querySelectorAll('.step.broken').length })`, 800), examples(11));
     if (r.wizard || r.name !== 'Black walnut and hard maple chess board' || !/12″ × 12″/.test(r.size) || !/12″ × 12″/.test(r.info) || r.broken) throw new Error(JSON.stringify(r));
   }],
   ['picking the double border board opens it the same way, named for its three woods', async () => {
-    const r = await probe('wizard=end', later(
-      `const card = [...document.querySelectorAll('.wizard-examples button')].find((b) => /double border/.test(b.textContent)); const picture = !!card.querySelector('img')?.src.startsWith('data:image/png'); card.click()`,
-      `({ picture, wizard: !!document.querySelector('.modal'), name: document.title.replace(' - Cutting Boards', ''), broken: document.querySelectorAll('.step.broken').length })`, 800), examples(7));
+    const r = await probe('wizard=designs', later(
+      `const card = [...document.querySelectorAll('.wizard-examples button')].find((b) => b.querySelector('strong').textContent === 'Double border'); const picture = !!card.querySelector('img')?.src.startsWith('data:image/png'); card.click()`,
+      `({ picture, wizard: !!document.querySelector('.modal'), name: document.title.replace(' - Cutting Boards', ''), broken: document.querySelectorAll('.step.broken').length })`, 800), examples(11));
     if (!r.picture || r.wizard || r.name !== 'Hard maple, black walnut and white oak double border' || r.broken) throw new Error(JSON.stringify(r));
   }],
   ['the app icon files exist', async () => {

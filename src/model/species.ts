@@ -24,7 +24,11 @@ export function allSpecies(design: Design): Species[] {
   return [...BUILTIN_SPECIES, ...design.customSpecies];
 }
 
+/** What a routing template is made of. Not a wood of the board: it is in no picker, name or cut list. */
+export const TEMPLATE_WOOD = 'template';
+const TEMPLATE: Species = { id: TEMPLATE_WOOD, name: 'Template (MDF or plywood)', color: '#b79f7b' };
+
 /** Look a wood up by id. A missing id gets a grey placeholder so a design with a deleted custom wood still draws. */
 export function speciesById(list: Species[], id: string): Species {
-  return list.find((s) => s.id === id) ?? { id, name: id, color: '#999999' };
+  return list.find((s) => s.id === id) ?? (id === TEMPLATE_WOOD ? TEMPLATE : { id, name: id, color: '#999999' });
 }

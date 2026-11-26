@@ -1,11 +1,13 @@
+import { makeDesign, type Parts } from './design';
 import { DEFAULT_FINISH } from './finish';
 import { withAutoName } from './naming';
 import { BUILTIN_SPECIES } from './species';
 import type { Design, Selector, Step, StripSpec } from './types';
 
-let counter = 0;
-/** A unique id for a strip, step or custom wood, used as a stable list key. */
-export const newId = () => `${Date.now().toString(36)}-${(counter++).toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+import { newId } from './ids';
+
+export { newId } from './ids';
+export { newStep } from './pipeline';
 
 /** Shorthand for one strip in a preset. */
 const strip = (species: string, width: number): StripSpec => ({ id: newId(), species, width });
@@ -16,26 +18,28 @@ type StepInit = Step extends infer S ? (S extends { id: string } ? Omit<S, 'id'>
 /** Give each preset step a fresh id. */
 const steps = (...list: StepInit[]): Step[] => list.map((s) => ({ ...s, id: newId() }) as Step);
 
-/** Which face of the wood ends up on top of the finished board. */
-export type BoardType = 'end' | 'edge';
-
 export interface Preset {
   key: string;
-  type: BoardType;
   /** The pattern, as it appears in the design's name. */
   style: string;
+  /** The design's name and what it is, as the lists of designs show them. Neither says which grain is on top: that is chosen on the board, not by picking a design. */
   label: string;
   blurb: string;
+  /**
+   * True for a starter that is another one in the other grain. It is left out of the lists of
+   * designs, since the grain is a switch on the board, but still opens by its key.
+   */
+  twin?: boolean;
   make: () => Design;
 }
 
-const STARTERS: Preset[] = [
+/** A starter as it is written here: its strips and the steps after the first glue-up, or a whole design. */
+const STARTERS: (Omit<Preset, 'make'> & { make: () => Parts | Design })[] = [
   {
     key: 'single-end-grain',
     style: 'end grain',
-    type: 'end',
-    label: 'Single-wood end grain',
-    blurb: 'The classic butcher block: one species, end grain up, every other slice reversed to mix the grain.',
+    label: 'Single wood',
+    blurb: 'One species all through: the plain butcher block.',
     make: () => ({
       version: 1,
       name: 'Maple end grain',
@@ -60,9 +64,9 @@ const STARTERS: Preset[] = [
   {
     key: 'single-edge-grain',
     style: 'edge grain',
-    type: 'edge',
-    label: 'Single-wood edge grain',
-    blurb: 'Plain and quick: strips of one species glued side by side, trimmed and flattened.',
+    label: 'Single wood, strips',
+    blurb: 'Strips of one species glued side by side, trimmed and flattened.',
+    twin: true,
     make: () => ({
       version: 1,
       name: 'Walnut edge grain',
@@ -81,9 +85,8 @@ const STARTERS: Preset[] = [
   {
     key: 'edge-grain-stripes',
     style: 'stripes',
-    type: 'edge',
-    label: 'Edge-grain stripes',
-    blurb: 'The simplest board: one glue-up of long strips, no cross cut. Wide maple and cherry with thin walnut lines.',
+    label: 'Stripes',
+    blurb: 'Wide maple and cherry strips with thin walnut lines between them.',
     make: () => ({
       version: 1,
       name: 'Edge-grain stripes',
@@ -102,9 +105,8 @@ const STARTERS: Preset[] = [
   {
     key: 'edge-grain-border',
     style: 'stripes with a border',
-    type: 'edge',
-    label: 'Edge grain with a border',
-    blurb: 'Long grain. 1″ maple strips with 1/8″ purpleheart lines, trimmed square, then a 1″ purpleheart border glued round it. The ends of the border cross the grain of the strips, so keep the board dry and oiled.',
+    label: 'Stripes in a border',
+    blurb: '1″ maple strips with 1/8″ purpleheart lines, trimmed square, then a 1″ purpleheart border glued round it. The ends of the border cross the grain of the strips, so keep the board dry and oiled.',
     make: () => ({
       version: 1,
       name: 'Edge grain with a border',
@@ -128,9 +130,8 @@ const STARTERS: Preset[] = [
   {
     key: 'maple-purpleheart',
     style: 'grid',
-    type: 'end',
-    label: 'Maple blocks, purpleheart grid',
-    blurb: 'End grain. 1″ maple squares with 1/8″ purpleheart lines both ways.',
+    label: 'Grid',
+    blurb: '1″ maple squares with 1/8″ purpleheart lines both ways.',
     make: () => ({
       version: 1,
       name: 'Maple blocks, purpleheart grid',
@@ -155,9 +156,8 @@ const STARTERS: Preset[] = [
   {
     key: 'checkerboard',
     style: 'checkerboard',
-    type: 'end',
-    label: 'Walnut and maple checkerboard',
-    blurb: 'End grain. Flip every other slice end for end.',
+    label: 'Checkerboard',
+    blurb: 'Walnut and maple squares, turn about, as many as the size takes.',
     make: () => ({
       version: 1,
       name: 'Walnut and maple checkerboard',
@@ -182,9 +182,8 @@ const STARTERS: Preset[] = [
   {
     key: 'brick',
     style: 'brick',
-    type: 'end',
     label: 'Brick (running bond)',
-    blurb: 'End grain, one species. Every other slice slides half a block; trim the ragged edges.',
+    blurb: 'One species. Every other row slides half a block, like brickwork.',
     make: () => ({
       version: 1,
       name: 'Teak brick',
@@ -210,7 +209,6 @@ const STARTERS: Preset[] = [
   {
     key: 'basket-weave',
     style: 'basket weave',
-    type: 'end',
     label: 'Basket weave',
     blurb: 'Walnut bars woven over and under, a maple square at every crossing, a cherry line round everything, in a walnut border. Two panels, each cross cut, then interleaved.',
     make: () => basketWeave(),
@@ -218,9 +216,8 @@ const STARTERS: Preset[] = [
   {
     key: 'chevron',
     style: 'chevron',
-    type: 'edge',
     label: 'Chevron',
-    blurb: 'Long grain. Cross cut at 45°, flip every other slice face down, trim.',
+    blurb: 'Three woods cut at 45° and flipped into zigzags.',
     make: () => ({
       version: 1,
       name: 'Three-wood chevron',
@@ -243,40 +240,29 @@ const STARTERS: Preset[] = [
   },
 ];
 
-/** The design a first launch opens with. */
 /**
- * The starter designs. Each one's `make` returns a fresh design that knows its pattern and is
+ * The starter designs. None is labelled end grain or edge grain: that follows from its steps
+ * (see `grainOf`), and is changed by adding or taking out the step that stands the slices up.
+ * Each one's `make` returns a fresh design that knows its pattern and is
  * named from its woods, so the name follows when the woods are changed.
  */
+/** The starters the lists of designs offer: each design once, whichever grain it starts in. */
+export const designs = (): Preset[] => PRESETS.filter((p) => !p.twin);
+
 export const PRESETS: Preset[] = STARTERS.map((p) => ({
   ...p,
-  make: () => withAutoName({ ...p.make(), style: p.style, autoName: true }, BUILTIN_SPECIES),
+  make: () => {
+    const made = p.make();
+    return withAutoName({ ...('layup' in made ? makeDesign(made) : made), style: p.style, autoName: true }, BUILTIN_SPECIES);
+  },
 }));
 
+/** The design a first launch opens with. */
 export const defaultDesign = (): Design => PRESETS.find((p) => p.key === 'maple-purpleheart')!.make();
 
-/** A step of the given type with sensible starting values, for the "Add a step" buttons. */
-export function newStep(type: Step['type']): Step {
-  const id = newId();
-  switch (type) {
-    case 'crosscut': return { id, type, width: 1.25, kerf: 0.125, angle: 0 };
-    case 'turn': return { id, type, sel: { mode: 'all' } };
-    case 'flip': return { id, type, sel: { mode: 'every', n: 2, offset: 1 }, how: 'end' };
-    case 'shift': return { id, type, sel: { mode: 'every', n: 2, offset: 1 }, amount: 0.5 };
-    case 'insert': return { id, type, species: 'walnut', thickness: 0.125, every: 1 };
-    case 'glue': return { id, type };
-    case 'trim': return { id, type, auto: true, x0: 0, x1: 0, z0: 0, z1: 0 };
-    case 'flatten': return { id, type, top: 0.0625, bottom: 0.0625 };
-    case 'rotate': return { id, type };
-    case 'frame': return { id, type, species: 'walnut', width: 1.5, lineSpecies: 'maple', line: 0.125, block: 3 };
-    case 'panel': return { id, type, strips: [{ id: newId(), species: 'walnut', width: 1 }, { id: newId(), species: 'maple', width: 1 }], thickness: 0.875, extra: 0 };
-    case 'combine': return { id, type };
-  }
-}
-
 /**
- * The design with a step put in after stage `at` (0 is the first glue-up, so 0 makes it the first
- * step). Positions past the end, such as the Finish stage, add it as the last step.
+ * The design with a step put in at position `at` of its steps, so after step `at - 1`. Positions
+ * past the end, such as a finishing stage, add it as the last step.
  */
 export function insertStep(design: Design, at: number, step: Step): Design {
   const i = Math.min(Math.max(0, Math.floor(at)), design.steps.length);
@@ -314,7 +300,7 @@ export function chessBoard(o: ChessOptions): Design {
   const cut = end ? o.thickness + 2 * flat : o.square;
   const flatten = { type: 'flatten', top: flat, bottom: flat } as const;
   const side = o.square * CHESS_SQUARES;
-  return withAutoName({
+  return withAutoName(makeDesign({
     version: 1,
     name: 'Chess board',
     style: 'chess board',
@@ -339,7 +325,7 @@ export function chessBoard(o: ChessOptions): Design {
       flatten,
     ),
     customSpecies: [],
-  }, BUILTIN_SPECIES);
+  }), BUILTIN_SPECIES);
 }
 
 export interface DoubleBorderOptions {
@@ -396,7 +382,7 @@ export function doubleBorder(o: DoubleBorderOptions): Design {
   const flatten = { type: 'flatten', top: flat, bottom: flat } as const;
   const cell = o.block + 2 * o.line;
   const wide = across * cell + (across + 1) * o.line, long = along * cell + (along + 1) * o.line;
-  return withAutoName({
+  return withAutoName(makeDesign({
     version: 1,
     name: 'Double border',
     style: 'double border',
@@ -427,7 +413,7 @@ export function doubleBorder(o: DoubleBorderOptions): Design {
       { type: 'trim', auto: false, x0: 0, x1: 0, z0: o.line, z1: o.line },
     ),
     customSpecies: [],
-  }, BUILTIN_SPECIES);
+  }), BUILTIN_SPECIES);
 }
 
 /**
@@ -498,7 +484,7 @@ export function basketWeave(o: BasketWeaveOptions = {}): Design {
   const rows = along + 1;
   const flatten = { type: 'flatten', top: flat, bottom: flat } as const;
   const grown = border ? 2 * (W + t) : 0;
-  return withAutoName({
+  return withAutoName(makeDesign({
     version: 1,
     name: 'Basket weave',
     style: 'basket weave',
@@ -542,5 +528,5 @@ export function basketWeave(o: BasketWeaveOptions = {}): Design {
       ...(border ? [{ type: 'frame', species: bars, width: W, lineSpecies: lines, line: t, block: W + 2 * t + 4 * h } as const, flatten] : []),
     ),
     customSpecies: [],
-  }, BUILTIN_SPECIES);
+  }), BUILTIN_SPECIES);
 }

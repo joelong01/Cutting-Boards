@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fitThickness, fitToTarget } from '../model/fit';
-import { convertGrain } from '../model/grain';
 import { inches } from '../model/fractions';
 import { run } from '../model/pipeline';
-import { CHESS_SQUARES, PRESETS, chessBoard, doubleBorder, doubleBorderCount, type BoardType } from '../model/presets';
+import { CHESS_SQUARES, chessBoard, designs, doubleBorder, doubleBorderCount } from '../model/presets';
 import type { Design, Stage } from '../model/types';
 import { Len } from './inputs';
 
 interface Props {
   /** Starting size, normally the current design's target. */
   initial: Design['target'];
-  /** Open straight at the designs for this grain; used by the smoke test. */
-  startType?: BoardType;
+  /** Open straight at the designs page; used by the smoke test. */
+  startAtDesigns?: boolean;
   /** Render a stage to a PNG data URL, for the example thumbnails. */
   snapshot: (stage: Stage) => string;
   onCreate: (design: Design) => void;
@@ -23,19 +22,6 @@ const COMMON_SIZES: { label: string; size: Design['target'] }[] = [
   { label: 'Everyday', size: { length: 16, width: 12, thickness: 1.25 } },
   { label: 'Large', size: { length: 18, width: 12, thickness: 1.5 } },
   { label: 'Butcher block', size: { length: 20, width: 16, thickness: 2 } },
-];
-
-const GRAINS: { type: BoardType; title: string; text: string }[] = [
-  {
-    type: 'end',
-    title: 'End grain',
-    text: 'Blocks standing on end, fibres pointing up. Easiest on knife edges and hides cuts best. Two glue-ups: strips into a panel, then cross-cut slices turned up and glued again.',
-  },
-  {
-    type: 'edge',
-    title: 'Edge grain',
-    text: 'Long strips glued side by side, fibres running the length of the board. One glue-up, less wood lost to the saw, and the quickest board to make. Shows knife marks sooner.',
-  },
 ];
 
 /** One design the wizard offers on its last page, before it is built and drawn. */
@@ -57,30 +43,6 @@ function sized(base: Design, target: Design['target']): Design {
   return fitThickness(fitToTarget({ ...base, target }));
 }
 
-/** What changes when a starter design is built the other way up, said on its card. */
-const OTHER_WAY: Record<BoardType, string> = {
-  edge: 'The same pattern with the slices left lying flat, so the top is long grain and the stock is thinner. The ends of the blocks are glued to each other and any cross strips run across the grain: weaker joints, and the board can crack as it moves with the seasons. Keep it dry and oiled.',
-  end: 'The same pattern cut into slices and stood on end, so the top is end grain: kinder to knives, and it hides cut marks.',
-};
-
-/**
- * Every starter pattern built with `grain` up: the ones made that way as they are, and the others
- * turned round by `convertGrain`. The single-wood designs are left out the other way up, since each
- * is then just the other one; so are the recipes `convertGrain` cannot turn round.
- */
-function starters(grain: BoardType, target: Design['target']): Candidate[] {
-  return PRESETS.flatMap((p): Candidate[] => {
-    if (p.type === grain) return [{ key: p.key, label: p.label, blurb: p.blurb, make: () => sized(p.make(), target) }];
-    if (p.key.startsWith('single-') || !convertGrain(p.make(), grain)) return [];
-    return [{
-      key: `${p.key}-${grain}`,
-      label: `${p.label}, ${grain} grain`,
-      blurb: OTHER_WAY[grain],
-      make: () => sized(convertGrain(p.make(), grain)!, target),
-    }];
-  });
-}
-
 /** Whether two board sizes are the same, so the matching common-size button can be highlighted. */
 const sameSize = (a: Design['target'], b: Design['target']) =>
   Math.abs(a.length - b.length) < 1e-6 && Math.abs(a.width - b.width) < 1e-6 && Math.abs(a.thickness - b.thickness) < 1e-6;
@@ -98,45 +60,39 @@ const chessSquare = (target: Design['target']) =>
   Math.max(0.5, Math.round(Math.min(target.length, target.width)) / CHESS_SQUARES);
 
 /**
- * Two-page dialog for starting a board. The first page asks for its size and which grain faces
- * up; the second offers the designs of that grain, built to the size asked for. Picking one opens
- * it for editing, where its woods and sizes are changed like any other board's. The chess board
- * is eight squares each way, as wide as the board asked for; the double border board is a whole
- * number of blocks, the nearest to the size.
+ * Two-page dialog for starting a board. The first page asks for its size; the second offers every
+ * design once, built to that size, named and described without a word about grain. Picking one opens it for editing, where its woods, its sizes
+ * and which grain is on top are changed like any other board's: end grain or edge grain is not a
+ * kind of board here, only whether the recipe stands the slices up. The chess board is eight
+ * squares each way, as wide as the board asked for; the double border board is a whole number of
+ * blocks, the nearest to the size.
  */
-export function BoardWizard({ initial, startType, snapshot, onCreate, onClose }: Props) {
+export function BoardWizard({ initial, startAtDesigns, snapshot, onCreate, onClose }: Props) {
   const [target, setTarget] = useState(initial);
-  const [grain, setGrain] = useState<BoardType>(startType ?? 'end');
-  const [page, setPage] = useState<1 | 2>(startType ? 2 : 1);
+  const [page, setPage] = useState<1 | 2>(startAtDesigns ? 2 : 1);
   const [examples, setExamples] = useState<Example[]>([]);
 
   const candidates = useMemo<Candidate[]>(() => {
-    // Slices not turned on end show face grain; that is the edge-grain way to make these two.
-    const way = grain === 'end' ? 'end' : 'face';
     const blocks = {
       along: doubleBorderCount(target.length, DOUBLE.block, DOUBLE.line),
       across: doubleBorderCount(target.width, DOUBLE.block, DOUBLE.line),
     };
     return [
-      ...starters(grain, target),
+      ...designs().map((p) => ({ key: p.key, label: p.label, blurb: p.blurb, make: () => sized(p.make(), target) })),
       {
-        key: `chess-${way}`,
-        label: way === 'end' ? 'End-grain chess board' : 'Face-grain chess board',
-        blurb: way === 'end'
-          ? 'Eight squares each way, as wide as the board asked for. Two glue-ups: eight strips, then eight slices turned on end with every other one turned end for end.'
-          : 'Eight squares each way, as wide as the board asked for, from thinner stock: eight strips, cross cut into eight slices, every other one turned end for end. Solid wood this wide moves with the seasons, so do not glue it into a tight frame.',
-        make: () => chessBoard({ ...CHESS, square: chessSquare(target), thickness: target.thickness, grain: way }),
+        key: 'chess',
+        label: 'Chess board',
+        blurb: 'For playing on: exactly eight squares each way, so the board is square, as wide as the width asked for.',
+        make: () => chessBoard({ ...CHESS, square: chessSquare(target), thickness: target.thickness, grain: 'end' }),
       },
       {
-        key: `double-${way}`,
-        label: way === 'end' ? 'End-grain double border' : 'Face-grain double border',
-        blurb: way === 'end'
-          ? 'Maple blocks, each ringed with walnut, in a white oak grid. Three glue-ups: strips with a cheap spacer in them, then slices turned on end with a three-strip stack between them, then the panel sawn through each spacer and the oak glued into the kerfs.'
-          : 'Maple blocks, each ringed with walnut, in a white oak grid: three glue-ups without turning the slices up, from thinner stock. Solid wood this wide moves with the seasons, so do not glue it into a tight frame.',
-        make: () => doubleBorder({ ...DOUBLE, ...blocks, thickness: target.thickness, grain: way }),
+        key: 'double',
+        label: 'Double border',
+        blurb: 'Maple blocks, each ringed with walnut, in a white oak grid. Three glue-ups: strips with a cheap spacer in them, then slices turned on end with a three-strip stack between them, then the panel sawn through each spacer and the oak glued into the kerfs.',
+        make: () => doubleBorder({ ...DOUBLE, ...blocks, thickness: target.thickness, grain: 'end' }),
       },
     ];
-  }, [grain, target]);
+  }, [target]);
 
   // Sizing and drawing an example takes a moment, so add them one per tick: the page paints
   // first and each card appears as it is ready, instead of the dialog freezing until all are done.
@@ -176,7 +132,7 @@ export function BoardWizard({ initial, startType, snapshot, onCreate, onClose }:
         <header>
           <h2>New board</h2>
           <ol className="crumbs">
-            <li className={page === 1 ? 'on' : ''} onClick={() => setPage(1)}>1. Size and grain</li>
+            <li className={page === 1 ? 'on' : ''} onClick={() => setPage(1)}>1. Size</li>
             <li className={page === 2 ? 'on' : ''} onClick={() => setPage(2)}>2. Design</li>
           </ol>
           <button onClick={onClose} title="Close (Esc)">✕</button>
@@ -204,15 +160,6 @@ export function BoardWizard({ initial, startType, snapshot, onCreate, onClose }:
                 </button>
               ))}
             </div>
-            <p>Which grain faces up?</p>
-            <div className="wizard-types" role="radiogroup" aria-label="Grain">
-              {GRAINS.map((g) => (
-                <button key={g.type} role="radio" aria-checked={grain === g.type} className={grain === g.type ? 'on' : ''} onClick={() => setGrain(g.type)}>
-                  <strong>{g.title}</strong>
-                  <span>{g.text}</span>
-                </button>
-              ))}
-            </div>
             <footer>
               <button className="primary" onClick={() => setPage(2)}>Next: design ▶</button>
             </footer>
@@ -222,9 +169,9 @@ export function BoardWizard({ initial, startType, snapshot, onCreate, onClose }:
         {page === 2 && (
           <section>
             <p>
-              {grain === 'end' ? 'End-grain' : 'Edge-grain'} boards, built as close to{' '}
-              {inches(target.length)} × {inches(target.width)} × {inches(target.thickness)} as their block sizes allow.
-              Pick one to start from; its woods and everything else in it can be changed.
+              Pick a design. Each is drawn at{' '}
+              {inches(target.length)} × {inches(target.width)} × {inches(target.thickness)}, or as close as its pattern allows.
+              End grain or edge grain is chosen afterwards, on the board, along with its woods and sizes.
             </p>
             {examples.length < candidates.length && <p className="note">Drawing examples… {examples.length} of {candidates.length}</p>}
             <div className="wizard-examples">
@@ -237,7 +184,7 @@ export function BoardWizard({ initial, startType, snapshot, onCreate, onClose }:
                 </button>
               ))}
             </div>
-            <footer><button onClick={() => setPage(1)}>◀ Size and grain</button></footer>
+            <footer><button onClick={() => setPage(1)}>◀ Size</button></footer>
           </section>
         )}
       </div>

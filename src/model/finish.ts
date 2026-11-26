@@ -1,13 +1,15 @@
-import { bbox, clip, dot, faceNormal, normalize, volume, type Box3 } from './geometry';
+import { bbox, box, clip, dot, faceNormal, normalize, volume, type Box3 } from './geometry';
 import { inches } from './fractions';
-import type { Design, Finish, Piece, Plane, Stage, Vec3 } from './types';
+import { TEMPLATE_WOOD } from './species';
+import type { Design, Finish, FinishPart, Piece, Plane, Vec3 } from './types';
 
 /** The usual finishing touches at ordinary sizes, all on unless turned off. */
-export const DEFAULT_FINISH: Finish = {
+export const DEFAULT_FINISH: Required<Finish> = {
   groove: { on: true, inset: 0.75, width: 0.5, depth: 0.25, cornerRadius: 0, align: true },
   chamfer: { on: true, size: 0.25 },
   corners: { on: true, radius: 0.5 },
   roundover: { on: true, radius: 0.125 },
+  template: { on: false, stripWidth: 2, thickness: 0.5 },
 };
 
 export const NO_FINISH: Finish = {
@@ -15,11 +17,13 @@ export const NO_FINISH: Finish = {
   chamfer: { ...DEFAULT_FINISH.chamfer, on: false },
   corners: { ...DEFAULT_FINISH.corners, on: false },
   roundover: { ...DEFAULT_FINISH.roundover, on: false },
+  template: { ...DEFAULT_FINISH.template, on: false },
 };
 
 /** The finishing options of a design, with the defaults filled in for designs that predate them. */
-export function finishOf(design: Pick<Design, 'finish'>): Finish {
+export function finishOf(design: Pick<Design, 'finish'>): Required<Finish> {
   return {
+    template: { ...DEFAULT_FINISH.template, ...design.finish?.template },
     groove: { ...DEFAULT_FINISH.groove, ...design.finish?.groove },
     chamfer: { ...DEFAULT_FINISH.chamfer, ...design.finish?.chamfer },
     corners: { ...DEFAULT_FINISH.corners, ...design.finish?.corners },
@@ -179,6 +183,9 @@ export function patternLines(pieces: Piece[], axis: 0 | 2, size: number, otherSi
   return [...lines].sort((a, b) => a - b).map((k) => k / 1e4);
 }
 
+/** A groove lined up with the pattern is set this many steps to the inch from the edge: eighths, which a rule and a jig can be set to. */
+const GROOVE_STEP = 8;
+
 /**
  * The best place, near `want`, for the centre line of a groove of the given width running along
  * one side of the board: the middle of a row of blocks or of an accent strip, so the groove sits
@@ -242,23 +249,44 @@ function sidePlanes(X: number, Z: number, cornerRadius: number): { sides: Plane[
   return { sides, facets };
 }
 
+/** A panel with finishing touches cut into it, and what to say about each. */
+export interface Finished {
+  pieces: Piece[];
+  /** The instruction for each touch that was done. */
+  done: Partial<Record<FinishPart, string>>;
+  /** Why each touch that was asked for and does not fit was left off. */
+  skipped: Partial<Record<FinishPart, string>>;
+  /** The pieces of the groove's template, lying on top of the board, when one is asked for and fits. They are not part of the board. */
+  template?: Piece[];
+}
+
+/** The finishing touches, in the order they are done at the bench and checked against each other. */
+export const FINISH_PARTS: FinishPart[] = ['corners', 'chamfer', 'roundover', 'template', 'groove'];
+
 /**
- * The finished board: the last glued panel with its corners rounded, its bottom edges chamfered,
- * its top edges rounded over and a juice groove routed in the top, as the design's finishing
- * options ask. Curves are drawn as short flat facets. Returns null when there is nothing to do
- * (every option off, or the recipe does not end in a sound panel). An option that does not fit
- * the board is skipped and reported in the stage's warning, so the picture never shows a cut that
- * could not be made.
- *
- * Every piece is given its `origin` planes first, with the board's own six faces marked `outer`,
- * so the view can draw glue lines and block edges but not the facet lines of the curves.
+ * Cut the finishing touches that are turned on in `finish` into a panel `size` big made of the
+ * pieces `before`: rounded corners, a chamfer round the bottom, a roundover round the top and a
+ * juice groove. They are worked out together because each depends on the ones before it. A touch
+ * that does not fit is left off and its reason given. The groove's template, when on, cuts nothing:
+ * its pieces come back separately, placed from where the groove goes (which is worked out for it
+ * even while the groove itself is not yet cut), and it changes how the groove turns its corners. Every piece that comes back carries
+ * `origin`, the planes of its block before any of these cuts, which the view uses to tell real
+ * edges and glue lines from the facets of a rounded edge.
  */
-export function applyFinish(prev: Stage, finish: Finish): Stage | null {
-  if (prev.kind !== 'panel' || prev.error) return null;
-  if (!finish.groove.on && !finish.chamfer.on && !finish.corners.on && !finish.roundover.on) return null;
-  const [X, T, Z] = prev.size;
-  const done: string[] = [];
-  const skipped: string[] = [];
+export function finishPanel(size: Vec3, before: Piece[], finish: Finish): Finished {
+  const [X, T, Z] = size;
+  const done: Finished['done'] = {};
+  const skipped: Finished['skipped'] = {};
+  // Which touch the sentences being written belong to.
+  let part: FinishPart = 'corners';
+  /** Record the instruction for the touch in hand. */
+  const say = (text: string) => {
+    done[part] = text;
+  };
+  /** Record why the touch in hand was left off. */
+  const skip = (text: string) => {
+    skipped[part] = text;
+  };
 
   /** Whether a plane is one of the six faces of the whole board. */
   const isOuter = ({ n, d }: Plane) => {
@@ -269,7 +297,7 @@ export function applyFinish(prev: Stage, finish: Finish): Stage | null {
     }
     return false;
   };
-  let pieces: Piece[] = prev.slices[0].pieces.map((p) => ({
+  let pieces: Piece[] = before.map((p) => ({
     ...p,
     origin: planesOf(p).map((pl) => ({ ...pl, outer: isOuter(pl) })),
   }));
@@ -278,28 +306,33 @@ export function applyFinish(prev: Stage, finish: Finish): Stage | null {
   let r = 0;
   if (finish.corners.on) {
     if (!(finish.corners.radius > 0) || finish.corners.radius > Math.min(X, Z) / 2 - 0.25) {
-      skipped.push(`Corners of ${inches(finish.corners.radius)} radius do not fit a board ${inches(Math.min(X, Z))} wide.`);
+      skip(`Corners of ${inches(finish.corners.radius)} radius do not fit a board ${inches(Math.min(X, Z))} wide.`);
     } else {
       r = finish.corners.radius;
-      done.push(`Round the four corners to a ${inches(r)} radius: mark them from a template, saw outside the line and sand to it.`);
+      say(`Round the four corners to a ${inches(r)} radius: mark them from a template, saw outside the line and sand to it.`);
     }
   }
+  part = 'chamfer';
   let c = 0;
   if (finish.chamfer.on) {
     if (!(finish.chamfer.size > 0) || finish.chamfer.size > T / 2 || finish.chamfer.size > Math.min(X, Z) / 4) {
-      skipped.push(`A ${inches(finish.chamfer.size)} chamfer does not fit a board ${inches(T)} thick.`);
+      skip(`A ${inches(finish.chamfer.size)} chamfer does not fit a board ${inches(T)} thick.`);
     } else {
       c = finish.chamfer.size;
-      done.push(`Chamfer the bottom edges ${inches(c)} at 45° all the way round, so fingers can get under the board.`);
+      say(`Chamfer the bottom edges ${inches(c)} at 45° all the way round, so fingers can get under the board.`);
     }
   }
+  part = 'roundover';
   let ro = 0;
   if (finish.roundover.on) {
     if (!(finish.roundover.radius > 0) || finish.roundover.radius > T - c - 1 / 16 || finish.roundover.radius > Math.min(X, Z) / 4) {
-      skipped.push(`A ${inches(finish.roundover.radius)} roundover does not fit a board ${inches(T)} thick.`);
+      // Say what is in the way and the biggest bit that would work, so the next try is not a guess.
+      const most = Math.floor(Math.min(T - c - 1 / 16, Math.min(X, Z) / 4) * 16) / 16;
+      const why = c ? `a board ${inches(T)} thick with a ${inches(c)} chamfer underneath` : `a board ${inches(T)} thick`;
+      skip(`Not cut: a ${inches(finish.roundover.radius)} roundover does not fit ${why}. The largest that fits is ${inches(most)}.`);
     } else {
       ro = finish.roundover.radius;
-      done.push(`Round over the top edges all the way round with a ${inches(ro)} roundover bit.`);
+      say(`Round over the top edges all the way round with a ${inches(ro)} roundover bit.`);
     }
   }
 
@@ -331,34 +364,55 @@ export function applyFinish(prev: Stage, finish: Finish): Stage | null {
   }
 
   // ---- juice groove
-  if (finish.groove.on) {
+  part = 'groove';
+  const tpl = finish.template?.on ? finish.template : undefined;
+  let template: Piece[] | undefined;
+  /** Leave the groove off, and with it the template that guides it. */
+  const refuse = (why: string) => {
+    if (finish.groove.on) skipped.groove = why;
+    if (tpl) skipped.template = `No template: the groove it guides does not fit. ${why}`;
+  };
+  if (finish.groove.on || tpl) {
     const { inset, width, depth } = finish.groove;
     const a = width / 2;
     // The path of the centre of the bit: a rectangle, its corners turned at radius rc. Each side
     // starts `inset` in from its edge and, when aligning, moves to sit evenly on the pattern.
     let x0 = inset + a, x1 = X - inset - a, z0 = inset + a, z1 = Z - inset - a;
     if (finish.groove.align && width > 0) {
-      const before = prev.slices[0].pieces;
       const minWall = Math.max(0.375, ro + 1 / 16);
       const xs = patternLines(before, 0, X, Z), zs = patternLines(before, 2, Z, X);
       x0 = alignGroove(xs, x0, width, minWall, true);
       x1 = alignGroove(xs, x1, width, minWall, false);
       z0 = alignGroove(zs, z0, width, minWall, true);
       z1 = alignGroove(zs, z1, width, minWall, false);
+      // The middle of a row is rarely a distance a jig can be set to (0.762″), so each one is moved
+      // to the nearest 1/8″ from its edge, never closer to the edge than the wall allows. The
+      // groove is drawn where the instruction says, at most 1/16″ off the true middle.
+      /** A distance from the edge to the groove's outer edge, on the nearest 1/8″ that leaves the wall. */
+      const settable = (wall: number) => {
+        const near = Math.round(wall * GROOVE_STEP) / GROOVE_STEP;
+        return near < minWall - 1e-9 ? Math.ceil(minWall * GROOVE_STEP - 1e-9) / GROOVE_STEP : near;
+      };
+      x0 = settable(x0 - a) + a;
+      x1 = X - a - settable(X - x1 - a);
+      z0 = settable(z0 - a) + a;
+      z1 = Z - a - settable(Z - z1 - a);
     }
     // Distance from each edge of the board to the groove's outer edge, as the jig must be set.
     const walls = { ends: [x0 - a, X - x1 - a], sides: [z0 - a, Z - z1 - a] };
     const wall = Math.min(...walls.ends, ...walls.sides);
     const room = Math.min(x1 - x0, z1 - z0) - width;
-    const rc = Math.max(0, finish.groove.cornerRadius);
+    // A bearing rolling round the square corner of a template carries the centre of the bit round
+    // it at the bearing's own radius, so with a template the path never turns tighter than that.
+    const rc = Math.max(0, finish.groove.cornerRadius, tpl ? a : 0);
     if (!(width > 0) || !(depth > 0) || !(inset >= 0) || room < 2 || depth > T - 0.25 || depth > width || wall < ro) {
-      skipped.push(room < 2
+      refuse(room < 2
         ? `A juice groove ${inches(inset)} in from the edge leaves no room on a board ${inches(Math.min(X, Z))} wide.`
         : wall < ro
           ? `A juice groove ${inches(wall)} from the edge would cut into the ${inches(ro)} rounded edge.`
           : `A juice groove ${inches(depth)} deep does not fit: it must be no deeper than it is wide and leave 1/4″ of board under it.`);
     } else if (rc > Math.min(x1 - x0, z1 - z0) / 2) {
-      skipped.push(`A juice groove with ${inches(rc)} corners does not fit: the corners would meet.`);
+      refuse(`A juice groove with ${inches(rc)} corners does not fit: the corners would meet.`);
     } else {
       // Four straight runs between the corners, then the four corners, each a quarter turn.
       const regions: { region: Plane[]; min: Vec3; max: Vec3 }[] = [
@@ -374,7 +428,7 @@ export function applyFinish(prev: Stage, finish: Finish): Stage | null {
           regions.push({ region, min: [cx - reach, T - depth, cz - reach], max: [cx + reach, T, cz + reach] });
         }
       }
-      for (const { region, min, max } of regions) {
+      for (const { region, min, max } of finish.groove.on ? regions : []) {
         const out: Piece[] = [];
         for (const p of pieces) {
           if (!overlaps(bbox([p]), min, max)) out.push(p);
@@ -386,25 +440,51 @@ export function applyFinish(prev: Stage, finish: Finish): Stage | null {
       const pair = (v: number[]) => (Math.abs(v[0] - v[1]) < 1e-6 ? inches(v[0]) : `${inches(v[0])} and ${inches(v[1])}`);
       const even = Math.abs(walls.ends[0] - walls.ends[1]) < 1e-6 && Math.abs(walls.sides[0] - walls.sides[1]) < 1e-6
         && Math.abs(walls.ends[0] - walls.sides[0]) < 1e-6;
-      done.push(`Rout a juice groove in the top with a ${inches(width)} round-bottomed bit, ${inches(depth)} deep, `
+      if (tpl) {
+        // The bearing is taken to be the same diameter as the cutter, so the template's outside
+        // edge is the groove's inner edge.
+        const ix0 = x0 + a, ix1 = x1 - a, iz0 = z0 + a, iz1 = z1 - a;
+        const L = ix1 - ix0, W = iz1 - iz0, w = tpl.stripWidth, th = tpl.thickness;
+        if (!(w > 0) || !(th > 0)) skipped.template = 'The template needs a strip width and a thickness greater than zero.';
+        else {
+          // Strips too wide to leave a hole in the middle make one solid board.
+          const solid = Math.min(L, W) <= 2 * w + 1e-9;
+          /** One piece of the template, lying on the top of the board. */
+          const strip = (lo: [number, number], hi: [number, number], grain: Vec3, n: number) =>
+            box([lo[0], T, lo[1]], [hi[0], T + th, hi[1]], TEMPLATE_WOOD, grain, 0.3 + n / 8);
+          template = solid
+            ? [strip([ix0, iz0], [ix1, iz1], [1, 0, 0], 0)]
+            : [
+              strip([ix0, iz0], [ix1, iz0 + w], [1, 0, 0], 0),
+              strip([ix0, iz1 - w], [ix1, iz1], [1, 0, 0], 1),
+              strip([ix0, iz0 + w], [ix0 + w, iz1 - w], [0, 0, 1], 2),
+              strip([ix1 - w, iz0 + w], [ix1, iz1 - w], [0, 0, 1], 3),
+            ];
+          const corners = rc - a > 1e-9 ? `its outside corners rounded to a ${inches(rc - a)} radius` : 'its outside corners left square';
+          done.template = 'Make a template for the router to rest on and run round: '
+            + (solid
+              ? `a board ${inches(L)} × ${inches(W)} and ${inches(th)} thick, ${corners}. `
+              : `a frame ${inches(L)} × ${inches(W)} of strips ${inches(w)} wide and ${inches(th)} thick, two ${inches(L)} long and two ${inches(W - 2 * w)} long between them, ${corners}. `)
+            + `Stick it to the top of the board with double-sided tape, its outside edge ${pair([ix0, X - ix1])} in from the two ends and ${pair([iz0, Z - iz1])} in from the two long sides. `
+            + `The bit's bearing runs along that outside edge, which is the inner edge of the groove. `
+            + `This is for a bit whose bearing is the same diameter as its cutter, ${inches(width)}: check yours.`;
+        }
+      }
+      if (finish.groove.on) say(`Rout a juice groove in the top with a ${inches(width)} round-bottomed bit, ${inches(depth)} deep, `
         + (even
           ? `its outer edge ${inches(walls.ends[0])} in from the edge of the board all round. `
           : `its outer edge ${pair(walls.ends)} in from the two ends and ${pair(walls.sides)} in from the two long sides. `)
-        + (finish.groove.align ? 'Those distances put it evenly on the pattern. ' : '')
-        + 'Use a jig or template and take several light passes of 1/16″ to 1/8″. '
-        + (rc > 0
+        + (finish.groove.align ? 'Those distances put it evenly on the pattern, to the nearest 1/8″. ' : '')
+        + (tpl
+          ? "Keep the router flat on the template with the bit's bearing against its outside edge, and take several light passes of 1/16″ to 1/8″. "
+          : 'Use a jig or template and take several light passes of 1/16″ to 1/8″. ')
+        + (tpl && rc <= a + 1e-9
+          ? `Rolling round the template's square corners, the bit leaves the groove's outside corners rounded to a ${inches(width)} radius and the inside corners sharp.`
+          : rc > 0
           ? `The centre of the bit turns each corner at a ${inches(rc)} radius.`
           : `Guided by straight rails, the bit leaves the groove's outside corners rounded to its own ${inches(a)} radius and the inside corners sharp.`));
     }
   }
 
-  if (!done.length && !skipped.length) return null;
-  return {
-    kind: 'panel',
-    slices: [{ pieces }],
-    size: prev.size,
-    title: 'Finish',
-    summary: [...done, 'Sand through the grits and oil.'].join(' '),
-    warning: skipped.length ? skipped.join(' ') : undefined,
-  };
+  return { pieces, done, skipped, template };
 }

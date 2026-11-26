@@ -4,7 +4,8 @@ import { fitThickness, fitToTarget } from './fit';
 import { volume } from './geometry';
 import { convertGrain, grainOf, withGrain, type Grain } from './grain';
 import { PRESETS } from './presets';
-import { run } from './pipeline';
+import { layupOf } from './design';
+import { run } from './test-helpers';
 import type { Design } from './types';
 
 /** The other grain. */
@@ -31,16 +32,17 @@ const SIZES = [
 
 describe('the same pattern in the other grain', () => {
   it('knows which grain each starter design is', () => {
-    for (const p of PRESETS) expect(grainOf(p.make()), p.key).toBe(p.type);
+    const end = PRESETS.filter((p) => grainOf(p.make()) === 'end').map((p) => p.key);
+    expect(end).toEqual(['single-end-grain', 'maple-purpleheart', 'checkerboard', 'brick', 'basket-weave']);
   });
 
   it('turns round every starter design but basket weave (several panels) and chevron (angled cuts)', () => {
-    const turned = PRESETS.filter((p) => convertGrain(p.make(), other(p.type)) !== null).map((p) => p.key);
+    const turned = PRESETS.filter((p) => convertGrain(p.make(), other(grainOf(p.make()))) !== null).map((p) => p.key);
     expect(turned.sort()).toEqual(PRESETS.map((p) => p.key).filter((k) => k !== 'basket-weave' && k !== 'chevron').sort());
   });
 
-  const cases = PRESETS.filter((p) => convertGrain(p.make(), other(p.type)))
-    .flatMap((p) => SIZES.map((size) => [p.key, other(p.type), `${size.length} x ${size.width} x ${size.thickness}`, size] as const));
+  const cases = PRESETS.filter((p) => convertGrain(p.make(), other(grainOf(p.make()))))
+    .flatMap((p) => SIZES.map((size) => [p.key, other(grainOf(p.make())), `${size.length} x ${size.width} x ${size.thickness}`, size] as const));
 
   it.each(cases)('%s as %s grain at %s builds, has that grain on top, and is the size asked for', (key, grain, _label, target) => {
     const base = PRESETS.find((p) => p.key === key)!.make();
@@ -69,7 +71,7 @@ describe('the same pattern in the other grain', () => {
   it('turning a design round and back gives the same recipe', () => {
     const grid = PRESETS.find((p) => p.key === 'maple-purpleheart')!.make();
     const back = convertGrain(convertGrain(grid, 'edge')!, 'end')!;
-    expect(back.layup.thickness).toBeCloseTo(grid.layup.thickness, 9);
+    expect(layupOf(back).thickness).toBeCloseTo(layupOf(grid).thickness, 9);
     expect(back.steps.map((s) => s.type)).toEqual(grid.steps.map((s) => s.type));
   });
 

@@ -1,5 +1,6 @@
+import { OPENING_STEPS, layupOf, unfitted, withLayup } from './design';
 import { fitThickness, fitToTarget } from './fit';
-import { newId } from './presets';
+import { newId } from './ids';
 import type { Design, Step } from './types';
 
 /** Which face of the wood ends up on top of the finished board. */
@@ -31,8 +32,10 @@ const flatOff = (s: Step) => (s.type === 'flatten' ? s.top + s.bottom : 0);
  * built from several panels (basket weave), ones that turn only some slices, and angled cuts,
  * whose slices would stand up at a slant.
  */
-export function convertGrain(design: Design, to: Grain): Design | null {
-  if (grainOf(design) === to) return design;
+export function convertGrain(asFitted: Design, to: Grain): Design | null {
+  if (grainOf(asFitted) === to) return asFitted;
+  // Work from the sizes asked for: what the last fit added belongs to the board as it was.
+  const design = unfitted(asFitted);
   const steps = design.steps;
   if (steps.some((s) => s.type === 'panel' || s.type === 'combine')) return null;
   const cutAt = steps.findIndex((s) => s.type === 'crosscut');
@@ -44,30 +47,28 @@ export function convertGrain(design: Design, to: Grain): Design | null {
   if (to === 'edge') {
     if (!cut || steps.some((s) => s.type === 'turn' && s.sel.mode !== 'all')) return null;
     const stock = cut.width + before;
-    const width = Math.max(0.125, design.layup.thickness - before);
-    return {
+    const width = Math.max(0.125, layupOf(design).thickness - before);
+    return withLayup({
       ...design,
-      layup: { ...design.layup, thickness: stock },
       steps: steps.filter((s) => s.type !== 'turn').map((s) => (s === cut ? { ...cut, width } : s)),
-    };
+    }, { thickness: stock });
   }
 
   const turn: Step = { id: newId(), type: 'turn', sel: { mode: 'all' } };
   if (cut) {
     const stock = cut.width + before;
-    const width = Math.max(0.125, design.layup.thickness - before);
-    return {
+    const width = Math.max(0.125, layupOf(design).thickness - before);
+    return withLayup({
       ...design,
-      layup: { ...design.layup, thickness: stock },
       steps: [...steps.slice(0, cutAt), { ...cut, width }, turn, ...steps.slice(cutAt + 1)],
-    };
+    }, { thickness: stock });
   }
   // No cross cut: true the panel as it was, then cut it up, stand the slices on end and glue
   // them back together before anything else (a border, say) goes on.
-  let at = 0;
+  let at = OPENING_STEPS;
   while (at < steps.length && (steps[at].type === 'trim' || steps[at].type === 'flatten')) at++;
   const trued = steps.slice(0, at).reduce((t, s) => t + flatOff(s), 0);
-  const slice: Step = { id: newId(), type: 'crosscut', width: Math.max(0.125, design.layup.thickness - trued), kerf: 0.125, angle: 0 };
+  const slice: Step = { id: newId(), type: 'crosscut', width: Math.max(0.125, layupOf(design).thickness - trued), kerf: 0.125, angle: 0 };
   const glue: Step = { id: newId(), type: 'glue' };
   return { ...design, steps: [...steps.slice(0, at), slice, turn, glue, ...steps.slice(at)] };
 }
