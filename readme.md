@@ -294,7 +294,8 @@ After that, open it from the Start Menu as **Cutting Boards**.
 - **To update**, download and run the newer installer. It replaces the old version and keeps your
   designs.
 - **To remove it**, use **Settings → Apps → Installed apps → Cutting Boards → Uninstall**. Your
-  designs are left where they are.
+  designs are left where they are. So is a small settings folder, `%APPDATA%\cutting-boards`,
+  which remembers the board you had open; delete it by hand if you want nothing left.
 
 Windows 10 or 11, 64-bit. There is no installer for macOS or Linux yet: use the browser version,
 or run it from the source.
@@ -638,7 +639,7 @@ grains, a line per stage. A change to how the recipe is run must leave every lin
 | `src/model/` | Geometry, the recipe, presets, cut list, fit-to-target, storage. No UI. Tested. |
 | `src/view/` | The three.js scene, procedural wood textures, the viewport component. |
 | `src/ui/` | The editors for strips, steps and the cut list. |
-| `electron/` | The desktop shell. Only it touches the disk, through the small API in `preload.cts`. |
+| `electron/` | The desktop shell. Only it touches the disk, through the small API in `preload.cts`. Its tests are beside it. |
 | `designs/` | Designs saved from the desktop app. |
 | `docs/` | The pictures this page shows. |
 | `.ai/` | Rules and a project summary for AI assistants working on the code. |
@@ -659,7 +660,7 @@ grains, a line per stage. A change to how the recipe is run must leave every lin
 ### Checks
 
 ```powershell
-npm test                                   # 524 tests of the model: the installer's settings, the defects a review found, what each pattern must look like, building every design from Custom, feet, one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
+npm test                                   # 532 tests: the installer's settings and the Start Menu entry (in `electron/`), and of the model: the defects a review found, what each pattern must look like, building every design from Custom, feet, one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
 npm run smoke                              # builds, then 50 checks of the real window: About, Custom, feet, the wizard list, the Target board and Dimensions tiles, the grain switch, 3D view, wizard, print preview, edge tags, add step, accent strips, removing strips and woods, pinned target size, hiding the panel, save and open
 node scripts/run.mjs --selftest            # save, list, read and delete a design through the app
 node scripts/run.mjs --screenshot=out.png --query=preset=brick   # render one frame and exit
@@ -689,11 +690,18 @@ node scripts/make-installer.mjs --plan   # say what it would do, change nothing
 
 `npm run installer` runs `npm run check` first and stops on any failure. It then packs the build
 with electron-builder (settings in `electron-builder.json`) into
-`release/Cutting-Boards-Setup-<version>.exe`, a per-user installer, and runs the packed app's own
-self test: saving, listing, reading and deleting a design in a throwaway folder. It prints the
-installer's size and SHA-256. It has to be run on Windows, and it does not run the installer.
+`release/Cutting-Boards-Setup-<version>.exe`, a per-user installer. It then checks what it packed:
+that the package holds the page, the shell and the icon and nothing else, and that the packed
+app, run off the screen in a throwaway folder, draws a board and saves, lists, reads and deletes
+a design. A packed app that does not finish in a minute is stopped and counted as failed. It
+prints the installer's size and SHA-256. It has to be run on Windows, and it does not run the installer.
 `release/` is generated and ignored by git; an installer is given to people by attaching it to a
 release on GitHub. The installer is not code signed.
+
+An installed copy is locked down in ways a copy run from the project is not. It ignores the test
+switches (`--eval`, `--pdf`, `--screenshot`, `--query` and the rest) and the development server
+address, keeping only `--selftest`; and its Electron will not run as plain Node, take debugger
+switches, or load code from outside its own package (`electronFuses` in `electron-builder.json`).
 
 ### Publishing the web version
 

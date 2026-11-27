@@ -15,11 +15,20 @@
   "asar": true,
   "npmRebuild": false,
   "publish": null,
+  "electronFuses": {
+    "runAsNode": false,
+    "enableNodeOptionsEnvironmentVariable": false,
+    "enableNodeCliInspectArguments": false,
+    "enableEmbeddedAsarIntegrityValidation": true,
+    "onlyLoadAppFromAsar": true
+  },
   "win": {
     "target": [
       {
         "target": "nsis",
-        "arch": ["x64"]
+        "arch": [
+          "x64"
+        ]
       }
     ],
     "icon": "assets/icon.ico"
@@ -32,6 +41,7 @@
     "createStartMenuShortcut": true,
     "runAfterFinish": true,
     "deleteAppDataOnUninstall": false,
-    "artifactName": "Cutting-Boards-Setup-${version}.${ext}"
+    "artifactName": "Cutting-Boards-Setup-${version}.${ext}",
+    "uninstallDisplayName": "Cutting Boards"
   }
 }

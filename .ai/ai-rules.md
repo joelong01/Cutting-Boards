@@ -135,6 +135,8 @@ the live files against the build by hash. See `readme.md` for what it needs.
   Start Menu entry and an uninstall record. Test the packed app in `release/win-unpacked/` with
   its `--selftest` or `--screenshot` flags, which run off the screen in a throwaway folder.
 - Publishing a release on GitHub, and attaching an installer to one, needs the owner's yes.
+- An installed copy obeys no switch that runs code or writes a file where it is told. A new
+  test switch in `electron/main.cts` is read through `devArg`, never `arg`.
 - `appId` in `electron-builder.json` and `APP_ID` in `electron/main.cts` are the same string;
   changing it orphans the settings and the taskbar identity of every installed copy.
 
