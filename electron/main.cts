@@ -213,7 +213,11 @@ async function createWindow() {
   }
 }
 
+// The installer is built with this same identity (`appId` in electron-builder.json), so the
+// installed app's window groups under the Start Menu entry the installer makes.
 const APP_ID = 'Shop.CuttingBoards';
+/** The file name of the installed program on Windows: the product name in electron-builder.json. */
+const INSTALLED_EXE = 'Cutting Boards.exe';
 // The name Windows shows for the app, in the print dialog's title among other places. Changing
 // the name would also move the folder Electron keeps the app's settings in, and with it the
 // design left open last time, so that folder is pinned to where it has always been.
@@ -243,15 +247,20 @@ app.setAppUserModelId(APP_ID);
  * starts this same Electron with this same project folder, so it opens whatever was last built.
  * It is rewritten only when missing or pointing somewhere else (the project moved, Electron was
  * upgraded), so a normal start touches nothing. Does nothing on other systems.
+ *
+ * An installed copy does nothing here: its installer made the entry and its uninstaller removes
+ * it. A copy run from the project leaves an installed copy's entry alone, so trying the source
+ * does not take over the Start Menu entry of the app someone installed.
  */
 function ensureStartMenuShortcut(): string {
   if (process.platform !== 'win32') return 'skipped: not Windows';
+  if (app.isPackaged) return 'skipped: the installer made it';
   const link = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Cutting Boards.lnk');
   const root = app.getAppPath();
   const want = {
     target: process.execPath,
-    // A packaged app is its own program; run from the project, Electron needs the folder to load.
-    args: app.isPackaged ? '' : `"${root}"`,
+    // Run from the project, Electron needs the folder to load.
+    args: `"${root}"`,
     cwd: root,
     description: 'Model a cutting board through its glue-ups',
     icon: path.join(root, 'assets', 'icon.ico'),
@@ -266,6 +275,10 @@ function ensureStartMenuShortcut(): string {
   }
   if (have && have.target === want.target && (have.args ?? '') === want.args && have.icon === want.icon) {
     return `already present: ${link}`;
+  }
+  // An installed copy is its own program, named for the app; Electron run from a project is not.
+  if (have && path.basename(have.target).toLowerCase() === INSTALLED_EXE.toLowerCase()) {
+    return `left alone: ${link} belongs to the installed app`;
   }
   const ok = shell.writeShortcutLink(link, have ? 'replace' : 'create', want);
   return ok ? `${have ? 'updated' : 'created'}: ${link}` : `failed to write: ${link}`;

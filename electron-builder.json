@@ -1,0 +1,37 @@
+{
+  "appId": "Shop.CuttingBoards",
+  "productName": "Cutting Boards",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**",
+    "electron-dist/**",
+    "assets/**",
+    "package.json",
+    "!dist/staticwebapp.config.json",
+    "!**/node_modules/**"
+  ],
+  "asar": true,
+  "npmRebuild": false,
+  "publish": null,
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "assets/icon.ico"
+  },
+  "nsis": {
+    "oneClick": true,
+    "perMachine": false,
+    "shortcutName": "Cutting Boards",
+    "createDesktopShortcut": false,
+    "createStartMenuShortcut": true,
+    "runAfterFinish": true,
+    "deleteAppDataOnUninstall": false,
+    "artifactName": "Cutting-Boards-Setup-${version}.${ext}"
+  }
+}

@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.9.0",
   "description": "Design a cutting board before you cut any wood: every stage in 3D, with a cut list and instructions.",
+  "author": "Joe Long",
   "homepage": "https://boards.longshotsw.com",
   "repository": {
     "type": "git",
@@ -18,6 +19,7 @@
     "check": "vitest run && npm run smoke",
     "web": "vite --open",
     "deploy": "node scripts/deploy-azure.mjs",
+    "installer": "node scripts/make-installer.mjs",
     "icon": "node scripts/run.mjs --icon",
     "shortcut": "tsc -p electron && node scripts/run.mjs --shortcut-only"
   },
@@ -34,6 +36,7 @@
     "@types/three": "^0.169.0",
     "@vitejs/plugin-react": "^4.3.3",
     "electron": "^33.4.11",
+    "electron-builder": "^26.18.0",
     "typescript": "^5.6.3",
     "vite": "^5.4.10",
     "vitest": "^2.1.4"

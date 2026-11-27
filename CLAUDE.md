@@ -10,6 +10,7 @@ conventions; this file only records the commands and gates that are cheapest to 
 npm run check                          # model tests, then the window checks: before every commit
 npm run deploy -- --bump=patch         # check, upload, verify by hash; patch, minor or major by the change
 node scripts/deploy-azure.mjs --plan   # say what a deploy would do, change nothing
+npm run installer                      # check, then build and verify the Windows installer in release/
 ```
 
 ## The gates

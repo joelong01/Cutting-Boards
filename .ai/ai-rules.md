@@ -48,6 +48,7 @@ public/                 # files copied into the build as they are
 designs/                # designs saved from the desktop app
 docs/                   # pictures the readme shows
 dist/  electron-dist/   # build output: generated, ignored by git
+release/                # the Windows installer and the app it packs: generated, ignored by git
 ```
 
 ## What the app must be for the person at the bench
@@ -97,6 +98,7 @@ npm test         # the model's unit tests
 npm run smoke    # build, then check the real window feature by feature
 npm run check    # both: run this before every commit
 npx tsc --noEmit # types only, for a quick look while editing
+npm run installer # check, then build and verify the Windows installer in release/
 ```
 
 - Run `npm run check` before committing, and read its result.
@@ -124,6 +126,17 @@ the live files against the build by hash. See `readme.md` for what it needs.
   if it is not the owner's own subscription.
 - **The deployment token is never printed, logged, written to a file or put on a command line.**
 - Deleting anything in Azure, and anything that costs money, needs the owner's explicit yes.
+
+## The installer
+
+`npm run installer` builds the Windows installer; see `readme.md`.
+
+- **Never run the installer or the uninstaller on the owner's machine to test it.** It writes a
+  Start Menu entry and an uninstall record. Test the packed app in `release/win-unpacked/` with
+  its `--selftest` or `--screenshot` flags, which run off the screen in a throwaway folder.
+- Publishing a release on GitHub, and attaching an installer to one, needs the owner's yes.
+- `appId` in `electron-builder.json` and `APP_ID` in `electron/main.cts` are the same string;
+  changing it orphans the settings and the taskbar identity of every installed copy.
 
 ## Secrets and privacy
 
