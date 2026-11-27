@@ -414,7 +414,7 @@ export function App() {
                   setMenu(null);
                   setWizard(true);
                 }}
-              ><strong>Board wizard…</strong><small>Choose a size and end or edge grain, then pick from the designs.</small></button>
+              ><strong>Board wizard…</strong><small>Choose a size, then pick from the designs.</small></button>
               <hr />
               <button onClick={() => load(customDesign(design.target))}>
                 <strong>Custom</strong><small>Start with the strips and their glue-up, and build the rest by adding steps.</small>

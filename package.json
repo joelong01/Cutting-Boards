@@ -2,6 +2,12 @@
   "name": "cutting-boards",
   "private": true,
   "version": "0.9.0",
+  "description": "Design a cutting board before you cut any wood: every stage in 3D, with a cut list and instructions.",
+  "homepage": "https://boards.longshotsw.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joelong01/Cutting-Boards.git"
+  },
   "type": "module",
   "scripts": {
     "start": "npm run build && node scripts/run.mjs",

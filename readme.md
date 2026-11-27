@@ -1,55 +1,307 @@
 # Cutting Boards
 
-A desktop app for modelling a cutting board before any wood is cut. Enter the strips for the first
-glue-up, then add the operations a real board goes through: cross cut, turn to end grain, flip,
-offset, insert accent strips, glue up, trim, flatten. Every stage is drawn in 3D, and the app
-writes the cut list and the order of operations.
+Design a cutting board before you cut any wood. Pick a pattern and a size, choose your woods, and
+the app shows the board in 3D at every stage of the build, then writes the list of stock to mill
+and step-by-step instructions you can take to the shop.
 
-Status as of **2026-11-17**: first version, built and smoke-tested. Not yet used to build a board.
+**Use it now, with nothing to install: <https://boards.longshotsw.com>**
 
-## Run it
+![The app with a basket weave board open: the design on the left, the board in 3D on the right](docs/basket-weave.png)
 
-Needs Node 22 or newer. From this folder:
+It runs in any modern browser, on a computer, a tablet or a phone. There is also a desktop app for
+Windows, macOS and Linux that keeps your designs as files ([Install the desktop app](#install-the-desktop-app)).
 
-```powershell
-npm install          # once
-npm start            # build, then open the desktop app
-npm run dev          # desktop app with hot reload, for changing the code
-npm test             # geometry and recipe tests
-npm run smoke        # build, then check the real app window feature by feature
-npm run check        # both of the above: about 15 seconds
-npm run web          # the same page in a browser (designs save to browser storage instead of files)
-npm run deploy       # run every check; only if all pass, publish the web version to Azure and check it by hash
+> The sizes and steps are worked out by software, and no board has yet been built from them.
+> Check every measurement against your own stock and tools before you cut.
+
+## Contents
+
+- [Your first board, in five minutes](#your-first-board-in-five-minutes)
+- [The window](#the-window)
+- [Set the size and how sizes are written](#set-the-size-and-how-sizes-are-written)
+- [Choose the woods and strips](#choose-the-woods-and-strips)
+- [Watch the build](#watch-the-build)
+- [Change the recipe](#change-the-recipe)
+- [Finishing touches and feet](#finishing-touches-and-feet)
+- [Take it to the shop: cut list, print, PDF](#take-it-to-the-shop-cut-list-print-pdf)
+- [Save, open and share designs](#save-open-and-share-designs)
+- [On a phone or tablet](#on-a-phone-or-tablet)
+- [The designs](#the-designs)
+- [Build your own pattern from nothing](#build-your-own-pattern-from-nothing)
+- [Keyboard shortcuts](#keyboard-shortcuts)
+- [Install the desktop app](#install-the-desktop-app)
+- [Reference: everything it does](#reference-everything-it-does)
+- [Known limits](#known-limits)
+- [For developers](#for-developers)
+
+## Your first board, in five minutes
+
+1. Open <https://boards.longshotsw.com>. A board is already on screen; you can change it, or
+   start a new one.
+2. Click **New**, then **Board wizard…**.
+3. **Page 1, Size.** Type the length, width and thickness you want the finished board to be, then
+   press **Next: design**.
+4. **Page 2, Design.** Every pattern is drawn at your size, easiest first, under Beginner,
+   Intermediate and Advanced. Click one and press **OK**, or double-click it.
+
+   ![The wizard's second page, with a picture of each design](docs/wizard.png)
+
+5. The board opens. On the left, under **Target board**, choose **End grain** or **Edge grain**.
+6. Under **Rip the strips** (step 1), change the woods to the ones you have.
+7. Press **Play** under the board to watch it being built, one operation at a time.
+8. Click the **Cut list and steps** tab for the stock to mill and the written instructions.
+9. Click **Print** to print them, or **Export** for a PDF with a picture of every step.
+
+That is the whole loop. The rest of this page explains each part.
+
+## The window
+
+| Part | Where | What it is for |
+| --- | --- | --- |
+| Toolbar | Along the top | **New**, **Open**, **Save**, **Save as**; **Undo**, **Redo**; **Add step**; **Export**, **Print**, **Picture**; **Hide panel**; **About**. |
+| Side panel | Left | Two tabs. **Design** is where you change the board. **Cut list and steps** is what you take to the shop. |
+| The board | Right | The board in 3D, as the selected step leaves it. |
+| Step card | Top left of the board | The step being shown, the size it leaves, and how many pieces. |
+| View buttons | Top right of the board | **3D**, **Top**, **Side**, **End**; **Glue lines** on or off; **Spread** pulls the pieces apart so you can see them. |
+| Player | Under the board | **Play**, back and forward one step, jump to the start or the end, and a dot for every stage. |
+
+The **Design** tab reads from top to bottom in the order you work:
+
+1. **Target board**: which design, and which grain is on top.
+2. **Dimensions**: the finished size, the units, and your saw.
+3. **The steps**, numbered. Step 1 is always the strips. Click any step to see the board as that
+   step leaves it.
+4. **Finishing**: rounded corners, chamfer, round-over, juice groove, feet.
+
+Drag the bar between the panel and the board to make the panel wider or narrower.
+Anything you change can be undone with **Undo** (Ctrl+Z).
+
+## Set the size and how sizes are written
+
+Everything here is in the **Dimensions** card.
+
+- **Length, Width, Thickness**: the size the finished board should be. With
+  **Keep the board at this size** ticked (it starts ticked), the app works out how many strips
+  and how much stock are needed, and works them out again whenever you change something. The line
+  beside it, "Finishes at…", is the size the recipe really ends at.
+- **Units**: inches as fractions, inches as decimals, or millimetres, like the modes of a
+  caliper. Every size on screen and on paper is written that way. (Sizes are still *typed* in
+  inches. You can type shop fractions: `1 1/8`, `3/4`.)
+- **Round to**: the finest step you can actually cut to, such as 1/16″ or 0.5 mm. Every size in
+  the instructions is rounded to it, and the board drawn is built from those rounded sizes, so
+  what you read is what you get. Choose **Exact** for no rounding.
+- **Saw kerf**: how thick your blade cuts (1/8″ to start with). Every cut allows for the wood the
+  blade turns to dust.
+- **Thinnest strip**: the thinnest piece your planer or sander can handle. A step that needs
+  anything thinner is flagged. Set it to 0 to turn the check off.
+
+To change the board to a different pattern at the same size, pick another one from **Design** in
+the **Target board** card. **End grain / Edge grain** in the same card turns the board round: end
+grain is kinder to knives; edge grain uses thinner stock and is simpler to make.
+
+## Choose the woods and strips
+
+Step 1, **Rip the strips**, is the first glue-up: the strips laid side by side.
+
+- Each row is one strip: its **wood** and its **width**. The buttons at the end of a row move it
+  up or down, copy it, or remove it. **S** marks it a spacer: a cheap strip that is sawn out later
+  to leave a gap for an accent.
+- **+ Add strip** adds a row. **+ Custom wood** adds a species that is not in the list, with a
+  colour you pick.
+- **Stock length** and **Thickness** are the size of the strips before the first cut.
+- **Repeat** is how many times the set of strips repeats across the board, and
+  **End with first strip** adds one more of the first strip so the panel is symmetric. While the
+  board is held at its size, the app sets the repeat and the stock length for you.
+- The coloured bar under the rows shows the panel the strips make, and the line under it says how
+  many strips and how big.
+
+## Watch the build
+
+- **Play** runs the whole build as an animation. The arrows beside it go back and forward one
+  operation; the outer buttons jump to the first step and to the finished board.
+- Click a step on the left, or a dot under the board, to stop on that step. The card at the top
+  left says which step you are on, and **Show finished board** takes you back to the end.
+
+  ![The 3D board part-way through: slices stood on end, before they are slid together](docs/3d-board-step.png)
+
+- Drag on the board to turn it. Scroll, or pinch, to zoom. **Top**, **Side** and **End** look
+  straight on; **3D** goes back to the angled view.
+- Hold the pointer over a piece to see its wood, its size and which way its grain runs.
+- The line above the player is the instruction for the step on screen.
+
+Each stage is one operation at the bench: mill, glue, cut, turn, place. Nothing smaller than a
+strip or a slice of a panel is ever handled on its own.
+
+## Change the recipe
+
+A board is a list of steps, and you can change the list.
+
+- **Change a step**: click its card and edit its fields: how wide the slices are, the angle of a
+  cut, how far to slide, how much to trim. Every card has a line for a note of your own, which is
+  added to that step's instruction.
+- **Add a step**: click the step it should follow, then **Add step** in the toolbar, and choose
+  from the menu. Steps that do not fit there are greyed out and say what they need.
+- **Move or remove a step**: the arrows and the ✕ at the top right of its card.
+- For **Turn**, **Flip** and **Offset**, click slices in the 3D view to choose which ones the
+  step applies to.
+
+The steps you can add:
+
+| Step | What it does |
+| --- | --- |
+| Cross cut | Cuts the panel into slices, square or at an angle. |
+| Rip the panel | Saws the panel lengthways into strips. |
+| Turn to end grain | Rolls slices 90° so the end grain faces up. |
+| Flip | Turns slices end for end, or face down. |
+| Offset | Slides slices along their length (brick, steps). |
+| Insert accent strips | Adds thin strips between the slices. |
+| Glue up | Glues the slices into a new panel. |
+| Trim | Squares up the edges. |
+| Flatten | Takes a little off both faces. |
+| Quarter-turn panel | Turns the panel 90° so the next cut is a rip. |
+| Add a border | Glues a frame round the panel, with a thin line inside it if you like. |
+| Start another panel | Sets the slices aside and glues up a second panel, for a pattern one panel cannot make. |
+| Interleave the slices | Brings back the slices set aside and puts a new slice after each. |
+
+If a step cannot be done (a cross cut with nothing glued yet, a strip thinner than your planer
+allows), its card says so in plain words and the board is drawn up to the step before.
+
+## Finishing touches and feet
+
+Under the steps are the finishing cards. Each is off until ticked, has its own sizes, and becomes
+a numbered step with its own picture and instruction:
+
+- Round the corners.
+- Chamfer the bottom edges.
+- Round over the top edges.
+- A juice groove in the top: the width of the router bit, the depth, and how it turns the corners.
+- **Add the feet**: a round foot under each corner, sized for the common screw-on brass-and-rubber
+  feet (0.82″ across, 0.35″ tall, 1″ in from each edge). All three sizes can be changed.
+
+**Sand and oil** is always the last step before the feet.
+
+## Take it to the shop: cut list, print, PDF
+
+Click the **Cut list and steps** tab.
+
+![The cut list and steps tab beside a brick board](docs/cut-list.png)
+
+- **Finished board**: the size the recipe ends at, against the size you asked for.
+- **Stock to mill**: for each wood, how many pieces, the size to **rough cut** them and the size
+  to **mill** them to. Sizes are thickness × width × length. The **Rough extra** boxes set how
+  much you allow for jointing, planing and snipe. Underneath are the board feet and how much of
+  the wood ends up in the board.
+- **Order of operations**: the numbered instructions, one operation each.
+
+To get it on paper:
+
+- **Print** (Ctrl+P) shows the sheet as it will print. Tick **Show a picture of each step** to
+  put a drawing beside every instruction.
+- **Export → PDF: cut list and steps…**, or **PDF with a picture of each step…**.
+- **Picture** saves the view of the board as a PNG image.
+
+## Save, open and share designs
+
+- **Save** (Ctrl+S) keeps the design under its name. **Save as** (Ctrl+Shift+S) gives it a new
+  name. **Open** lists what you have saved; the ✕ beside one deletes it.
+- A design names itself from its woods and pattern ("Hard maple and black walnut grid") until you
+  save it or name it yourself.
+- **In the browser**, designs are saved *in that browser on that device*. They are not uploaded
+  anywhere, nobody else can see them, and they are not on your other devices. Clearing the
+  browser's site data removes them, and an iPhone or iPad can clear them after a week or so without a visit.
+  The board you are working on is remembered between visits even if you never press Save.
+- **To keep a design safely, or move it to another device or person**, use
+  **Export → Design file (.board.json)…**, and bring it back with
+  **Open → Import a .board.json file…**.
+- **In the desktop app**, Save writes a file in the app's `designs` folder, and
+  **Open → Show the designs folder…** opens it.
+
+## On a phone or tablet
+
+Open the same address. On a narrow screen the side panel starts hidden so the board has the whole
+screen:
+
+- The blue **☰ Edit** tab on the left edge opens the panel.
+- The blue **Show the board ›** bar along the bottom goes back to the board.
+- Drag with one finger to turn the board; pinch to zoom.
+
+On an iPhone or iPad, **Share → Add to Home Screen** makes it open like an app. Designs saved
+there are kept separately from the ones saved in Safari, so export any you want to carry over.
+
+## The designs
+
+| Level | Design | What it is |
+| --- | --- | --- |
+| Beginner | Single wood | One species all through: the plain butcher block. |
+| Beginner | Stripes | Wide strips of two woods with thin lines of a third between them. |
+| Beginner | Stripes in a border | Striped panel with a border glued round it. |
+| Beginner | Checkerboard | Squares of two woods, turn about, as many as the size takes. |
+| Beginner | Chess board | Exactly eight squares each way, so the board is square. |
+| Intermediate | Brick | One species; every other row slides half a block, like brickwork. |
+| Intermediate | Grid | Squares of one wood with thin lines of another both ways. |
+| Intermediate | Chevron | Three woods cut at an angle and flipped into zigzags. |
+| Advanced | Double border | Blocks each ringed with a second wood, in a grid of a third. Three glue-ups. |
+| Advanced | Basket weave | Bars woven over and under, with a square at every crossing. Two panels. |
+| Advanced | 3D Board | Tumbling blocks: diamonds in three woods that read as stacked cubes. |
+
+Every design can be made end grain or edge grain except basket weave and chevron. All of them are
+also listed under **New** at a default size, and each is only a starting point: change its woods,
+sizes and steps as you like.
+
+## Build your own pattern from nothing
+
+**New → Custom** starts a board with only the strips and their glue-up: no pattern, no finishing.
+Set up the strips in step 1, then build the rest with **Add step**. A checkerboard, for example:
+
+1. In step 1, two strips of different woods, the same width.
+2. **Add step → Cross cut**, with slices as wide as the strips.
+3. **Add step → Turn to end grain** (leave this out for an edge-grain board).
+4. **Add step → Flip**, applied to every other slice.
+5. **Add step → Glue up**, then **Trim** and **Flatten**.
+
+Every design in the table above can be built this way, step by step.
+
+## Keyboard shortcuts
+
+| Keys | What it does |
+| --- | --- |
+| Ctrl+S, Ctrl+Shift+S | Save; Save as |
+| Ctrl+Z, Ctrl+Y | Undo; Redo |
+| Ctrl+P | Print preview |
+| Ctrl+B | Hide or show the side panel |
+| Space | Play or pause the build |
+| Left, Right | Back or forward one step |
+| Up, Down in a size box | Nudge the size by 1/16″ |
+| Esc | Close a dialog |
+
+## Install the desktop app
+
+The desktop app is the same program in its own window, with designs saved as files. There is no
+installer yet: it is run from the source. You need [Node.js](https://nodejs.org) 22 or newer and
+[Git](https://git-scm.com).
+
+```sh
+git clone https://github.com/joelong01/Cutting-Boards.git
+cd Cutting-Boards
+npm install
+npm start
 ```
 
-On Windows the app adds itself to the Start Menu as **Cutting Boards** the first time it starts,
-so after that it can be opened from there without a terminal. `npm run shortcut` adds the entry
-without opening the app. The shortcut opens the last build; it does not rebuild, so run
-`npm start` once after changing the code. To remove it, delete
-`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Cutting Boards.lnk`.
+`npm start` builds the app and opens it. After the first time:
 
-If `npm install` reports that Electron's install script was skipped, run
-`node node_modules/electron/install.js` once to fetch the Electron binary.
+- **On Windows** the app adds itself to the Start Menu as **Cutting Boards**, so it can be opened
+  from there without a terminal. The shortcut opens the last build, so run `npm start` once after
+  updating. To remove it, delete
+  `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Cutting Boards.lnk`.
+- **To update**, run `git pull`, then `npm install`, then `npm start`.
+- If `npm install` reports that Electron's install script was skipped, run
+  `node node_modules/electron/install.js` once.
 
-## On a phone
+To use the browser version from your own machine instead of the public site, run `npm run web`.
 
-The web version is published to the Azure Static Web App `cuttingboard` (resource group
-`rg-cutting-boards`, Free plan) at <https://boards.longshotsw.com>. That name is a CNAME record,
-kept at Cloudflare, for the address Azure gave the site,
-`agreeable-sand-0852a761e.4.azurestaticapps.net`, which also works and is the one the deploy
-checks. It is only files: no server of ours runs. `public/staticwebapp.config.json` tells the host to make phones
-re-check the page on every visit and to keep the hashed files under `assets/` for a year.
-`npm run deploy` runs `npm run check` first and stops if any test or window check fails; otherwise
-it uploads `dist/` and checks every live file against the build by hash. It needs `az login` and
-prints a timing report; `--plan` says what it would do without deploying, and `--bump=patch`,
-`--bump=minor` or `--bump=major` moves the version on first. The site is public and keeps designs in the phone's browser
-storage, so it is for showing a board, not keeping designs. Open a starter design with
-`?preset=brick` (or any key under **New**).
+## Reference: everything it does
 
-On a phone the side panel starts hidden. The blue **☰ Edit** tab on the left edge opens it; the
-blue **Show the board ›** bar along the bottom goes back to the board.
-
-## What it does
+The sections above are the directions. This is the full list, for looking things up.
 
 - **Toolbar.** Along the top, laid out like an Office ribbon: groups of buttons (File, Edit,
   Share, View), each button an icon over its label. The design's name is in the window's title
@@ -153,8 +405,9 @@ blue **Show the board ›** bar along the bottom goes back to the board.
 - **Names.** A design names itself from its woods and pattern ("Hard maple and black walnut grid")
   and keeps that up to date as the woods change, until you save it or give it a name of your own
   with **Save as**. The name is shown in the window's title bar.
-- **Save, open, export.** Save (Ctrl+S) writes `designs/<name>.board.json` in this folder, so
-  designs are versioned with the repo. Delete moves the file to the recycle bin. Undo and redo
+- **Save, open, export.** In the desktop app, Save (Ctrl+S) writes `designs/<name>.board.json` in
+  the app's folder and Delete moves the file to the recycle bin; in a browser, designs are kept in
+  the browser's storage. Undo and redo
   with Ctrl+Z and Ctrl+Y.
 - **Print preview.** **Print…** (or Ctrl+P) shows the sheet as it will print: the cut list and the
   order of operations. Tick "Show a picture of each step" and every step is drawn beside its
@@ -183,8 +436,7 @@ with no cross cut gets one, with a turn and a glue-up. Basket weave (two panels)
 Picking a design opens it for
 editing. A design is a pattern, not a grain: its name and description say nothing of which
 grain is on top, and each is listed once (single wood is one design, not one for each grain). The
-same nine starting designs are listed under **New** at their default sizes: single wood, stripes,
-stripes in a border, grid, checkerboard, brick, basket weave, chevron and the 3D board. Each opens
+starting designs are also listed under **New** at their default sizes. Each opens
 in the grain it is usually made in, and the switch on the board changes it.
 
 **The 3D board** (tumbling blocks) is diamonds in three woods, three round every point, that read
@@ -228,7 +480,7 @@ Its sizes are not rounded, since they follow from the 60° of the diamonds.
 
 In either recipe each step is one operation at the bench, with its own picture and instruction.
 
-## About and the version
+### About and the version
 
 **About**, at the end of the toolbar, says who designed the app, that its code was written by
 Claude, and its version. The version is the one in `package.json`, put into the page when it is
@@ -236,7 +488,7 @@ built. A deploy moves it on by how big the change is: `npm run deploy -- --bump=
 fix, `--bump=minor` for something new, `--bump=major` when saved designs would open differently.
 Without `--bump` the version stays as it is.
 
-## Custom boards
+### Custom boards
 
 **New → Custom** starts a board with nothing but the strips and their glue-up: no pattern, no
 finishing, no feet. The rest is built by adding steps from **Add step** in the toolbar and
@@ -256,7 +508,7 @@ identical to the original. What makes that possible:
   wider than the blade is sawn out in two passes.
 - Every step's card takes a note, added to its instruction.
 
-## Feet
+### Feet
 
 **Add the feet**, the last card under Finishing, is off until ticked. Ticked, it is the last step
 of all, after the sanding: a round foot screwed under each corner, drawn beneath the board. Its
@@ -265,7 +517,7 @@ each foot's centre 1″ in from both edges, and all three can be changed. Feet a
 board's size, its wood or its yield. Feet that would stick out past the edges or meet in the
 middle are left off, with the reason.
 
-## One operation, one stage
+### One operation, one stage
 
 What the view plays, and what the instructions number, is one operation at the bench at a time:
 mill, glue, cut, turn, place. A step in the Design tab is usually one operation. Three are
@@ -286,7 +538,34 @@ operation, not what came before or what comes next. `run` gives a stage per oper
 Known exception: an accent strip that is itself a slice of another glue-up (a pattern) is still
 described in one long instruction.
 
-## How it models wood
+## Known limits
+
+- **Wood colours are approximations** picked by eye, and the grain is generated, not photographed.
+- **Strip sizes in the cut list are finished sizes.** Jointing and planing allowances are yours.
+- **The 3D board** is tumbling blocks only. The other 3D illusions (the "woven tube" look) are
+  not here. Its trim off the ragged block comes out in odd decimals; the size it trims to is
+  what matters.
+- **Auto trim** squares the two long edges only. Ends are trimmed by the amounts you enter.
+- Lengths are typed in inches whatever the units shown.
+- With rounding on, a held board finishes near its target, not on it: the fit finds the exact
+  sizes and rounds them, and does not yet look for a different count of strips that would land closer.
+
+## For developers
+
+The app is TypeScript, React and three.js, built with Vite, with Electron as the desktop shell.
+The web page and the desktop app are the same code.
+
+```sh
+npm install          # once
+npm start            # build, then open the desktop app
+npm run dev          # desktop app with hot reload, for changing the code
+npm run web          # the same page in a browser, with hot reload
+npm test             # the model's tests
+npm run smoke        # build, then check the real app window feature by feature
+npm run check        # both of the above: run it before every commit
+```
+
+### How it models wood
 
 Every piece is a convex solid with a species and a grain direction (`src/model/geometry.ts`). A
 cut clips solids with a plane; a turn or flip is a rotation; a glue-up packs slices together.
@@ -336,11 +615,13 @@ grains, a line per stage. A change to how the recipe is run must leave every lin
 | `src/view/` | The three.js scene, procedural wood textures, the viewport component. |
 | `src/ui/` | The editors for strips, steps and the cut list. |
 | `electron/` | The desktop shell. Only it touches the disk, through the small API in `preload.cts`. |
-| `designs/` | Saved designs. Source files: commit them. |
+| `designs/` | Designs saved from the desktop app. |
+| `docs/` | The pictures this page shows. |
+| `.ai/` | Rules and a project summary for AI assistants working on the code. |
 | `dist/`, `electron-dist/` | Build output. Generated, ignored by git. |
 | `assets/`, `public/icon.png` | The app icon. Generated by `scripts/make-icon.cjs`; regenerate with `npm run icon`, never edit by hand. |
 
-## Code conventions
+### Code conventions
 
 - **Every feature has at least one test.** Logic in `src/model/` gets a unit test
   (`*.test.ts`); anything that only exists in the window gets a check in `scripts/smoke.mjs`.
@@ -351,7 +632,7 @@ grains, a line per stage. A change to how the recipe is run must leave every lin
 - **When a function changes, its comment changes in the same edit.** A comment that no longer
   matches the code is a defect.
 
-## Checks
+### Checks
 
 ```powershell
 npm test                                   # 516 tests of the model: the defects a review found, what each pattern must look like, building every design from Custom, feet, one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
@@ -375,14 +656,31 @@ folder before and after, and fails if the run left anything changed.
 `--eval=<expression>` runs one expression in the page and prints the result; the 3D scene is
 reachable there as `window.boardScene`.
 
-## Known limits
+### Publishing the web version
 
-- **Wood colours are approximations** picked by eye, and the grain is generated, not photographed.
-- **Strip sizes in the cut list are finished sizes.** Jointing and planing allowances are yours.
-- **The 3D board** is tumbling blocks only. The other 3D illusions (the "woven tube" look) are
-  not here. Its trim off the ragged block comes out in odd decimals; the size it trims to is
-  what matters.
-- **Auto trim** squares the two long edges only. Ends are trimmed by the amounts you enter.
-- Lengths are typed in inches whatever the units shown.
-- With rounding on, a held board finishes near its target, not on it: the fit finds the exact
-  sizes and rounds them, and does not yet look for a different count of strips that would land closer.
+This is for whoever maintains the public site; you do not need it to use or change the app.
+
+The site is an Azure Static Web App on the Free plan: only files, with no server of its own.
+`public/staticwebapp.config.json` tells the host to make browsers re-check the page on every visit
+and to keep the hashed files under `assets/` for a year.
+
+```sh
+npm run deploy                     # check, upload, verify
+npm run deploy -- --bump=patch     # the same, moving the version on first: patch, minor or major
+node scripts/deploy-azure.mjs --plan   # say what it would do, change nothing
+```
+
+`npm run deploy` runs `npm run check` first and stops if any test or window check fails. Otherwise
+it uploads `dist/` and then fetches every file from the live site and compares it with the build
+by SHA-256. It needs the Azure CLI signed in (`az login`) to an account that owns a Static Web App
+with the name and resource group set at the top of `scripts/deploy-azure.mjs`; to publish a copy
+of your own, create a Static Web App and change those two names. The deployment token is read at
+deploy time and never printed or stored.
+
+### Working on it with an AI assistant
+
+`.ai/ai-rules.md` holds the rules an AI assistant must follow here: what a recipe has to be for
+the person at the bench, the code conventions, the checks, and what must never be committed to a
+public repository. `CLAUDE.md` and `AGENTS.md` point at it. The app's code, tests and
+documentation were written by an AI model to the owner's design and standards, as the About box
+says.
