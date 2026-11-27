@@ -9,7 +9,7 @@ and step-by-step instructions you can take to the shop.
 ![The app with a basket weave board open: the design on the left, the board in 3D on the right](docs/basket-weave.png)
 
 It runs in any modern browser, on a computer, a tablet or a phone. There is also a desktop app for
-Windows, macOS and Linux that keeps your designs as files ([Install the desktop app](#install-the-desktop-app)).
+Windows, with an installer, that keeps your designs as files ([Install the desktop app](#install-the-desktop-app)).
 
 > The sizes and steps are worked out by software, and no board has yet been built from them.
 > Check every measurement against your own stock and tools before you cut.
@@ -213,8 +213,8 @@ To get it on paper:
 - **To keep a design safely, or move it to another device or person**, use
   **Export → Design file (.board.json)…**, and bring it back with
   **Open → Import a .board.json file…**.
-- **In the desktop app**, Save writes a file in the app's `designs` folder, and
-  **Open → Show the designs folder…** opens it.
+- **In the desktop app**, Save writes a file in `Documents\Cutting Boards` (in the project's
+  `designs` folder when run from the source), and **Open → Show the designs folder…** opens it.
 
 ## On a phone or tablet
 
@@ -276,9 +276,33 @@ Every design in the table above can be built this way, step by step.
 
 ## Install the desktop app
 
-The desktop app is the same program in its own window, with designs saved as files. There is no
-installer yet: it is run from the source. You need [Node.js](https://nodejs.org) 22 or newer and
-[Git](https://git-scm.com).
+The desktop app is the same program in its own window, with designs saved as files on your
+computer.
+
+### On Windows, with the installer
+
+1. Go to the [Releases page](https://github.com/joelong01/Cutting-Boards/releases) and download
+   `Cutting-Boards-Setup-<version>.exe` from the newest release.
+2. Run it. Windows will show a blue box saying **Windows protected your PC**, because the
+   installer is not signed with a paid certificate. Click **More info**, then **Run anyway**.
+3. It installs for you alone, with no administrator password, and opens the app when it is done.
+
+After that, open it from the Start Menu as **Cutting Boards**.
+
+- **Your designs** are saved in `Documents\Cutting Boards`, one `.board.json` file each, so they
+  can be backed up, copied or sent like any other file.
+- **To update**, download and run the newer installer. It replaces the old version and keeps your
+  designs.
+- **To remove it**, use **Settings → Apps → Installed apps → Cutting Boards → Uninstall**. Your
+  designs are left where they are. So is a small settings folder, `%APPDATA%\cutting-boards`,
+  which remembers the board you had open; delete it by hand if you want nothing left.
+
+Windows 10 or 11, 64-bit. There is no installer for macOS or Linux yet: use the browser version,
+or run it from the source.
+
+### On any system, from the source
+
+You need [Node.js](https://nodejs.org) 22 or newer and [Git](https://git-scm.com).
 
 ```sh
 git clone https://github.com/joelong01/Cutting-Boards.git
@@ -287,10 +311,11 @@ npm install
 npm start
 ```
 
-`npm start` builds the app and opens it. After the first time:
+`npm start` builds the app and opens it. Run this way, designs are saved in the `designs` folder
+of the project.
 
-- **On Windows** the app adds itself to the Start Menu as **Cutting Boards**, so it can be opened
-  from there without a terminal. The shortcut opens the last build, so run `npm start` once after
+- **On Windows** the app adds itself to the Start Menu as **Cutting Boards**, unless the installed
+  app is already there. The shortcut opens the last build, so run `npm start` once after
   updating. To remove it, delete
   `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Cutting Boards.lnk`.
 - **To update**, run `git pull`, then `npm install`, then `npm start`.
@@ -614,7 +639,7 @@ grains, a line per stage. A change to how the recipe is run must leave every lin
 | `src/model/` | Geometry, the recipe, presets, cut list, fit-to-target, storage. No UI. Tested. |
 | `src/view/` | The three.js scene, procedural wood textures, the viewport component. |
 | `src/ui/` | The editors for strips, steps and the cut list. |
-| `electron/` | The desktop shell. Only it touches the disk, through the small API in `preload.cts`. |
+| `electron/` | The desktop shell. Only it touches the disk, through the small API in `preload.cts`. Its tests are beside it. |
 | `designs/` | Designs saved from the desktop app. |
 | `docs/` | The pictures this page shows. |
 | `.ai/` | Rules and a project summary for AI assistants working on the code. |
@@ -635,7 +660,7 @@ grains, a line per stage. A change to how the recipe is run must leave every lin
 ### Checks
 
 ```powershell
-npm test                                   # 516 tests of the model: the defects a review found, what each pattern must look like, building every design from Custom, feet, one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
+npm test                                   # 532 tests: the installer's settings and the Start Menu entry (in `electron/`), and of the model: the defects a review found, what each pattern must look like, building every design from Custom, feet, one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
 npm run smoke                              # builds, then 50 checks of the real window: About, Custom, feet, the wizard list, the Target board and Dimensions tiles, the grain switch, 3D view, wizard, print preview, edge tags, add step, accent strips, removing strips and woods, pinned target size, hiding the panel, save and open
 node scripts/run.mjs --selftest            # save, list, read and delete a design through the app
 node scripts/run.mjs --screenshot=out.png --query=preset=brick   # render one frame and exit
@@ -655,6 +680,28 @@ outright rather than to the recycle bin. The smoke script compares the designs f
 folder before and after, and fails if the run left anything changed.
 `--eval=<expression>` runs one expression in the page and prints the result; the 3D scene is
 reachable there as `window.boardScene`.
+
+### Building the Windows installer
+
+```sh
+npm run installer                        # check, build, pack, verify
+node scripts/make-installer.mjs --plan   # say what it would do, change nothing
+```
+
+`npm run installer` runs `npm run check` first and stops on any failure. It then packs the build
+with electron-builder (settings in `electron-builder.json`) into
+`release/Cutting-Boards-Setup-<version>.exe`, a per-user installer. It then checks what it packed:
+that the package holds the page, the shell and the icon and nothing else, and that the packed
+app, run off the screen in a throwaway folder, draws a board and saves, lists, reads and deletes
+a design. A packed app that does not finish in a minute is stopped and counted as failed. It
+prints the installer's size and SHA-256. It has to be run on Windows, and it does not run the installer.
+`release/` is generated and ignored by git; an installer is given to people by attaching it to a
+release on GitHub. The installer is not code signed.
+
+An installed copy is locked down in ways a copy run from the project is not. It ignores the test
+switches (`--eval`, `--pdf`, `--screenshot`, `--query` and the rest) and the development server
+address, keeping only `--selftest`; and its Electron will not run as plain Node, take debugger
+switches, or load code from outside its own package (`electronFuses` in `electron-builder.json`).
 
 ### Publishing the web version
 

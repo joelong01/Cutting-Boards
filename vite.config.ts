@@ -8,6 +8,8 @@ const version: string = JSON.parse(readFileSync(new URL('./package.json', import
 export default defineConfig({
   plugins: [react()],
   define: { __APP_VERSION__: JSON.stringify(version) },
+  // The desktop shell's files are .cts; the tests of its pure parts (electron/*.test.ts) import them.
+  esbuild: { include: /\.([cm]?ts|[jt]sx)$/ },
   // Relative asset paths, so the built page loads from file:// inside Electron.
   base: './',
   server: { port: 5183 },

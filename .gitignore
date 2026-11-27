@@ -8,3 +8,6 @@ electron-dist/
 /tmp/
 /output/
 .DS_Store
+
+# Installers and the unpacked app they are made from
+release/
