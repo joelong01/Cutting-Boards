@@ -539,9 +539,9 @@ In either recipe each step is one operation at the bench, with its own picture a
 
 **About**, at the end of the toolbar, says who designed the app, that its code was written by
 Claude, and its version. The version is the one in `package.json`, put into the page when it is
-built. A deploy moves it on by how big the change is: `npm run deploy -- --bump=patch` for a
-fix, `--bump=minor` for something new, `--bump=major` when saved designs would open differently.
-Without `--bump` the version stays as it is.
+built. A release moves it on by how big the change is: a patch for a fix, minor for something
+new, major when saved designs would open differently. See
+[Releasing](#releasing-what-happens-when-a-change-lands-on-main).
 
 ### Custom boards
 
@@ -694,7 +694,7 @@ grains, a line per stage. A change to how the recipe is run must leave every lin
 ### Checks
 
 ```powershell
-npm test                                   # 541 tests: the installer's settings and the Start Menu entry (in `electron/`), and of the model: the defects a review found, what each pattern must look like, building every design from Custom, feet, one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
+npm test                                   # 547 tests: how a commit subject sets the version (in `scripts/`), the installer's settings and the Start Menu entry (in `electron/`), and of the model: the defects a review found, what each pattern must look like, building every design from Custom, feet, one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
 npm run smoke                              # builds, then 54 checks of the real window: Instructions on the toolbar, sizes taken up on leaving a Dimensions box, typing a size in the other units, the starting and finished thickness, About, Custom, feet, the wizard list, the Target board and Dimensions tiles, the grain switch, 3D view, wizard, print preview, edge tags, add step, accent strips, removing strips and woods, the Dimensions tile scrolling with the panel, hiding the panel, save and open
 node scripts/run.mjs --selftest            # save, list, read and delete a design through the app
 node scripts/run.mjs --screenshot=out.png --query=preset=brick   # render one frame and exit
@@ -718,8 +718,9 @@ reachable there as `window.boardScene`.
 ### Building the Windows installer
 
 ```sh
-npm run installer                        # check, build, pack, verify
-node scripts/make-installer.mjs --plan   # say what it would do, change nothing
+npm run installer                            # check, build, pack, verify
+node scripts/make-installer.mjs --no-check   # build, pack, verify: what the release workflow runs
+node scripts/make-installer.mjs --plan       # say what it would do, change nothing
 ```
 
 `npm run installer` runs `npm run check` first and stops on any failure. It then packs the build
@@ -737,9 +738,60 @@ switches (`--eval`, `--pdf`, `--screenshot`, `--query` and the rest) and the dev
 address, keeping only `--selftest`; and its Electron will not run as plain Node, take debugger
 switches, or load code from outside its own package (`electronFuses` in `electron-builder.json`).
 
-### Publishing the web version
+### Releasing: what happens when a change lands on main
 
-This is for whoever maintains the public site; you do not need it to use or change the app.
+Nobody builds or uploads a release by hand, and nothing reaches `main` except through a pull
+request that has passed its checks.
+
+**Before a merge.** `.github/workflows/checks.yml` runs the unit tests and the build on every
+pull request, and `main` is protected so that a pull request cannot be merged until that has
+passed. The window checks are not run there: they drive the real app on a real desktop, which
+GitHub's machines do not have. Run `npm run check` yourself before opening a pull request.
+
+**After a merge.** Every commit that lands on `main` is a release, if it changes anything a
+person using the app would see. `.github/workflows/release.yml` runs on Windows machines of
+GitHub's and:
+
+1. Reads the kind of change from the subjects of the commits since the last release, and moves
+   the last release's version on by it.
+2. Runs the unit tests, builds the page and the installer with that version in them, and runs
+   the packed app's own self test. Any failure stops it here, with nothing published.
+3. Tags the commit `v<version>`. The tag is the record of the release: nothing is committed to
+   `main`, and the version in `package.json` there is only what a copy built from the source
+   shows.
+4. Uploads the web version and compares every file the site serves with the build, by SHA-256.
+5. Publishes the installer as the latest release on GitHub, which is where the link in
+   [Install the desktop app](#install-the-desktop-app) leads.
+
+Steps 1 and 2 are a job that can only read the repository, so the code of the project's
+dependencies never runs where it could write to it; steps 3 to 5 are a second job that can
+write and has the deployment token.
+
+The subjects of the commits decide the version (`scripts/release-kind.mjs`; a squashed pull
+request's subject is its title). Several commits are released as the largest of their kinds:
+
+| Subject starts | Version | Meaning |
+| --- | --- | --- |
+| `fix:` | patch | Something that was wrong now works. |
+| `model:`, `ui:`, `view:`, `desktop:` | minor | Something new in the app. |
+| `docs:`, `test:`, `deploy:` | no release | Nothing a person using the app would see. |
+| anything else | patch | Better a release too many than a change left unpublished. |
+
+A mark at the end of the subject overrules that: `[major]`, `[minor]`, `[patch]` or
+`[no release]`. To choose the kind yourself, run it by hand on `main`:
+**Actions → Release → Run workflow**.
+
+If a run fails after step 3, the tag is there with no release behind it. Run the workflow by
+hand on `main`: it sees a version that is tagged and not published, and finishes that release
+without taking a new number.
+
+It needs one secret in the repository's settings, `AZURE_STATIC_WEB_APPS_API_TOKEN`: the
+deployment token of the Static Web App.
+
+### Publishing the web version by hand
+
+This is for whoever maintains the public site, for putting the same thing up again or for when
+the workflow cannot run; you do not need it to use or change the app.
 
 The site is an Azure Static Web App on the Free plan: only files, with no server of its own.
 `public/staticwebapp.config.json` tells the host to make browsers re-check the page on every visit

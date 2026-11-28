@@ -3,8 +3,13 @@
  * Build the Windows installer for the desktop app, and check the app inside it before saying it
  * is ready. Every test and window check runs first; a failure stops it before anything is packed.
  *
- *   node scripts/make-installer.mjs           check, build, pack, verify
- *   node scripts/make-installer.mjs --plan    say what it would do, change nothing
+ *   node scripts/make-installer.mjs              check, build, pack, verify
+ *   node scripts/make-installer.mjs --no-check   build, pack, verify: the checks were run elsewhere
+ *   node scripts/make-installer.mjs --plan       say what it would do, change nothing
+ *
+ * `--no-check` is for the release workflow (.github/workflows/release.yml). The window checks
+ * need a real desktop, which the machine a release is built on does not have, so there they are
+ * run before a change is merged and not again; the packed app's own self test still runs.
  *
  * What comes out, in `release/` (generated, ignored by git):
  *
@@ -40,6 +45,8 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const release = join(root, 'release');
 const plan = process.argv.includes('--plan');
+/** Build without running the tests and window checks first: they were run before this. */
+const unchecked = process.argv.includes('--no-check');
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const config = JSON.parse(readFileSync(join(root, 'electron-builder.json'), 'utf8'));
 /** The installer's file name, as `artifactName` in electron-builder.json gives it. */
@@ -132,18 +139,19 @@ function selfTest() {
   }
 }
 
-/** Check, build, pack and verify, printing where the installer is and its SHA-256. */
+/** Check (unless `--no-check`), build, pack and verify, printing where the installer is and its SHA-256. */
 async function main() {
   if (process.platform !== 'win32') throw new Error('this builds the Windows installer, and has to be run on Windows.');
   console.log(`Installer: ${installer}`);
   console.log(`Version: ${pkg.version}`);
   if (plan) {
-    console.log('Plan: npm run check (model tests, then build and window checks), stopping on any failure; empty release/; pack the build with electron-builder into a per-user NSIS installer; check the package holds the page, the shell and the icon and nothing else; run the packed app\'s self test in a throwaway folder and delete the folder; print the installer\'s size and SHA-256. The installer itself is not run.');
+    console.log(`Plan: ${unchecked ? 'npm run build, with no tests or window checks' : 'npm run check (model tests, then build and window checks), stopping on any failure'}; empty release/; pack the build with electron-builder into a per-user NSIS installer; check the package holds the page, the shell and the icon and nothing else; run the packed app's self test in a throwaway folder and delete the folder; print the installer's size and SHA-256. The installer itself is not run.`);
     return;
   }
   // `check` builds dist/ and electron-dist/ and tests the window against them, so what is packed
-  // is what was tested.
-  await phase('test and build', () => run('npm', ['run', 'check']));
+  // is what was tested. Without it they are only built.
+  if (unchecked) await phase('build', () => run('npm', ['run', 'build']));
+  else await phase('test and build', () => run('npm', ['run', 'check']));
   await phase('pack', () => {
     // An installer left from another version would sit beside the new one and be mistaken for it.
     rmSync(release, { recursive: true, force: true });

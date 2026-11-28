@@ -11,7 +11,7 @@ Electron desktop app and, from the same code, a web page at <https://boards.long
 
 ## Where it stands
 
-- Version **0.9.1**, on Electron 45. 541 tests (`npm test`) and 54 checks of the real window
+- Version **0.9.1**, on Electron 45. 547 tests (`npm test`) and 54 checks of the real window
   (`npm run smoke`) pass.
 - No board has been built in wood from its instructions yet. Until one has, the recipes are
   checked by geometry and by reading, not at the bench.
@@ -31,8 +31,11 @@ Electron desktop app and, from the same code, a web page at <https://boards.long
   2026-11-27, waiting for the owner to look at them.)
 - A Windows installer is built by `npm run installer` (electron-builder, per user, unsigned) and
   attached to a release on GitHub. There is no installer for macOS or Linux.
-- The web version is an Azure Static Web App on the Free plan. `npm run deploy` checks, uploads
-  and verifies it by hash.
+- The web version is an Azure Static Web App on the Free plan. A change that lands on `main` is
+  released by `.github/workflows/release.yml`: version worked out from the commit subjects and
+  recorded as a tag, unit tests, installer, site uploaded and verified by hash, release
+  published. `main` takes only pull requests that pass `.github/workflows/checks.yml`. Neither
+  workflow runs the window checks. The release workflow had not yet run on 2026-11-27.
 
 ## History
 

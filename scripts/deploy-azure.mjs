@@ -20,21 +20,32 @@
  * The bump is made before the checks, so the page that is tested and built carries the new
  * number; it is an edit to package.json and package-lock.json, to commit with the change.
  *
- * Needs the Azure CLI signed in (`az login`). The site is only files: `dist/` as built, uploaded
+ * The release workflow (.github/workflows/release.yml) runs it another way, on a machine with
+ * no Azure CLI and with the build already made and checked by the step before:
+ *
+ *   node scripts/deploy-azure.mjs --built --site=https://example.com
+ *
+ * `--built` uploads `dist/` as it stands, without testing or building again, and takes the
+ * deployment token from the environment variable SWA_CLI_DEPLOYMENT_TOKEN, which the workflow
+ * fills from a secret of the repository. `--site` is the address to verify against, in place of
+ * asking Azure for it.
+ *
+ * Run by hand, without `--built`, it needs the Azure CLI signed in (`az login`), and reads the
+ * token from Azure whatever the environment holds. The site is only files: `dist/` as built, uploaded
  * with Microsoft's Static Web Apps tool (`swa`, a development dependency). No server of ours
  * runs. `public/staticwebapp.config.json`, which the build copies into `dist/`, tells the host to
  * make phones re-check the page on every visit and to keep the hashed files under `assets/` for
  * a year; without the first, a phone keeps showing an old page after a deploy.
  *
- * The deployment token is read from Azure at deploy time, handed to the upload in its
- * environment, and never printed or written anywhere.
+ * The deployment token, wherever it comes from, is handed to the upload in its environment and
+ * never printed or written anywhere.
  *
  * The web version keeps designs in the browser's storage, not in files: it is for showing a
  * board (on a phone, say), not for keeping designs.
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -49,6 +60,14 @@ const plan = process.argv.includes('--plan');
 const bump = process.argv.find((a) => a.startsWith('--bump='))?.slice('--bump='.length) ?? '';
 if (bump && !['patch', 'minor', 'major'].includes(bump)) {
   console.error(`--bump takes patch, minor or major, not "${bump}".`);
+  process.exit(2);
+}
+/** Upload `dist/` as it stands: it was built and checked already, by the step before this one. */
+const built = process.argv.includes('--built');
+/** The site's address when it is given and not asked of Azure, without a slash at the end. */
+const given = (process.argv.find((a) => a.startsWith('--site='))?.slice('--site='.length) ?? '').replace(/\/+$/, '');
+if (built && bump) {
+  console.error('--built uploads what is already built, so the version cannot be moved on here: bump it before building.');
   process.exit(2);
 }
 /** The version in package.json as it stands. */
@@ -90,8 +109,12 @@ function files(dir) {
 /** SHA-256 of some bytes, in hex. */
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
-/** The site's address, asked of Azure: a Static Web App's host name is given to it, not chosen. */
+/**
+ * The site's address: the one given with `--site`, else asked of Azure, since a Static Web App's
+ * host name is given to it, not chosen.
+ */
 function siteUrl() {
+  if (given) return given;
   const host = run('az', ['staticwebapp', 'show', '-n', APP, '-g', GROUP, '--query', 'defaultHostname', '-o', 'tsv'], { capture: true });
   if (!host) throw new Error(`the Static Web App ${APP} in ${GROUP} has no host name: does it exist?`);
   return `https://${host}`;
@@ -126,13 +149,31 @@ async function verify(site) {
   }
 }
 
-/** Test and build, then upload and verify, printing a timing report at the end. */
+/**
+ * The deployment token. With `--built` it is the one in the environment, where the release
+ * workflow puts a secret of the repository; by hand it is read from Azure with the signed-in
+ * CLI, and one left lying in the environment is not used, so the target printed is the target
+ * uploaded to. It is returned to be handed to the upload in its environment, and is never printed.
+ */
+function deploymentToken() {
+  if (built) {
+    const fromEnv = process.env.SWA_CLI_DEPLOYMENT_TOKEN?.trim();
+    if (!fromEnv) throw new Error('--built takes the deployment token from SWA_CLI_DEPLOYMENT_TOKEN, and it is not set.');
+    return fromEnv;
+  }
+  const token = run('az', ['staticwebapp', 'secrets', 'list', '-n', APP, '-g', GROUP, '--query', 'properties.apiKey', '-o', 'tsv'], { capture: true });
+  if (!token) throw new Error('Azure gave no deployment token for the Static Web App.');
+  return token;
+}
+
+/** Test and build (unless `--built`), then upload and verify, printing a timing report at the end. */
 async function main() {
   const site = siteUrl();
   console.log(`Target: Static Web App ${APP} in ${GROUP}, ${site}`);
   console.log(bump ? `Version: ${version()}, to be moved on by a ${bump} bump` : `Version: ${version()}, unchanged (no --bump)`);
+  if (built && !existsSync(join(dist, 'index.html'))) throw new Error('--built was given but there is no dist/index.html: build first.');
   if (plan) {
-    console.log('Plan: npm run check (model tests, then build and window checks), stopping on any failure; upload dist/ with swa deploy to the production environment; then fetch every file from the site and compare it with the build by SHA-256.');
+    console.log(`Plan: ${built ? 'use dist/ as it is built, without testing or building again' : 'npm run check (model tests, then build and window checks), stopping on any failure'}; upload dist/ with swa deploy to the production environment; then fetch every file from the site and compare it with the build by SHA-256.`);
     return;
   }
   // The version moves on first, so the page that is tested, built and uploaded carries the new
@@ -143,12 +184,10 @@ async function main() {
   }
   // `check` runs the model tests, then builds dist/ and checks the real window against it, so
   // what is uploaded is exactly what was tested. Any failure throws here, before the upload.
-  await phase('test and build', () => run('npm', ['run', 'check']));
+  if (!built) await phase('test and build', () => run('npm', ['run', 'check']));
   await phase('deploy', () => {
     // The token goes to the upload in its environment: not on its command line, not in any output.
-    const token = run('az', ['staticwebapp', 'secrets', 'list', '-n', APP, '-g', GROUP, '--query', 'properties.apiKey', '-o', 'tsv'], { capture: true });
-    if (!token) throw new Error('Azure gave no deployment token for the Static Web App.');
-    run('npx', ['swa', 'deploy', '"./dist"', '--env', 'production', '--no-use-keychain'], { env: { SWA_CLI_DEPLOYMENT_TOKEN: token } });
+    run('npx', ['swa', 'deploy', '"./dist"', '--env', 'production', '--no-use-keychain'], { env: { SWA_CLI_DEPLOYMENT_TOKEN: deploymentToken() } });
   });
   await phase('verify', () => verify(site));
   console.log(`Deployed: ${site} (version ${version()})`);

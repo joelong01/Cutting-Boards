@@ -1,0 +1,227 @@
+# Release Cutting Boards when a change lands on main: work out the new version, build the page
+# and the Windows installer, put the web version up, and publish the installer on GitHub.
+#
+# A change reaches main only through a pull request that has passed its checks (checks.yml, and
+# the branch protection on main), and its author has run the window checks before opening it.
+# So this does not run the window checks again, which need a desktop these machines do not
+# have. It runs the unit tests, which are quick, and the packed app's own self test.
+#
+# The version is a tag, `v<version>`, on the commit that was released. Nothing is committed to
+# main: package.json there keeps whatever number it has, and the build is given the version of
+# the release. The new version is the last tag's moved on by the kind of change, read from the
+# subjects of the commits since that tag (scripts/release-kind.mjs): `fix:` is a patch;
+# `model:`, `ui:`, `view:` and `desktop:` are minor; `docs:`, `test:` and `deploy:` release
+# nothing; the largest wins. A mark at the end of a subject overrides its area: [major],
+# [minor], [patch] or [no release]. Run by hand (Actions, Release, Run workflow, on main) it can
+# be told the kind outright.
+#
+# There are two jobs, so that the code of the project's dependencies never runs where it could
+# write to the repository:
+#
+#   build    reads only. Installs, runs the unit tests, builds the page and the installer, runs
+#            the packed app's own self test, and hands the page and the installer on. A failure
+#            here publishes nothing.
+#   publish  may write, and has the deployment token. Pushes the tag, which fails if that
+#            version has been taken; then uploads the site and verifies it by hash; then
+#            publishes the installer.
+#
+# If publish fails after the tag is pushed, run the workflow by hand on main: it sees a version
+# tagged on that commit with no release, and finishes that release without a new number.
+#
+# It needs one secret of the repository, AZURE_STATIC_WEB_APPS_API_TOKEN: the deployment token of
+# the Static Web App. It is handed to the upload in its environment and is never printed.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: How far to move the version on. "auto" reads it from the commits since the last release.
+        type: choice
+        options: [auto, patch, minor, major]
+        default: auto
+
+# Each job asks for what it needs.
+permissions: {}
+
+# One release at a time, and one that has started is left to finish.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # The address the web version is verified against, file by file.
+  SITE: https://boards.longshotsw.com
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  build:
+    # Only main is released: run by hand on another branch, this does nothing.
+    if: github.ref == 'refs/heads/main'
+    # The installer can only be built on Windows.
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      kind: ${{ steps.plan.outputs.kind }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      # The whole history and the tags, to find the last release and what has landed since. The
+      # token is not left behind for the steps that run the project's code.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # "resume" is a version already tagged on this commit that never got its release.
+      - name: Decide the kind of release and its version
+        id: plan
+        env:
+          ASKED: ${{ inputs.bump }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $kind = ''
+          $here = @(git tag --points-at HEAD) -match '^v\d+\.\d+\.\d+$' | Select-Object -First 1
+          if ($here) {
+            gh release view $here *> $null
+            if ($LASTEXITCODE -ne 0) { $kind = 'resume'; $version = $here.Substring(1) }
+          }
+          if (-not $kind) {
+            $kind = if ($env:ASKED -and $env:ASKED -ne 'auto') { $env:ASKED } else { node scripts/release-kind.mjs }
+            if ($LASTEXITCODE -ne 0) { throw 'The kind of release could not be worked out.' }
+          }
+          if ($kind -notin 'major', 'minor', 'patch', 'none', 'resume') { throw "Not a kind of release: '$kind'" }
+          if ($kind -in 'major', 'minor', 'patch') {
+            # The last release's version, moved on. With no release yet, package.json's.
+            $last = git describe --tags --abbrev=0 --match 'v[0-9]*' 2>$null
+            if ($last) {
+              npm version $last.Substring(1) --no-git-tag-version --allow-same-version | Out-Null
+              if ($LASTEXITCODE -ne 0) { throw "npm could not start from $last." }
+            }
+            npm version $kind --no-git-tag-version | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'npm could not move the version on.' }
+            $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          } elseif ($kind -eq 'resume') {
+            npm version $version --no-git-tag-version --allow-same-version | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "npm could not set the version to $version." }
+          }
+          "Kind of release: $kind. Version: $version."
+          "kind=$kind" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+          if ($kind -eq 'none') { 'No release: nothing has landed since the last one that a person using the app would see.' >> $env:GITHUB_STEP_SUMMARY }
+
+      - name: Install
+        if: steps.plan.outputs.kind != 'none'
+        run: npm ci
+
+      - name: Unit tests
+        if: steps.plan.outputs.kind != 'none'
+        run: npm test
+
+      # Builds the page and the shell with the version in them, packs the installer, and checks
+      # the packed app: what is in it, and that it draws a board and saves a design.
+      - name: Build and pack the installer
+        if: steps.plan.outputs.kind != 'none'
+        run: node scripts/make-installer.mjs --no-check
+
+      - name: Hand on the page
+        if: steps.plan.outputs.kind != 'none'
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: dist/
+          if-no-files-found: error
+          include-hidden-files: true
+
+      - name: Hand on the installer
+        if: steps.plan.outputs.kind != 'none'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: release/Cutting-Boards-Setup-${{ steps.plan.outputs.version }}.exe
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: needs.build.outputs.kind != 'none'
+    # Windows, as the upload has only been run there.
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      KIND: ${{ needs.build.outputs.kind }}
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # The tag is the record of the release. Pushing it first claims the version: if another
+      # release has taken it, this fails here and nothing is published.
+      - name: Tag the release
+        if: env.KIND != 'resume'
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          git tag "v$env:VERSION"
+          git push origin "refs/tags/v$env:VERSION"
+
+      - name: Fetch the page
+        uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: dist
+
+      - name: Fetch the installer
+        uses: actions/download-artifact@v4
+        with:
+          name: installer
+          path: release
+
+      # Only the upload tool is needed, and nothing is run on the way to installing it.
+      - name: Install the upload tool
+        run: npm ci --ignore-scripts
+
+      - name: Put the web version up and verify it by hash
+        env:
+          SWA_CLI_DEPLOYMENT_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+        run: |
+          if (-not $env:SWA_CLI_DEPLOYMENT_TOKEN) { throw 'The repository has no AZURE_STATIC_WEB_APPS_API_TOKEN secret, so the site cannot be uploaded.' }
+          node scripts/deploy-azure.mjs --built "--site=$env:SITE"
+          if ($LASTEXITCODE -ne 0) { throw 'The upload or its verification failed.' }
+
+      - name: Publish the installer as a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $installer = "release/Cutting-Boards-Setup-$env:VERSION.exe"
+          if (-not (Test-Path $installer)) { throw "$installer is not here." }
+          gh release view "v$env:VERSION" *> $null
+          if ($LASTEXITCODE -eq 0) { "v$env:VERSION is published already."; exit 0 }
+          gh release create "v$env:VERSION" $installer --title "Cutting Boards $env:VERSION" --generate-notes --latest --verify-tag
+          if ($LASTEXITCODE -ne 0) { throw 'The release could not be published.' }
+
+      - name: Say what happened
+        if: always()
+        env:
+          STATUS: ${{ job.status }}
+        run: |
+          if ($env:STATUS -eq 'success') {
+            "Released **$env:VERSION** ($env:KIND): the site at $env:SITE and the installer on the Releases page." >> $env:GITHUB_STEP_SUMMARY
+          } else {
+            "The release of $env:VERSION ($env:KIND) did not finish: $env:STATUS. If the tag v$env:VERSION was pushed, run this workflow by hand on main to finish it." >> $env:GITHUB_STEP_SUMMARY
+          }
