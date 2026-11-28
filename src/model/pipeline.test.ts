@@ -669,7 +669,7 @@ describe('designs name themselves from their woods', () => {
       'edge-grain-border': 'Hard maple and purpleheart stripes with a border',
       'maple-purpleheart': 'Hard maple and purpleheart grid',
       checkerboard: 'Black walnut and hard maple checkerboard',
-      brick: 'Teak brick',
+      brick: 'Hard maple brick',
       'basket-weave': 'Black walnut, hard maple and cherry basket weave',
       chevron: 'Four-wood chevron',
       'tumbling-blocks': 'Hard maple, black walnut and cherry 3D blocks',

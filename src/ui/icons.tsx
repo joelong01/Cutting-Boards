@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type IconName = 'new' | 'open' | 'save' | 'saveas' | 'export' | 'undo' | 'redo' | 'print' | 'picture' | 'panel' | 'addstep' | 'about';
+export type IconName = 'new' | 'open' | 'save' | 'saveas' | 'export' | 'undo' | 'redo' | 'print' | 'picture' | 'panel' | 'instructions' | 'design' | 'addstep' | 'about';
 
 /**
  * The drawing for each toolbar icon on a 24 × 24 grid. Outlines take the button's text colour;
@@ -86,6 +86,22 @@ const DRAWINGS: Record<IconName, ReactNode> = {
       <rect x="3" y="4" width="18" height="16" rx="2" />
       <path d="M9.5 4v16" />
       <path className="accent" d="M5.4 8.5h2M5.4 12h2M5.4 15.5h2" />
+    </>
+  ),
+  // A sheet of numbered instructions.
+  instructions: (
+    <>
+      <path d="M6 3h12a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <path d="M11.5 8h4.5M11.5 12h4.5M11.5 16h4.5" />
+      <path className="accent" d="M8 8h.5M8 12h.5M8 16h.5" />
+    </>
+  ),
+  // A board being sized: a slab with a dimension line under it.
+  design: (
+    <>
+      <rect x="4" y="5" width="16" height="9" rx="1.5" />
+      <path d="M9.3 5v9M14.7 5v9" />
+      <path className="accent" d="M4 18.5h16M4 17v3M20 17v3" />
     </>
   ),
 };

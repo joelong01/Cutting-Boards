@@ -98,9 +98,6 @@ button:disabled { opacity: 0.4; cursor: default; }
   gap: 10px;
   min-width: 0;
 }
-.tabs { display: flex; gap: 4px; }
-.tabs button { flex: 1; }
-.tabs .on { background: var(--ink); color: #fff; border-color: var(--ink); }
 
 .card, .step {
   background: var(--card);
@@ -108,18 +105,9 @@ button:disabled { opacity: 0.4; cursor: default; }
   border-radius: 8px;
   padding: 10px;
 }
-/* The target board stays at the top of the side panel while the stock and steps scroll under it,
-   so the finished size is always in view. `top: 0` is measured inside the panel's padding, so it
-   rests 10px down; the strip before it fills that gap so nothing shows through, and the shadow
-   lifts it off what is scrolling beneath. */
-.card.target {
-  position: sticky; top: 0; z-index: 3; flex-shrink: 0;
-  box-shadow: 0 6px 8px -6px rgba(0, 0, 0, 0.25);
-}
-.card.target::before {
-  content: ''; position: absolute; left: -1px; right: -1px; top: -11px; height: 10px;
-  background: var(--panel);
-}
+/* The Dimensions tile scrolls with the rest of the side panel: it has grown too tall to keep
+   pinned, and the instructions are a button on the toolbar away. */
+.card.target { flex-shrink: 0; }
 h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--dim); }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-top: 8px; }
 .row:first-of-type { margin-top: 0; }
@@ -423,10 +411,9 @@ h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing
     font-size: 17px; font-weight: 600;
   }
   .app:not(.side-hidden) .side { padding-bottom: 62px; }
-  /* A phone is too short to keep the target board and "Add a step" pinned as well: between them
-     they would leave a strip a few lines high to scroll the steps through. */
-  .card.target, .add-step { position: static; }
-  .card.target::before { display: none; }
+  /* A phone is too short to keep "Add a step" pinned: it would leave a strip a few lines high
+     to scroll the steps through. */
+  .add-step { position: static; }
 }
 
 .side-handle .narrow { display: none; }

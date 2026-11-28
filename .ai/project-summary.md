@@ -11,7 +11,7 @@ Electron desktop app and, from the same code, a web page at <https://boards.long
 
 ## Where it stands
 
-- Version **0.9.1**, on Electron 45. 532 tests (`npm test`) and 50 checks of the real window
+- Version **0.9.1**, on Electron 45. 541 tests (`npm test`) and 54 checks of the real window
   (`npm run smoke`) pass.
 - No board has been built in wood from its instructions yet. Until one has, the recipes are
   checked by geometry and by reading, not at the bench.
@@ -24,7 +24,11 @@ Electron desktop app and, from the same code, a web page at <https://boards.long
   switch on the open board (`src/model/grain.ts`). The 3D board has a recipe for each grain
   (`src/model/blocks.ts`, `src/model/blocksFlat.ts`).
 - Units, rounding, saw kerf and the thinnest strip are settings of the design; the board drawn is
-  built from the rounded sizes.
+  built from the rounded sizes. Size boxes are in the design's units, and a size typed in the
+  other units (`43mm`, `3/4"`) is converted. The Dimensions tile takes the starting
+  thickness of the wood as well as the finished thickness of the board, and the instructions say
+  where a size is set for good. The brick board starts in hard maple. (All uncommitted on
+  2026-11-27, waiting for the owner to look at them.)
 - A Windows installer is built by `npm run installer` (electron-builder, per user, unsigned) and
   attached to a release on GitHub. There is no installer for macOS or Linux.
 - The web version is an Azure Static Web App on the Free plan. `npm run deploy` checks, uploads
@@ -40,7 +44,6 @@ and may mention pull requests of that repository.
 
 See "Known limits" in `readme.md`. Beyond those:
 
-- Lengths are typed in inches whatever the units shown.
 - With rounding on, a held board finishes near its target, not on it.
 - The feet are drawn grey, not brass.
 - An accent strip that is itself a slice of another glue-up is described in one long instruction.

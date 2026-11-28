@@ -1,5 +1,5 @@
 import { BEVEL_TITLE, BOARDS_TITLE, EMPTY, act, failed, type Action, type Names } from './actions';
-import { AS_ASKED, dimensionsOf, milledStrips, sizingOf, withAlong, type Sizing } from './design';
+import { AS_ASKED, dimensionsOf, layupOf, milledStrips, sizingOf, withAlong, type Sizing } from './design';
 import { inches, roundTo } from './fractions';
 import { finishOf } from './finish';
 import { newId } from './ids';
@@ -68,7 +68,8 @@ const STEPS: { [K in Step['type']]: StepDef<K> } = {
   insert: { title: 'Insert accent strips', needs: 'slices', actions: (s) => [{ type: 'millAccents', spec: s }, { type: 'addStrips', spec: s }], start: () => ({ species: 'walnut', thickness: 0.125, every: 1 }) },
   glue: { title: 'Glue up', needs: 'slices', orStrips: true, actions: () => [{ type: 'glue' }], start: () => ({}) },
   trim: { title: 'Trim', needs: 'panel', actions: (s) => [{ type: 'trim', auto: s.auto, x0: s.x0, x1: s.x1, z0: s.z0, z1: s.z1 }], start: () => ({ auto: true, x0: 0, x1: 0, z0: 0, z1: 0 }) },
-  flatten: { title: 'Flatten', needs: 'panel', actions: (s) => [{ type: 'flatten', top: s.top, bottom: s.bottom }], start: () => ({ top: 0.0625, bottom: 0.0625 }) },
+  // The flattening that mills the board to its final thickness is told the thickness wanted.
+  flatten: { title: 'Flatten', needs: 'panel', actions: (s, sizing) => [{ type: 'flatten', top: s.top, bottom: s.bottom, ...(sizing.millTo?.step === s.id ? { want: sizing.millTo.want } : {}) }], start: () => ({ top: 0.0625, bottom: 0.0625 }) },
   rotate: { title: 'Quarter-turn panel', needs: 'panel', actions: () => [{ type: 'rotate', axis: 'y', angle: 90 }], start: () => ({}) },
   frame: { title: 'Add a border', needs: 'panel', actions: (s) => [{ type: 'millBorder', spec: s }, { type: 'borderPanels' }, { type: 'borderCut' }, { type: 'borderEnds' }, { type: 'borderSides' }], start: () => ({ species: 'walnut', width: 1.5, lineSpecies: 'maple', line: 0.125, block: 3 }) },
   // A second panel is the first two steps over again, once the slices are out of the way.
@@ -145,7 +146,7 @@ function rounded(a: Action, grid: number): Action {
     case 'crosscut': return { ...a, width: r(a.width), kerf: r(a.kerf), ...(a.blade !== undefined ? { blade: r(a.blade) } : {}) };
     case 'ripPanel': return { ...a, width: r(a.width), kerf: r(a.kerf) };
     case 'shift': return { ...a, amount: r(a.amount) };
-    case 'flatten': return { ...a, top: r(a.top), bottom: r(a.bottom) };
+    case 'flatten': return { ...a, top: r(a.top), bottom: r(a.bottom), grid };
     case 'millAccents': case 'addStrips':
       return { ...a, spec: { ...accent(a.spec), ...(a.spec.more ? { more: a.spec.more.map(accent) } : {}), ...(a.spec.stagger !== undefined ? { stagger: r(a.spec.stagger) } : {}) } };
     // The border's own stock follows from the board's size, so the action is told the step to mill it on.
@@ -278,7 +279,8 @@ export function applyStep(prev: Stage, step: Step, names: Names, sizing: Sizing 
  * Run a design from a clear bench. `parts[i]` are the stages of steps[i], one for each
  * operation, and `steps[i]` is that step whole. When the recipe ends in a sound panel,
  * `finishing` has a stage for each finishing touch the design has turned on, in the order of
- * FINISH_STEPS, and one for sanding and oiling. Warnings are added to both views of a step.
+ * FINISH_STEPS, and one for sanding and oiling. Warnings are added to both views of a step, and
+ * the instructions say where a size is set for good (`sayLastChances`).
  */
 function build(design: Design, names: Names): { parts: Stage[][]; steps: Stage[]; finishing: Stage[] } {
   const parts: Stage[][] = [];
@@ -291,6 +293,7 @@ function build(design: Design, names: Names): { parts: Stage[][]; steps: Stage[]
   }
   // A design always has something to show, even one with no steps at all.
   if (!parts.length) parts.push([failed(EMPTY, STEPS.strips.title, 'This design has no steps. Start a new board.')]);
+  sayLastChances(design, parts);
   const steps = parts.map((made, i) => whole(made, design.steps[i] ? stepTitle(design.steps[i]) : made[0].title));
   parts.forEach((made, i) => {
     for (const p of [...made, steps[i]]) p.step = i;
@@ -356,6 +359,60 @@ export function wholeSteps(design: Design, stages: Stage[]): Stage[] {
 export function runSteps(design: Design, names: Names = (id) => id): Stage[] {
   const built = build(design, names);
   return [...built.steps, ...built.finishing];
+}
+
+/** Said where end-grain strips are milled: both their sizes are fixed in the pattern from here. */
+export const LAST_CHANCE_BLOCKS = 'Check both sizes before you go on: once the slices are stood on end, the width and thickness of these strips are the two sides of every block on the face of the board, and they cannot be changed.';
+/** Said where end-grain slices are cut: their width is the board's thickness. */
+export const LAST_CHANCE_SLICES = 'The width of these slices is the thickness of the board, so cut them all the same; from here it can only be flattened thinner.';
+/** Said where the strips of a board whose slices lie flat are milled: their thickness is the board's. */
+export const LAST_CHANCE_THICKNESS = 'The thickness of these strips is the thickness of the board, less what flattening takes off, so mill them all the same.';
+
+/**
+ * What stands between the wood and the board, in a sentence for the step that mills the wood of
+ * a board whose slices lie flat: how many times it is flattened and what each takes off its
+ * thickness in all, and how thick that leaves it. Each flattening is an allowance, taken only as
+ * far as the glue-up needs. Nothing when it is never flattened.
+ */
+function flatteningPlan(design: Design): string {
+  const grid = dimensionsOf(design).rounding;
+  const off = design.steps.flatMap((s) => (s.type === 'flatten' ? [roundTo(s.top, grid) + roundTo(s.bottom, grid)] : []));
+  if (!off.length) return '';
+  const left = roundTo(layupOf(design).thickness, grid) - off.reduce((sum, v) => sum + v, 0);
+  // When every flattening allows the same, say it once; otherwise each in turn.
+  const each = off.every((v) => Math.abs(v - off[0]) < 1e-9) ? `${inches(off[0])}${off.length > 1 ? ' each time' : ''}` : off.map((v) => inches(v)).join(', then ');
+  return `It is flattened ${off.length === 1 ? 'once' : `${off.length} times`}, allowing for up to ${each} off the thickness, which leaves it ${inches(left)} thick.`;
+}
+
+/**
+ * Add to the instructions the points after which a size can no longer be changed, at the step
+ * where it is set. Which sizes those are depends on whether the slices are stood on end, which
+ * only the recipe as a whole says, so it is done here and not by the actions. On an end-grain
+ * board the strips' width and thickness become the face of every block, and the cross cut before
+ * the turn sets the board's thickness; on a board whose slices lie flat the strips' thickness is
+ * the board's, and the same step says how many flattenings come off it and how much each allows
+ * for (`flatteningPlan`). A 3D board's sizes follow from its diamonds and are left alone.
+ */
+function sayLastChances(design: Design, parts: Stage[][]) {
+  const first = design.steps[0];
+  if (first?.type !== 'strips' || first.blocks) return;
+  /** Add a sentence to the last operation of a step, if it could be done. */
+  const add = (i: number, sentence: string) => {
+    const last = parts[i]?.[parts[i].length - 1];
+    if (last && !last.error) last.summary = `${last.summary} ${sentence}`.trim();
+  };
+  const turnAt = design.steps.findIndex((s) => s.type === 'turn');
+  if (turnAt < 0) {
+    add(0, `${LAST_CHANCE_THICKNESS} ${flatteningPlan(design)}`.trim());
+    return;
+  }
+  add(0, LAST_CHANCE_BLOCKS);
+  // The cross cut the turn stands up: the last one before it.
+  for (let i = turnAt - 1; i > 0; i--) {
+    if (design.steps[i].type !== 'crosscut') continue;
+    add(i, LAST_CHANCE_SLICES);
+    break;
+  }
 }
 
 /**

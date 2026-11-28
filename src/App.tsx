@@ -3,7 +3,7 @@ import { buildCutList } from './model/cutlist';
 import { fitToTarget, withAutoFit } from './model/fit';
 import { convertGrain, grainOf, withGrain, type Grain } from './model/grain';
 import { withAutoName } from './model/naming';
-import { DEFAULT_DIMENSIONS, dimensionsOf, layupOf } from './model/design';
+import { DEFAULT_DIMENSIONS, dimensionsOf, layupOf, withLayup, woodSetsThickness } from './model/design';
 import { STEP_TITLES, finishedBoard, matches, newStep, pieceCount, run, stepFits, stepNeeds, wholeSteps } from './model/pipeline';
 import { LEVELS, PRESETS, catalog, customDesign, defaultDesign, designs, insertStep, levelOf, offerOf } from './model/presets';
 import { allSpecies, speciesById } from './model/species';
@@ -391,6 +391,13 @@ export function App() {
   const inches = (v: number) => showLength(v, units);
   /** Change some of the design's dimension settings. */
   const setDims = (patch: Partial<Dimensions>) => setDesign({ ...design, dimensions: { ...dims, ...patch } });
+  // How much thinner than asked the board comes out, when it is enough to see: more than half a
+  // rounding step, or a 64th with no rounding. It is said, not stopped: the wood is what it is.
+  const short = errors ? 0 : design.target.thickness - final.size[1];
+  const thinner = short > Math.max(dims.rounding / 2, 1 / 64) + 1e-6 ? short : 0;
+  // And how much thicker, on a board whose wood sets its thickness: there the flattenings take only
+  // their allowances, and the rest is the person's to take off.
+  const thicker = !errors && woodSetsThickness(design) && -short > Math.max(dims.rounding / 2, 1 / 64) + 1e-6 ? -short : 0;
   const offers = catalog(design.target);
   const offer = offerOf(design);
 
@@ -546,6 +553,15 @@ export function App() {
         </div>
         <div className="group">
         <div>
+        {/* What the side panel shows: it is on the toolbar so it is in reach wherever the panel is scrolled to. */}
+        <button
+          className="rb panel-view"
+          onClick={() => {
+            setTab(tab === 'design' ? 'cutlist' : 'design');
+            if (sideHidden) toggleSide();
+          }}
+          title={tab === 'design' ? 'Show the cut list and the step-by-step instructions in the side panel' : 'Go back to the design in the side panel'}
+        ><Icon name={tab === 'design' ? 'instructions' : 'design'} /><span>{tab === 'design' ? 'Instructions' : 'Design'}</span></button>
         <button
           className="rb side-toggle"
           onClick={toggleSide}
@@ -564,10 +580,6 @@ export function App() {
       </header>
 
       <aside className="side">
-        <nav className="tabs">
-          <button className={tab === 'design' ? 'on' : ''} onClick={() => setTab('design')}>Design</button>
-          <button className={tab === 'cutlist' ? 'on' : ''} onClick={() => setTab('cutlist')}>Cut list and steps</button>
-        </nav>
         {tab === 'design' ? (
           <>
             <section className="card board-pick" onClick={() => setSelected(stages.length - 1)} title="Shows the finished board">
@@ -622,18 +634,14 @@ export function App() {
             </section>
             <section className="card target" onClick={() => setSelected(stages.length - 1)} title="Shows the finished board">
               <h3>Dimensions</h3>
-              <div className="row">
-                <Len label="Length" value={design.target.length} min={1} onChange={(length) => setDesign({ ...design, target: { ...design.target, length } })} />
-                <Len label="Width" value={design.target.width} min={1} onChange={(width) => setDesign({ ...design, target: { ...design.target, width } })} />
-                <Len label="Thickness" value={design.target.thickness} min={0.125} onChange={(thickness) => setDesign({ ...design, target: { ...design.target, thickness } })} />
-              </div>
+              {/* The units come first: they say what a number typed into any field below means. */}
               <div className="row">
                 <label className="field">
                   <span>Units</span>
                   <select
                     aria-label="Units"
                     value={dims.notation}
-                    title="How every length is written, like the modes of a caliper. Lengths are still typed in inches."
+                    title="How every length is written, like the modes of a caliper, and what a number typed into a field means. A size typed in the other units (43mm, or 3/4&quot;) is converted."
                     onChange={(e) => {
                       const notation = e.target.value as Notation;
                       // The step follows the notation: 1/16 inch, a hundredth of an inch, half a millimetre.
@@ -659,18 +667,40 @@ export function App() {
                   </select>
                 </label>
                 <Len
-                  label="Saw kerf"
+                  onLeave label="Saw kerf"
                   value={dims.kerf ?? 0.125}
                   min={0}
                   title="How thick your saw blade cuts. Every cut uses it, and the stock is sized to allow for the wood it turns to dust."
                   onChange={(kerf) => setDims({ kerf })}
                 />
                 <Len
-                  label="Thinnest strip"
+                  onLeave label="Thinnest strip"
                   value={dims.minWidth}
                   min={0}
                   title="The thinnest strip your planer or sander can work. Anything thinner in the recipe is flagged. 0 turns the check off."
                   onChange={(minWidth) => setDims({ minWidth })}
+                />
+              </div>
+              <div className="row">
+                <Len onLeave label="Length" value={design.target.length} min={1} onChange={(length) => setDesign({ ...design, target: { ...design.target, length } })} />
+                <Len onLeave label="Width" value={design.target.width} min={1} onChange={(width) => setDesign({ ...design, target: { ...design.target, width } })} />
+                <Len
+                  onLeave label="Desired thickness"
+                  value={design.target.thickness}
+                  min={0.125}
+                  title={grainOf(design) === 'end'
+                    ? 'How thick you want the finished board. On an end-grain board this is how wide the slices are cut, less the flattening.'
+                    : 'How thick you want the finished board. It is made from wood of the starting thickness, and each flattening allows for one rounding step off it. The instructions say where that leaves the board against this thickness.'}
+                  onChange={(thickness) => setDesign({ ...design, target: { ...design.target, thickness } })}
+                />
+                <Len
+                  onLeave label="Starting thickness"
+                  value={layupOf(design).thickness}
+                  min={0.125}
+                  title={grainOf(design) === 'end'
+                    ? 'How thick your wood is when it goes into the first glue-up. On an end-grain board the slices are stood on end, so this becomes the length of each block, not the thickness of the board.'
+                    : 'How thick your wood is when it goes into the first glue-up. The board finishes thinner by what the flattening takes off. This is the wood you have: the app does not change it.'}
+                  onChange={(thickness) => setDesign(withLayup(design, { thickness }))}
                 />
               </div>
               <label className="check" title="When on, changing strip sizes or steps changes how many strips and how much stock you need, not how big the board is.">
@@ -691,6 +721,16 @@ export function App() {
                   Finishes at {inches(Math.max(final.size[0], final.size[2]))} × {inches(Math.min(final.size[0], final.size[2]))} × {inches(final.size[1])}.
                 </p>
               </div>
+              {thinner > 0 && (
+                <p className="warning thinner">
+                  If every flattening takes all it allows for, this wood finishes {inches(final.size[1])} thick, {inches(thinner)} under the {inches(design.target.thickness)} wanted. Take less wherever a glue-up comes out flat, or start from thicker wood.
+                </p>
+              )}
+              {thicker > 0 && (
+                <p className="note over">
+                  With every flattening taken in full this wood is {inches(final.size[1])} thick, {inches(thicker)} over the {inches(design.target.thickness)} wanted. The last flattening's instruction says to keep going down to it.
+                </p>
+              )}
             </section>
             <LayupEditor warning={cards.whole[0]?.error ? undefined : cards.whole[0]?.warning} design={design} species={species} onChange={setDesign} onNotice={setMessage} selected={cards.cardOf(index) === 0} onSelect={() => setWantCard(0)} />
             <StepList design={design} stages={cards.whole} species={species} selected={cards.cardOf(index)} onSelect={setWantCard} onChange={setDesign} numberOf={cards.numberOf} />

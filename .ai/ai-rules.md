@@ -62,7 +62,11 @@ elegance in the code.
 - **One operation per step.** Mill, glue, cut, turn, place: each is its own stage with its own
   picture, animation and instruction. Never fold two operations into one stage.
 - **A step stands on its own.** Its instruction says what to do in that step, not what came before
-  or what comes next.
+  or what comes next. The one exception, which the owner asked for, is a warning at the step
+  where a size is set for good: that the strips' two sizes become the face of every block once
+  the slices are stood on end, how many flattenings a board's thickness has to last through,
+  and, at the last flattening, where the board stands against the thickness wanted. These say
+  why to get this step right; they do not tell the reader to do another step's work.
 - **Sizes a person can cut.** Nobody mills to a thousandth of an inch. Every length shown is
   written in the units and rounding the design asks for, and the board drawn is built from those
   rounded sizes. Someone who wants exact sizes sets rounding to Exact.

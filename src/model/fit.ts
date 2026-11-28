@@ -1,6 +1,6 @@
 import { isBlocks, reblock } from './blocks';
 import { fitFlatBlocks, inferBlocks } from './blocksFlat';
-import { dimensionsOf, isLocked, layupOf, sizingOf, unfitted, withLayup } from './design';
+import { dimensionsOf, isLocked, layupOf, sizingOf, unfitted, withLayup, woodSetsThickness } from './design';
 import { NO_FINISH } from './finish';
 import { run } from './pipeline';
 import type { Design } from './types';
@@ -67,7 +67,8 @@ function axesOf(design: Design, base: readonly number[]): { repeatAxis: 0 | 2; l
  * that an edit which makes the unfitted panel very wide does not turn the board round.
  *
  * With rounding on (`Design.dimensions`), every size is rounded to its step where it is used, so
- * each can be set on a machine, and the board finishes within a little of the target, not on it.
+ * each can be set on a machine, and the board finishes within a little of the target, not on it:
+ * it has as many pieces as the exact board, each off by less than a rounding step.
  *
  * A 3D board is fitted its own way (`reblock`): its board is sawn out of a block of logs, so the
  * fit counts the logs and sets the trim, and no size gives way.
@@ -83,7 +84,25 @@ export function fitToTarget(asGiven: Design, orientation: Design = asGiven): Des
   // board finishes as near its target as sizes on that step allow.
   const plain = (d: Design): Design => ({ ...unfitted(d), dimensions: { ...dimensionsOf(d), rounding: 0 } });
   const fitted = exactly(fitCounts(plain(design), plain(orientation)));
-  return withLayup({ ...fitted, dimensions: design.dimensions }, { length: Math.ceil(layupOf(fitted).length / grid - 1e-6) * grid });
+  const built = withLayup({ ...fitted, dimensions: design.dimensions }, { length: Math.ceil(layupOf(fitted).length / grid - 1e-6) * grid });
+  // Rounding can make every slice a little wider, and then the stock found for the exact slices
+  // is one slice short and the board a whole block under its target. Lengthen the stock until the
+  // board has as many pieces as the exact one: by whole rounding steps of about 1/16 inch, so a
+  // fine step (a thousandth) does not mean thousands of trials, and by no more than 4 inches.
+  const wanted = piecesIn(fitted);
+  if (!wanted || piecesIn(built) >= wanted) return built;
+  const by = grid * Math.max(1, Math.round(0.0625 / grid));
+  for (let more = by; more <= 4 + 1e-9; more += by) {
+    const longer = withLayup(built, { length: layupOf(built).length + more });
+    if (piecesIn(longer) >= wanted) return longer;
+  }
+  return built;
+}
+
+/** How many pieces of wood a design's finished board is made of, or 0 when the design cannot be built. */
+function piecesIn(d: Design): number {
+  const stages = run({ ...d, finish: NO_FINISH });
+  return stages.some((s) => s.error) ? 0 : stages[stages.length - 1].slices.reduce((n, sl) => n + sl.pieces.length, 0);
 }
 
 /** Whether a recipe's sizes can give way without breaking its pattern. */
@@ -159,18 +178,28 @@ function exactly(d: Design): Design {
  * follows whatever steps are in it. On most boards each knob moves one finished side; on an
  * angled-cut board both move both, so if the first pass falls short it keeps adding a repeat and
  * re-finding the stock length. Returns the closest design found when the target cannot be reached.
+ * A design that cannot be built only because its stock is too short is fitted from longer stock;
+ * one that cannot be built for any other reason comes back as it is.
  * `orientation` is as for `fitToTarget`.
  */
-function fitCounts(design: Design, orientation: Design): Design {
+function fitCounts(asGiven: Design, orientation: Design): Design {
+  // The stock length is this fit's to find, so one too short to build from (typed into the
+  // field, say: shorter than a single slice) is no reason to give up and leave the board broken.
+  // Start again from the shortest of a few generous lengths that can be built.
+  const design = finalSize(asGiven) ? asGiven
+    : [12, 24, 48, 96].map((length) => withLayup(asGiven, { length })).find((d) => finalSize(d)) ?? asGiven;
   const base = finalSize(design);
   if (!base) return design;
   const { repeatAxis, lengthAxis } = axesOf(design, base);
   // The longer target side goes with whichever finished side is longer in the orientation design.
-  const lie = finalSize(orientation) ?? base;
+  const lie = finalSize(orientation);
   const long = Math.max(design.target.length, design.target.width);
   const short = Math.min(design.target.length, design.target.width);
-  const repeatTarget = lie[repeatAxis] >= lie[lengthAxis] ? long : short;
-  const lengthTarget = lie[repeatAxis] >= lie[lengthAxis] ? short : long;
+  // With nothing to say how the board lay (it could not be built, and neither could the design
+  // it is to lie like), the stock runs the long way of the board, as it does in every starter.
+  const across = lie ? lie[repeatAxis] >= lie[lengthAxis] : design === asGiven && base[repeatAxis] >= base[lengthAxis];
+  const repeatTarget = across ? long : short;
+  const lengthTarget = across ? short : long;
 
   /** The same design with the shortest stock that reaches the length target. */
   const withLength = (d: Design): Design => shortestStock(d, lengthAxis, lengthTarget);
@@ -192,21 +221,45 @@ function fitCounts(design: Design, orientation: Design): Design {
 }
 
 /**
+ * The design with every flattening set to its allowance: one rounding step off the thickness
+ * (1/16 inch when nothing is rounded), half off each face. It is for a board whose slices lie
+ * flat (`woodSetsThickness`). There the wood has a starting thickness, which is what the person
+ * has, and nobody knows how much a glue-up needs to come flat until it is out of the clamps; so
+ * the recipe allows the same small amount each time, and neither the wood nor the flattening is
+ * bent to land on the thickness wanted. The board that leaves may be over or under what was
+ * wanted. That is not an error: the last flattening's instruction and the window say where it
+ * ends up, and the person takes it from there.
+ */
+function withAllowances(design: Design): Design {
+  const grid = dimensionsOf(design).rounding;
+  const face = (grid > 0 ? grid : 0.0625) / 2;
+  if (design.steps.every((s) => s.type !== 'flatten' || (Math.abs(s.top - face) < 1e-9 && Math.abs(s.bottom - face) < 1e-9))) return design;
+  const candidate = { ...design, steps: design.steps.map((s) => (s.type === 'flatten' ? { ...s, top: face, bottom: face } : s)) };
+  return finalSize(candidate) ? candidate : design;
+}
+
+/**
  * Adjust the design so the finished board is the target thickness. On an end-grain board the
  * thickness comes from the width of the last cross cut; otherwise it comes from the strip
  * thickness. Which one applies is found by trying it, so it follows whatever steps are in the
- * recipe, and the board stays lying the way it was. Returns the design unchanged when neither
- * knob reaches the target.
+ * recipe, and the board stays lying the way it was. With rounding on, reaching the target means
+ * landing within half a rounding step of it. Returns the design unchanged when neither knob
+ * reaches the target.
  */
 export function fitThickness(design: Design): Design {
   const base = finalSize(design);
   if (!base) return design;
   const delta = design.target.thickness - base[1];
-  if (Math.abs(delta) < 1e-6) return design;
+  // A board built from rounded sizes can only land within half a rounding step of a target that
+  // is not on a step (43 mm, with sixteenths): that is as near as it gets, and it counts. A board
+  // already that near is left alone: trying a knob that does not move the thickness would
+  // otherwise look like success and keep the change.
+  const near = dimensionsOf(design).rounding / 2 + 1e-6;
+  if (Math.abs(delta) < near) return design;
   /** Whether a candidate design runs cleanly and lands on the target thickness. */
   const hits = (d: Design) => {
     const s = finalSize(d);
-    return !!s && Math.abs(s[1] - design.target.thickness) < 1e-6;
+    return !!s && Math.abs(s[1] - design.target.thickness) < near;
   };
   for (let i = design.steps.length - 1; i >= 0; i--) {
     const step = design.steps[i];
@@ -230,7 +283,11 @@ export function fitThickness(design: Design): Design {
  * The design to keep after an edit. While the design holds its board size (autoFit not false),
  * an edit to the strips, the steps or the target is followed by a fresh fit, so that changing the
  * size of the wood changes how many strips and how much stock are needed and not how big the
- * board is. Edits that cannot change the size (the name, a custom wood) are passed through.
+ * board is. On a board stood on end an edit to the target thickness is followed by a fit of the
+ * thickness too, by the width of the cross cut. On one whose slices lie flat the wood is what
+ * the person has: an edit to the thickness wanted, to the thickness of the wood or to the
+ * rounding sets every flattening to its allowance (`withAllowances`) and changes nothing else.
+ * Edits that cannot change the size (the name, a custom wood) are passed through.
  */
 export function withAutoFit(prev: Design, edited: Design): Design {
   // What the first step makes follows from the steps, whether or not the size is held.
@@ -241,5 +298,18 @@ export function withAutoFit(prev: Design, edited: Design): Design {
   const same = alike(0) && prev.target === next.target && prev.autoFit !== false && dimensionsOf(prev).rounding === dimensionsOf(next).rounding && dimensionsOf(prev).kerf === dimensionsOf(next).kerf;
   // The board keeps lying the way it did before the edit; only a change to the steps after the
   // strips can turn it.
-  return same ? next : fitToTarget(next, alike(1) ? prev : next);
+  const fitted = same ? next : fitToTarget(next, alike(1) ? prev : next);
+  const asked = prev.target.thickness !== next.target.thickness;
+  // Where the wood sets the board's thickness, neither it nor the flattening gives way to the
+  // thickness wanted: the flattenings are set to their allowances and the instructions say where
+  // that leaves the board.
+  if (woodSetsThickness(fitted)) {
+    // The wood's thickness typed, and not changed along with the steps: turning the board to the
+    // other grain swaps it with the cross cut, and that is not the person's wood changing.
+    const wood = alike(1) && layupOf(prev).thickness !== layupOf(next).thickness;
+    const touched = asked || wood || dimensionsOf(prev).rounding !== dimensionsOf(next).rounding;
+    return touched ? withAllowances(fitted) : fitted;
+  }
+  // On a board stood on end the thickness is the width of the slices, which is free to change.
+  return asked ? fitThickness(fitted) : fitted;
 }

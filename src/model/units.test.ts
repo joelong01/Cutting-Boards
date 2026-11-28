@@ -3,7 +3,7 @@ import { buildCutList } from './cutlist';
 import { parseLength } from './fractions';
 import { run } from './pipeline';
 import { PRESETS } from './presets';
-import { IMPERIAL, millimetres, sensible, showBoardFeet, showLength, showSize, showText, type Units } from './units';
+import { IMPERIAL, fieldLength, fieldMark, millimetres, nudged, typedLength, sensible, showBoardFeet, showLength, showSize, showText, type Units } from './units';
 
 const METRIC: Units = { imperial: false, metric: true };
 const BOTH: Units = { imperial: true, metric: true };
@@ -51,6 +51,37 @@ describe('units', () => {
     // A foot mark is not an inch mark, and words are not lengths.
     expect(parseLength("1'")).toBeNull();
     expect(parseLength('one')).toBeNull();
+  });
+
+  it('a size typed in the other units is converted to the design\'s, and a bare number is in the design\'s own', () => {
+    const DECIMAL: Units = { imperial: true, metric: false, decimal: true };
+    // Millimetres typed into an imperial design become inches, shown as the design writes them.
+    for (const text of ['43mm', '43 mm', '43MM', '4.3cm', '43mm.']) expect(typedLength(text, IMPERIAL), text).toBeCloseTo(43 / 25.4, 12);
+    expect(fieldLength(typedLength('43mm', IMPERIAL)!, IMPERIAL)).toBe('1.693');
+    expect(fieldLength(typedLength('25.4mm', IMPERIAL)!, IMPERIAL)).toBe('1');
+    expect(fieldLength(typedLength('19.05 mm', IMPERIAL)!, IMPERIAL)).toBe('3/4');
+    expect(fieldLength(typedLength('19.05mm', DECIMAL)!, DECIMAL)).toBe('0.75');
+    // A bare number is inches in an imperial design and millimetres in a metric one.
+    expect(typedLength('43', IMPERIAL)).toBe(43);
+    expect(typedLength('1 1/2', IMPERIAL)).toBe(1.5);
+    expect(typedLength('43', METRIC)).toBeCloseTo(43 / 25.4, 12);
+    // Inches typed into a metric design, with the mark, become millimetres.
+    expect(typedLength('3/4"', METRIC)).toBe(0.75);
+    expect(typedLength('2 in', METRIC)).toBe(2);
+    expect(fieldLength(typedLength('3/4"', METRIC)!, METRIC)).toBe('19.05');
+    expect(fieldLength(16, METRIC)).toBe('406.4');
+    expect(fieldLength(0.125, METRIC)).toBe('3.175');
+    expect(fieldMark(METRIC)).toBe('mm');
+    expect(fieldMark(IMPERIAL)).toBe('″');
+    // Not lengths.
+    for (const text of ['mm', 'abc mm', '43m', '']) expect(typedLength(text, IMPERIAL), text).toBeNull();
+  });
+
+  it('the arrow keys nudge by 1/16 inch, or by a millimetre in a metric design', () => {
+    expect(nudged(1, 1, false, IMPERIAL)).toBe(1.0625);
+    expect(nudged(1, -1, true, IMPERIAL)).toBe(0.75);
+    expect(nudged(1, 1, false, METRIC) * 25.4).toBeCloseTo(26.4, 9);
+    expect(nudged(1, -1, true, METRIC) * 25.4).toBeCloseTo(15.4, 9);
   });
 
   it('with neither unit on falls back to inches', () => {
