@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Say how far the changes waiting to be released move the version on, from the subjects of
  * their commits, so that a release can be made without anyone choosing a number.
