@@ -85,7 +85,21 @@ export interface Sizing {
   grid: number;
   /** The saw kerf every cut uses, when the design sets one; otherwise each cutting step's own. */
   kerf?: number;
+  /**
+   * The flattening that mills the board to its final thickness, and the thickness wanted: the
+   * last one of a board whose wood sets its thickness (see `woodSetsThickness`). Absent on a
+   * board stood on end, whose thickness is the width of its slices, and on a 3D board.
+   */
+  millTo?: { step: string; want: number };
 }
+
+/**
+ * Whether the wood's own thickness sets the board's: its slices lie flat, so the strips' thickness,
+ * less the flattening, is the board's. Not so on a board stood on end, nor on a 3D board, whose
+ * sizes follow from its diamonds.
+ */
+export const woodSetsThickness = (design: Pick<Design, 'steps'>): boolean =>
+  !layupOf(design).blocks && !design.steps.some((s) => s.type === 'turn');
 
 /** Sizes used exactly as asked for. */
 export const AS_ASKED: Sizing = { scale: 1, along: 0, alongOn: null, cut: 0, grid: 0 };
@@ -94,14 +108,16 @@ export const AS_ASKED: Sizing = { scale: 1, along: 0, alongOn: null, cut: 0, gri
 export const withAlong = (size: number, sizing: Sizing): number => roundTo(size + sizing.along, sizing.grid);
 
 /** The sizing of a design: see `Sizing`. */
-export function sizingOf(design: Pick<Design, 'steps' | 'dimensions'>): Sizing {
+export function sizingOf(design: Pick<Design, 'steps' | 'dimensions'> & Partial<Pick<Design, 'target'>>): Sizing {
   const layup = layupOf(design);
   const cut = design.steps.find((s) => s.type === 'crosscut') as Extract<Step, { type: 'crosscut' }> | undefined;
   const stood = design.steps.some((s) => s.type === 'turn');
+  const lastFlat = [...design.steps].reverse().find((s) => s.type === 'flatten');
   return {
     scale: layup.scale ?? 1, along: layup.along ?? 0, alongOn: stood ? 'thickness' : cut ? 'crosscut' : null, cut: cut?.width ?? 0,
     // A face-grain 3D board's sizes are fixed by the 60° of its diamonds and are not rounded: see blocksFlat.ts.
     grid: layup.blocks?.flat ? 0 : dimensionsOf(design).rounding,
     kerf: dimensionsOf(design).kerf,
+    ...(lastFlat && design.target && woodSetsThickness(design) ? { millTo: { step: lastFlat.id, want: design.target.thickness } } : {}),
   };
 }

@@ -1,10 +1,10 @@
 import { dimensionsOf } from './design';
-import { inches, roundTo } from './fractions';
+import { formatLength, hasInchMark, inches, parseLength, roundTo } from './fractions';
 import type { Design, Notation } from './types';
 
 /**
- * Which units the cut list and instructions are written in. The design itself is always held and
- * entered in inches; this only changes how lengths are shown. At least one is always on.
+ * Which units the cut list and instructions are written in, and a bare number typed into a field
+ * is read in. The design itself is always held in inches. At least one is always on.
  */
 export interface Units {
   imperial: boolean;
@@ -56,6 +56,50 @@ export function millimetres(v: number, step?: number): string {
   }
   const text = Math.abs(mm) < 100 ? mm.toFixed(1).replace(/\.0$/, '') : String(Math.round(mm));
   return `${text} mm`;
+}
+
+/**
+ * A length typed into a field, in inches, or null when it is not a length. A number with `mm` or
+ * `cm` after it is metric and one with an inch mark is inches, whatever the units; a bare number
+ * is in the units the design is written in. So `43mm` typed into an imperial design is 1.693
+ * inches, and `3/4"` typed into a metric one is 19.05 mm.
+ */
+export function typedLength(text: string, units: Units): number | null {
+  const t = text.trim();
+  const metric = /^(.*\d)\s*(mm|cm)\.?$/i.exec(t);
+  if (metric) {
+    const v = parseLength(metric[1]);
+    return v === null ? null : (v * (metric[2].toLowerCase() === 'cm' ? 10 : 1)) / MM_PER_INCH;
+  }
+  const v = parseLength(t);
+  if (v === null) return null;
+  return sensible(units).imperial || hasInchMark(t) ? v : v / MM_PER_INCH;
+}
+
+/**
+ * A length in inches as a field shows it for editing, the number alone: a fraction, a decimal to
+ * a thousandth of an inch, or millimetres to a thousandth, so that an eighth of an inch is 3.175
+ * and not a rounding of it. It is not rounded to the design's step: a field shows the size held.
+ */
+export function fieldLength(v: number, units: Units): string {
+  if (!isFinite(v)) return '?';
+  const u = sensible(units);
+  if (!u.imperial) return String(Number((v * MM_PER_INCH).toFixed(3)));
+  return u.decimal ? String(Number(v.toFixed(3))) : formatLength(v);
+}
+
+/** The mark a field puts after its number: the inch mark, or mm. */
+export const fieldMark = (units: Units): string => (sensible(units).imperial ? '″' : 'mm');
+
+/**
+ * A length moved one step up (`by` 1) or down (-1) by the arrow keys: 1/16 inch, or 1/4 when
+ * `big`, kept on 64ths; in a metric design 1 mm, or 10 mm, kept on tenths of a millimetre.
+ */
+export function nudged(v: number, by: 1 | -1, big: boolean, units: Units): number {
+  const [step, grid] = sensible(units).imperial
+    ? [big ? 0.25 : 0.0625, 1 / 64]
+    : [(big ? 10 : 1) / MM_PER_INCH, 0.1 / MM_PER_INCH];
+  return Math.round((v + by * step) / grid) * grid;
 }
 
 /** A length in inches written in inches: a fraction, or a decimal when the units ask, rounded to their step first. */

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { ACTIONS, EMPTY, act, type Action } from './actions';
 import { bbox, volume } from './geometry';
-import { grainOf } from './grain';
+import { grainOf, withGrain } from './grain';
 import { buildCutList } from './cutlist';
 import { layupOf, withLayup } from './design';
 import { fitToTarget } from './fit';
 import { parseLength } from './fractions';
-import { actionsOf, applyStep, perform, runSteps as run, stepStages } from './pipeline';
+import { LAST_CHANCE_BLOCKS, LAST_CHANCE_SLICES, LAST_CHANCE_THICKNESS, actionsOf, applyStep, perform, run as runStages, runSteps as run, stepStages } from './pipeline';
 import { PRESETS, newStep } from './presets';
 import type { Design, Stage, Step } from './types';
 
@@ -138,6 +138,31 @@ describe('primitive actions', () => {
     expect(out.aside).toBeUndefined();
   });
 
+  it('the instructions say where a size is set for good: the strips and the slices of an end-grain board, the strips\' thickness of an edge-grain one', () => {
+    const brick = PRESETS.find((p) => p.key === 'brick')!.make();
+    /** Which stages say each of the three sentences, by title. */
+    const said = (design: Design) => {
+      const stages = runStages(design, names);
+      expect(stages.filter((s) => s.error)).toEqual([]);
+      return [LAST_CHANCE_BLOCKS, LAST_CHANCE_SLICES, LAST_CHANCE_THICKNESS].map((text) => stages.filter((s) => s.summary.includes(text)).map((s) => s.title));
+    };
+    // End grain: the strips are the blocks, and the slices are the board's thickness.
+    expect(said(brick)).toEqual([['Rip the strips'], ['Cross cut'], []]);
+    // The same board with its slices lying flat: only the strips' thickness matters, and it says so once.
+    expect(said(withGrain(brick, 'edge')!)).toEqual([[], [], ['Rip the strips']]);
+    // There it also counts the flattenings and says what each takes off the thickness.
+    expect(runStages(withGrain(brick, 'edge')!, names)[0].summary).toMatch(/It is flattened 2 times, allowing for up to 1\/8″ each time off the thickness, which leaves it 1 1\/2″ thick\.$/);
+    const once = PRESETS.find((p) => p.key === 'single-edge-grain')!.make();
+    expect(once.steps.filter((s) => s.type === 'flatten')).toHaveLength(1);
+    expect(runStages(once, names)[0].summary).toMatch(/It is flattened once, allowing for up to \S+″ off the thickness, which leaves it [^.]+″ thick\.$/);
+    // A board stood on end is not told this: its thickness is the width of its slices.
+    expect(runStages(brick, names)[0].summary).not.toMatch(/It is flattened/);
+    // The sentence ends the instruction it belongs to, after the sizes.
+    expect(runStages(brick, names)[0].summary).toMatch(/^Mill 7 maple strips .* long\. Check both sizes before you go on/);
+    // A 3D board's sizes follow from its diamonds: nothing is said.
+    expect(said(PRESETS.find((p) => p.key === 'tumbling-blocks')!.make())).toEqual([[], [], []]);
+  });
+
   it('the first step rips the strips and the second glues them: the blanks, then the panel', () => {
     const design = PRESETS.find((p) => p.key === 'maple-purpleheart')!.make();
     const [strips, glued, flattened] = run(design, names);
@@ -153,10 +178,11 @@ describe('primitive actions', () => {
     expect(glued.stock).toBeUndefined();
     // Each instruction says only what its own action does.
     // Each size to be milled is counted out: how many of which wood, at which width.
-    expect(strips.summary).toBe('Mill 21 strips in 2 sizes, all 1 1/8″ thick and 20 1/2″ long: 11 maple strips 1″ wide and 10 purpleheart strips 1/8″ wide.');
+    // On this end-grain board it then says that both sizes are set for good here.
+    expect(strips.summary).toBe(`Mill 21 strips in 2 sizes, all 1 1/8″ thick and 20 1/2″ long: 11 maple strips 1″ wide and 10 purpleheart strips 1/8″ wide. ${LAST_CHANCE_BLOCKS}`);
     // A board of one wood at one width is a single size, said in one plain sentence.
     const plain = run(PRESETS.find((p) => p.key === 'single-end-grain')!.make(), names)[0];
-    expect(plain.summary).toMatch(/^Mill \d+ \S.* strips [^,]+ wide, [^,]+ thick and [^,]+ long\.$/);
+    expect(plain.summary).toMatch(/^Mill \d+ \S.* strips [^,]+ wide, [^,]+ thick and [^,]+ long\. Check both sizes/);
     expect(glued.summary).toBe('Glue them edge to edge in order into a panel 12 1/4″ wide.');
     // Gluing changes nothing but that the strips are now one panel.
     expect(glued.kind).toBe('panel');
@@ -350,7 +376,7 @@ describe('primitive actions', () => {
     expect(design.version).toBe(2);
     expect(design).not.toHaveProperty('layup');
     expect(design.steps[0]).toMatchObject({ type: 'strips', thickness: 1.375, repeat: 7 });
-    expect(layupOf(design).strips.map((s) => s.species)).toEqual(['teak']);
+    expect(layupOf(design).strips.map((s) => s.species)).toEqual(['maple']);
     // Changing the strips changes that step and nothing else.
     const wider = withLayup(design, { repeat: 9 });
     expect(wider.steps[0]).toMatchObject({ type: 'strips', repeat: 9 });

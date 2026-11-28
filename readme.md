@@ -49,7 +49,7 @@ Windows, with an installer, that keeps your designs as files ([Install the deskt
 5. The board opens. On the left, under **Target board**, choose **End grain** or **Edge grain**.
 6. Under **Rip the strips** (step 1), change the woods to the ones you have.
 7. Press **Play** under the board to watch it being built, one operation at a time.
-8. Click the **Cut list and steps** tab for the stock to mill and the written instructions.
+8. Click **Instructions** in the toolbar for the stock to mill and the written instructions.
 9. Click **Print** to print them, or **Export** for a PDF with a picture of every step.
 
 That is the whole loop. The rest of this page explains each part.
@@ -58,14 +58,14 @@ That is the whole loop. The rest of this page explains each part.
 
 | Part | Where | What it is for |
 | --- | --- | --- |
-| Toolbar | Along the top | **New**, **Open**, **Save**, **Save as**; **Undo**, **Redo**; **Add step**; **Export**, **Print**, **Picture**; **Hide panel**; **About**. |
-| Side panel | Left | Two tabs. **Design** is where you change the board. **Cut list and steps** is what you take to the shop. |
+| Toolbar | Along the top | **New**, **Open**, **Save**, **Save as**; **Undo**, **Redo**; **Add step**; **Export**, **Print**, **Picture**; **Instructions**, **Hide panel**; **About**. |
+| Side panel | Left | Two views, swapped with **Instructions** in the toolbar, which is in reach however far down the panel is scrolled. The design is where you change the board. The cut list and steps are what you take to the shop; the button then reads **Design** and takes you back. |
 | The board | Right | The board in 3D, as the selected step leaves it. |
 | Step card | Top left of the board | The step being shown, the size it leaves, and how many pieces. |
 | View buttons | Top right of the board | **3D**, **Top**, **Side**, **End**; **Glue lines** on or off; **Spread** pulls the pieces apart so you can see them. |
 | Player | Under the board | **Play**, back and forward one step, jump to the start or the end, and a dot for every stage. |
 
-The **Design** tab reads from top to bottom in the order you work:
+The design reads from top to bottom in the order you work:
 
 1. **Target board**: which design, and which grain is on top.
 2. **Dimensions**: the finished size, the units, and your saw.
@@ -78,15 +78,33 @@ Anything you change can be undone with **Undo** (Ctrl+Z).
 
 ## Set the size and how sizes are written
 
-Everything here is in the **Dimensions** card.
+Everything here is in the **Dimensions** card. Set the units first: they say what a number you
+type means. A size typed
+here is taken up when you press Enter, leave the box, or click anywhere else, the board included;
+not while you are still typing it.
 
-- **Length, Width, Thickness**: the size the finished board should be. With
+- **Units**: inches as fractions, inches as decimals, or millimetres, like the modes of a
+  caliper. Every size on screen and on paper is written that way, and every size box is in those
+  units: in inches you can type shop fractions (`1 1/8`, `3/4`), in millimetres you type
+  millimetres. A size typed in the other units is converted: type `43mm` into a board in inches
+  and the box changes it to `1.693`; type `3/4"` into a board in millimetres and it becomes
+  `19.05`.
+- **Length, Width, Desired thickness**: the size the finished board should be. With
   **Keep the board at this size** ticked (it starts ticked), the app works out how many strips
   and how much stock are needed, and works them out again whenever you change something. The line
   beside it, "Finishes at…", is the size the recipe really ends at.
-- **Units**: inches as fractions, inches as decimals, or millimetres, like the modes of a
-  caliper. Every size on screen and on paper is written that way. (Sizes are still *typed* in
-  inches. You can type shop fractions: `1 1/8`, `3/4`.)
+- **Starting thickness**: how thick your wood is when it goes into the first glue-up. It is the
+  wood you have, and on an edge-grain board the app never changes it to suit the thickness you
+  want. Each flattening is an allowance of one rounding step off the thickness: its instruction
+  says to take only what the glue-up needs to come flat, up to that much. So flat stock 2″
+  thick, rounding to 1/8″, in a board with two glue-ups comes out 1 3/4″. If that is over the
+  thickness you want, the last flattening's instruction says by how much and to keep going down
+  to it; if it is under, it says so, and the board is made all the same. The step that mills
+  the wood says how many flattenings there are and what they leave. How much really comes off
+  depends on how flat your glue-ups are, and nobody can tell 1 1/2″ from 1 7/16″ in a finished
+  board. On an end-grain board the slices are
+  stood on end, so the wood's thickness becomes the length of each block and the board's
+  thickness is how wide the slices are cut.
 - **Round to**: the finest step you can actually cut to, such as 1/16″ or 0.5 mm. Every size in
   the instructions is rounded to it, and the board drawn is built from those rounded sizes, so
   what you read is what you get. Choose **Exact** for no rounding.
@@ -182,9 +200,9 @@ a numbered step with its own picture and instruction:
 
 ## Take it to the shop: cut list, print, PDF
 
-Click the **Cut list and steps** tab.
+Click **Instructions** in the toolbar.
 
-![The cut list and steps tab beside a brick board](docs/cut-list.png)
+![The cut list and steps beside a brick board](docs/cut-list.png)
 
 - **Finished board**: the size the recipe ends at, against the size you asked for.
 - **Stock to mill**: for each wood, how many pieces, the size to **rough cut** them and the size
@@ -271,7 +289,7 @@ Every design in the table above can be built this way, step by step.
 | Ctrl+B | Hide or show the side panel |
 | Space | Play or pause the build |
 | Left, Right | Back or forward one step |
-| Up, Down in a size box | Nudge the size by 1/16″ |
+| Up, Down in a size box | Nudge the size by 1/16″, or by 1 mm when the units are millimetres |
 | Esc | Close a dialog |
 
 ## Install the desktop app
@@ -336,8 +354,7 @@ The sections above are the directions. This is the full list, for looking things
   or Ctrl+B gives the 3D view the whole window; **Show panel** or the blue **☰ Edit** tab brings the side panel back. On a phone-width screen the panel starts hidden and,
   when shown, takes the whole width, so the toggle switches between editing and the board; the
   tab then becomes a **Show the board ›** bar along the bottom, clear of the panel's controls, so
-  there is always something on screen to tap. On a phone the Dimensions tile scrolls with the
-  list instead of staying pinned, to leave room for the steps.
+  there is always something on screen to tap.
 - **Grain switch.** **End grain / Edge grain** in the Target board card turns the open board
   round, keeping its woods, pattern and size: end to edge takes out the turn step and mills the
   stock to the board's thickness; edge to end cuts and stands the slices up. Greyed out for
@@ -347,12 +364,15 @@ The sections above are the directions. This is the full list, for looking things
   offer, and the grain switch. The designs are listed easiest first, under Beginner, Intermediate
   and Advanced, here, in the board wizard and under New. Picking another design changes the open board to it at the same
   size (Ctrl+Z brings the old one back).
-- **Dimensions.** The second tile, which stays at the top of the side panel while the steps
-  scroll under it: the size to build and the size the recipe finishes at, plus three settings
-  saved with the design.
+- **Dimensions.** The second tile, which scrolls with the rest of the side panel: the size to
+  build, the starting thickness of the wood and the size the recipe finishes at, plus the
+  settings below, which are saved with the design.
   - **Units**: inches as fractions, inches as decimals, or millimetres, like the modes of a
     caliper. Every length in the window, the cut list, the instructions and the printed sheet is
-    written that way. Lengths are still typed in inches.
+    written that way, and it comes first in the tile because every size box is in those units
+    too. A number typed with the other unit's mark (`43mm`, `4.3cm`, `3/4"`, `2 in`) is converted
+    to the design's units when the box is left. A box shows the size held, not rounded: a
+    fraction, a decimal to a thousandth of an inch, or millimetres to a thousandth.
   - **Round to**: 1/64 to 1/8 inch, 0.001 to 0.01 inch, or 0.1 to 1 mm, or Exact. Every size is
     rounded to it where it is used, so the board drawn is built from the sizes the instructions
     give, and "Finishes at" is where those sizes really land. A coarse step moves the board off
@@ -400,7 +420,17 @@ The sections above are the directions. This is the full list, for looking things
   step shows the board as that step leaves it; **Show finished board** goes back to the end.
   With a Trim step selected, the panel's sides are tagged Edge A, Edge B, End A and End B to
   match the step's fields.
-- **Target.** With "Keep the board at this size" ticked (the default), the target length and
+- **Target.** With "Keep the board at this size" ticked (the default), a new desired thickness typed
+  under Dimensions changes the board to it. On an end-grain board the cross cut gives way. On an
+  edge-grain one nothing does: the wood keeps the starting thickness typed, and typing either
+  thickness, or changing the rounding, sets every flattening to its allowance of one rounding
+  step off the thickness, half off each face (1/16″ in all with no rounding; `withAllowances`
+  in `src/model/fit.ts`). Every flattening's instruction gives its amounts as "up to". A board
+  that would finish over or under the thickness wanted, by more than half a rounding step, is
+  told so on the Dimensions tile and in the last flattening's instruction, and is not an error.
+  Turning a board to the other grain is not a change of wood and leaves its flattenings alone.
+  A stock length too short to build from (1 1/2″ typed into Stock length, say) does not leave
+  the board broken: the stock is the fit's to find, and it finds it again. The target length and
   width are held: change a strip width, the stock thickness or a step, and the app finds the
   repeat count and stock length again, so the wood changes and the board does not. The board
   finishes at the smallest size its blocks allow that is not under the target. Untick it to type
@@ -545,7 +575,7 @@ middle are left off, with the reason.
 ### One operation, one stage
 
 What the view plays, and what the instructions number, is one operation at the bench at a time:
-mill, glue, cut, turn, place. A step in the Design tab is usually one operation. Three are
+mill, glue, cut, turn, place. A step in the design is usually one operation. Three are
 several, and each of their operations has its own stage, picture and sentence
 (`performEach` in `src/model/pipeline.ts`):
 
@@ -557,7 +587,11 @@ several, and each of their operations has its own stage, picture and sentence
 
 A card that covers several operations is numbered with all of them ("8–9"), so the numbers in
 the list, the view and the printed instructions agree. An instruction says only its own
-operation, not what came before or what comes next. `run` gives a stage per operation and
+operation, not what came before or what comes next. The one thing added is where a size is
+set for good, said at the step that sets it: on an end-grain board the strips (their width and
+thickness are the face of every block) and the cross cut (its width is the board's thickness);
+on an edge-grain board the strips' thickness, which is the board's less the flattening, with how many flattenings there are and what each takes off it
+(`sayLastChances` in `src/model/pipeline.ts`). `run` gives a stage per operation and
 `runSteps` gives each step whole, for anything that asks what a step leaves.
 
 Known exception: an accent strip that is itself a slice of another glue-up (a pattern) is still
@@ -571,9 +605,9 @@ described in one long instruction.
   not here. Its trim off the ragged block comes out in odd decimals; the size it trims to is
   what matters.
 - **Auto trim** squares the two long edges only. Ends are trimmed by the amounts you enter.
-- Lengths are typed in inches whatever the units shown.
 - With rounding on, a held board finishes near its target, not on it: the fit finds the exact
-  sizes and rounds them, and does not yet look for a different count of strips that would land closer.
+  sizes and rounds them, with stock long enough for every slice at its rounded width, and does
+  not yet look for a different count of strips that would land closer.
 
 ## For developers
 
@@ -660,8 +694,8 @@ grains, a line per stage. A change to how the recipe is run must leave every lin
 ### Checks
 
 ```powershell
-npm test                                   # 532 tests: the installer's settings and the Start Menu entry (in `electron/`), and of the model: the defects a review found, what each pattern must look like, building every design from Custom, feet, one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
-npm run smoke                              # builds, then 50 checks of the real window: About, Custom, feet, the wizard list, the Target board and Dimensions tiles, the grain switch, 3D view, wizard, print preview, edge tags, add step, accent strips, removing strips and woods, pinned target size, hiding the panel, save and open
+npm test                                   # 541 tests: the installer's settings and the Start Menu entry (in `electron/`), and of the model: the defects a review found, what each pattern must look like, building every design from Custom, feet, one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
+npm run smoke                              # builds, then 54 checks of the real window: Instructions on the toolbar, sizes taken up on leaving a Dimensions box, typing a size in the other units, the starting and finished thickness, About, Custom, feet, the wizard list, the Target board and Dimensions tiles, the grain switch, 3D view, wizard, print preview, edge tags, add step, accent strips, removing strips and woods, the Dimensions tile scrolling with the panel, hiding the panel, save and open
 node scripts/run.mjs --selftest            # save, list, read and delete a design through the app
 node scripts/run.mjs --screenshot=out.png --query=preset=brick   # render one frame and exit
 ```

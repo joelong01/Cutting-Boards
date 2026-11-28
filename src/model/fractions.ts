@@ -1,10 +1,16 @@
+/** Every way an inch mark is typed after a number. */
+const INCH_MARK = /["″“”„‟]|′′|''|in\.?$/g;
+
+/** Whether a typed length carries an inch mark, which says it is inches whatever units the field is in. */
+export const hasInchMark = (text: string): boolean => text.trim().replace(INCH_MARK, '') !== text.trim();
+
 /**
  * Parse shop-style lengths: `1 1/2`, `1-1/2"`, `3/4`, `1.5`. Returns null when not a length. An
  * inch mark after the number is ignored, whichever one the keyboard gives: a straight quote, the
  * curly quotes a phone puts in its place, a double prime, two single primes, or "in".
  */
 export function parseLength(text: string): number | null {
-  const t = text.trim().replace(/["″“”„‟]|′′|''|in\.?$/g, '').trim();
+  const t = text.trim().replace(INCH_MARK, '').trim();
   if (!t) return null;
   const neg = t.startsWith('-');
   const body = neg ? t.slice(1).trim() : t;

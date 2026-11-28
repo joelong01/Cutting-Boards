@@ -78,7 +78,7 @@ export type Action =
   /** Saw the edges and ends of a panel straight; `auto` first takes off whatever is ragged. */
   | { type: 'trim'; auto: boolean; x0: number; x1: number; z0: number; z1: number }
   /** Take `top` and `bottom` off the faces of a panel. */
-  | { type: 'flatten'; top: number; bottom: number }
+  | { type: 'flatten'; top: number; bottom: number; want?: number; grid?: number }
   /** Saw a panel lengthways into strips `width` wide, and turn them to lie across the bench as slices. */
   | { type: 'ripPanel'; width: number; kerf: number; tilt?: number }
   /** Round the four corners of the finished panel, seen from above, to `radius`. */
@@ -1053,7 +1053,16 @@ function trim(prev: Stage, step: Extract<Action, { type: 'trim' }>): Stage {
   return done;
 }
 
-/** Take wood off the two faces of a panel, with a warning about planing when it is end grain. */
+/**
+ * Take wood off the two faces of a panel, with a warning about planing when it is end grain.
+ *
+ * A flattening is an allowance: nobody knows how much a glue-up needs until it is out of the
+ * clamps, so the instruction says to take what it needs, up to the amounts given. The one given a
+ * thickness wanted (`want`) is the last on a board whose wood sets its thickness: it says where
+ * the board ends up, with every allowance used, against what was wanted. Over, by more than half
+ * a rounding step (`grid`), it says to keep going down to it; under, it says so and that the
+ * board is thicker wherever less was taken.
+ */
 function flatten(prev: Stage, step: Extract<Action, { type: 'flatten' }>): Stage {
   const title = TITLES.flatten;
   const lo = Math.max(0, step.bottom), hi = prev.size[1] - Math.max(0, step.top);
@@ -1063,11 +1072,22 @@ function flatten(prev: Stage, step: Extract<Action, { type: 'flatten' }>): Stage
     const c = clipAxis(p, 1, lo, hi);
     if (c && volume(c) > 1e-9) pieces.push(c);
   }
+  const amounts = `${inches(step.top)} off the top and ${inches(step.bottom)} off the bottom`;
+  // How far the board is from the thickness wanted, when it is far enough to matter.
+  const off = step.want === undefined ? 0 : hi - lo - step.want;
+  const near = Math.max((step.grid ?? 0) / 2, 1 / 64) + 1e-6;
+  const how = `take off only what it needs to come flat, up to ${amounts}, which leaves it ${inches(hi - lo)} thick.`
+    + (step.want === undefined ? ''
+      : ' This is the last flattening.' + (off > near
+        ? ` With every flattening taken in full the board is ${inches(off)} over the ${inches(step.want)} wanted: keep going, the same off each face, until it is ${inches(step.want)} thick.`
+        : off < -near
+          ? ` With every flattening taken in full the board is ${inches(-off)} under the ${inches(step.want)} wanted. Wherever a glue-up came out flat and less was taken, it is that much thicker.`
+          : ' That is the thickness wanted.'));
   return stage('panel', [{ pieces: toOrigin(pieces) }], title,
     (endGrainUp(pieces)
       ? 'Flatten both faces with a drum sander or router sled: '
       : 'Flatten both faces (planer, drum sander or router sled): ')
-    + `${inches(step.top)} off the top and ${inches(step.bottom)} off the bottom, to ${inches(hi - lo)} thick.`
+    + how
     + (endGrainUp(pieces)
       ? ' This is end grain: a thickness planer can tear out the trailing edge or throw the board. If you do plane it, '
         + 'glue a sacrificial long-grain strip across the trailing end, take very light passes, and cut the strip off after.'

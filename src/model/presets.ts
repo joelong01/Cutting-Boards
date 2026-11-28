@@ -188,11 +188,11 @@ const STARTERS: (Omit<Preset, 'make'> & { make: () => Parts | Design })[] = [
     blurb: 'One species. Every other row slides half a block, like brickwork.',
     make: () => ({
       version: 1,
-      name: 'Teak brick',
+      name: 'Hard maple brick',
       target: { length: 16.25, width: 13, thickness: 1.5 },
       layup: {
         length: 24.5, thickness: 1.375, repeat: 7, closeWithFirst: false,
-        strips: [strip('teak', 2)],
+        strips: [strip('maple', 2)],
       },
       steps: steps(
         // The first glue-up never comes out flat or square: plane it and true the ends first.
