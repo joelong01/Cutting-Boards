@@ -1,16 +1,25 @@
 # Release Cutting Boards when a change lands on main: move the version on, check everything,
-# build the Windows installer, publish it as a release on GitHub, and put the web version up.
+# build the Windows installer, put the web version up, and publish the installer on GitHub.
 #
-# The version moves on by the kind of change, read from the subject of the commit that landed
-# (scripts/release-kind.mjs): `fix:` is a patch; `model:`, `ui:`, `view:` and `desktop:` are
-# minor; `docs:`, `test:` and `deploy:` release nothing. A mark in the subject overrides that:
-# [major], [minor], [patch] or [no release]. Run by hand (Actions, Release, Run workflow) it can
-# be told the kind outright.
+# The version moves on by the kind of change, read from the subjects of the commits since the
+# last version tag (scripts/release-kind.mjs): `fix:` is a patch; `model:`, `ui:`, `view:` and
+# `desktop:` are minor; `docs:`, `test:` and `deploy:` release nothing; the largest wins. A mark
+# at the end of a subject overrides its area: [major], [minor], [patch] or [no release]. Run by
+# hand (Actions, Release, Run workflow, on main) it can be told the kind outright.
 #
-# Nothing is published unless every test and window check passes and the packed app passes its
-# own self test. The order after that is: record the version on main, upload the site and verify
-# it by hash, then publish the installer. If main has moved on while this ran, the push fails and
-# nothing is published.
+# There are two jobs, so that the code of the project's dependencies never runs where it could
+# write to the repository:
+#
+#   build    reads only. Installs, runs every test and window check, builds the page and the
+#            installer, runs the packed app's own self test, and hands the page and the
+#            installer on. A failure here publishes nothing.
+#   publish  may write, and has the deployment token. Records the version on main with its tag
+#            in one push that either wholly happens or does not, so if main has moved on
+#            nothing is published; then uploads the site and verifies it by hash; then publishes
+#            the installer.
+#
+# If publish fails after the version is recorded, run the workflow by hand on main: it sees a
+# version that is tagged and has no release, and finishes that release without a new number.
 #
 # It needs one secret of the repository, AZURE_STATIC_WEB_APPS_API_TOKEN: the deployment token of
 # the Static Web App. It is handed to the upload in its environment and is never printed.
@@ -22,13 +31,13 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: How far to move the version on. "auto" reads it from the last commit's subject.
+        description: How far to move the version on. "auto" reads it from the commits since the last release.
         type: choice
         options: [auto, patch, minor, major]
         default: auto
 
-permissions:
-  contents: write
+# Each job asks for what it needs.
+permissions: {}
 
 # One release at a time, and one that has started is left to finish.
 concurrency:
@@ -39,14 +48,104 @@ env:
   # The address the web version is verified against, file by file.
   SITE: https://boards.longshotsw.com
 
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
-  release:
+  build:
+    # Only main is released: run by hand on another branch, this does nothing.
+    if: github.ref == 'refs/heads/main'
     # The installer can only be built on Windows, and the window checks run the real app.
     runs-on: windows-latest
     timeout-minutes: 30
-    defaults:
-      run:
-        shell: pwsh
+    permissions:
+      contents: read
+    outputs:
+      kind: ${{ steps.plan.outputs.kind }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      # The whole history and the tags, to find what has landed since the last release. The
+      # token is not left behind for the steps that run the project's code.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # "resume" is a version already recorded on this commit that never got its release.
+      - name: Decide the kind of release and its version
+        id: plan
+        env:
+          ASKED: ${{ inputs.bump }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $kind = ''
+          if (@(git tag --points-at HEAD) -contains "v$version") {
+            gh release view "v$version" *> $null
+            if ($LASTEXITCODE -ne 0) { $kind = 'resume' }
+          }
+          if (-not $kind) {
+            $kind = if ($env:ASKED -and $env:ASKED -ne 'auto') { $env:ASKED } else { node scripts/release-kind.mjs }
+            if ($LASTEXITCODE -ne 0) { throw 'The kind of release could not be worked out.' }
+          }
+          if ($kind -notin 'major', 'minor', 'patch', 'none', 'resume') { throw "Not a kind of release: '$kind'" }
+          if ($kind -in 'major', 'minor', 'patch') {
+            npm version $kind --no-git-tag-version | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'npm could not move the version on.' }
+            $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+            $taken = git ls-remote --tags origin "refs/tags/v$version"
+            if ($LASTEXITCODE -ne 0) { throw 'The tags could not be read.' }
+            if ($taken) { throw "v$version is tagged already. Run the workflow by hand on main to finish or replace it." }
+          }
+          "Kind of release: $kind. Version: $version."
+          "kind=$kind" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+          if ($kind -eq 'none') { 'No release: nothing has landed since the last one that a person using the app would see.' >> $env:GITHUB_STEP_SUMMARY }
+
+      - name: Install
+        if: steps.plan.outputs.kind != 'none'
+        run: npm ci
+
+      # Runs every test and window check first, builds the page and the shell with the version
+      # in them, packs the installer, and checks the packed app.
+      - name: Check, build and pack the installer
+        if: steps.plan.outputs.kind != 'none'
+        run: npm run installer
+
+      - name: Hand on the page
+        if: steps.plan.outputs.kind != 'none'
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: dist/
+          if-no-files-found: error
+          include-hidden-files: true
+
+      - name: Hand on the installer
+        if: steps.plan.outputs.kind != 'none'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: release/Cutting-Boards-Setup-${{ steps.plan.outputs.version }}.exe
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: needs.build.outputs.kind != 'none'
+    # Windows, as the upload has only been run there.
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      KIND: ${{ needs.build.outputs.kind }}
+      VERSION: ${{ needs.build.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -55,75 +154,66 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Decide the kind of release
-        id: kind
-        env:
-          ASKED: ${{ inputs.bump }}
-        run: |
-          $kind = if ($env:ASKED -and $env:ASKED -ne 'auto') { $env:ASKED } else { node scripts/release-kind.mjs }
-          if ($kind -notin 'major', 'minor', 'patch', 'none') { throw "release-kind.mjs answered '$kind'" }
-          "The last commit is: $(git log -1 --format=%s)"
-          "Kind of release: $kind"
-          "kind=$kind" >> $env:GITHUB_OUTPUT
-
-      - name: Install
-        if: steps.kind.outputs.kind != 'none'
-        run: npm ci
-
-      - name: Move the version on
-        id: version
-        if: steps.kind.outputs.kind != 'none'
-        run: |
-          npm version ${{ steps.kind.outputs.kind }} --no-git-tag-version | Out-Null
-          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          if (git ls-remote --tags origin "v$version") { throw "v$version has been released already." }
-          "Version: $version"
-          "version=$version" >> $env:GITHUB_OUTPUT
-
-      # Runs every test and window check first, builds the page and the shell with the new
-      # version in them, packs the installer, and checks the packed app.
-      - name: Check, build and pack the installer
-        if: steps.kind.outputs.kind != 'none'
-        run: npm run installer
-
-      # The commit is made in the name of whoever set the release off, at their GitHub address.
+      # The version is moved on again here, on a clean checkout, and must come out the same:
+      # what is committed to main is made by this job and not taken from the build's files.
       - name: Record the version on main
-        if: steps.kind.outputs.kind != 'none'
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
+        if: env.KIND != 'resume'
         run: |
-          git config user.name "${{ github.actor }}"
-          git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm version $env:KIND --no-git-tag-version | Out-Null
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($version -ne $env:VERSION) { throw "The build was of $env:VERSION and this is $version." }
+          # In the name of whoever set the release off, at their GitHub address.
+          git config user.name "$env:GITHUB_ACTOR"
+          git config user.email "$env:GITHUB_ACTOR_ID+$env:GITHUB_ACTOR@users.noreply.github.com"
           git add package.json package-lock.json
-          git commit -m "deploy: release $env:VERSION"
-          git tag "v$env:VERSION"
-          git push origin HEAD:main
-          git push origin "v$env:VERSION"
+          git commit -m "deploy: release $version"
+          git tag "v$version"
+          # Both or neither: if main has moved on, the tag is not pushed either and nothing below runs.
+          git push --atomic origin HEAD:refs/heads/main "refs/tags/v$version"
+
+      - name: Fetch the page
+        uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: dist
+
+      - name: Fetch the installer
+        uses: actions/download-artifact@v4
+        with:
+          name: installer
+          path: release
+
+      # Only the upload tool is needed, and nothing is run on the way to installing it.
+      - name: Install the upload tool
+        run: npm ci --ignore-scripts
 
       - name: Put the web version up and verify it by hash
-        if: steps.kind.outputs.kind != 'none'
         env:
           SWA_CLI_DEPLOYMENT_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
         run: |
           if (-not $env:SWA_CLI_DEPLOYMENT_TOKEN) { throw 'The repository has no AZURE_STATIC_WEB_APPS_API_TOKEN secret, so the site cannot be uploaded.' }
           node scripts/deploy-azure.mjs --built "--site=$env:SITE"
+          if ($LASTEXITCODE -ne 0) { throw 'The upload or its verification failed.' }
 
       - name: Publish the installer as a release
-        if: steps.kind.outputs.kind != 'none'
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
         run: |
           $installer = "release/Cutting-Boards-Setup-$env:VERSION.exe"
-          if (-not (Test-Path $installer)) { throw "$installer was not built." }
-          gh release create "v$env:VERSION" $installer --title "Cutting Boards $env:VERSION" --generate-notes --latest
+          if (-not (Test-Path $installer)) { throw "$installer is not here." }
+          gh release view "v$env:VERSION" *> $null
+          if ($LASTEXITCODE -eq 0) { "v$env:VERSION is published already."; exit 0 }
+          gh release create "v$env:VERSION" $installer --title "Cutting Boards $env:VERSION" --generate-notes --latest --verify-tag
+          if ($LASTEXITCODE -ne 0) { throw 'The release could not be published.' }
 
       - name: Say what happened
         if: always()
         env:
-          KIND: ${{ steps.kind.outputs.kind }}
-          VERSION: ${{ steps.version.outputs.version }}
+          STATUS: ${{ job.status }}
         run: |
-          if ($env:KIND -eq 'none') { "No release: the last commit changes nothing a person using the app would see." >> $env:GITHUB_STEP_SUMMARY }
-          elseif ('${{ job.status }}' -eq 'success') { "Released **$env:VERSION** ($env:KIND): the site at $env:SITE and the installer on the Releases page." >> $env:GITHUB_STEP_SUMMARY }
-          else { "The release of $env:VERSION ($env:KIND) did not finish: ${{ job.status }}. See the step that failed; anything before it has been done." >> $env:GITHUB_STEP_SUMMARY }
+          if ($env:STATUS -eq 'success') {
+            "Released **$env:VERSION** ($env:KIND): the site at $env:SITE and the installer on the Releases page." >> $env:GITHUB_STEP_SUMMARY
+          } else {
+            "The release of $env:VERSION ($env:KIND) did not finish: $env:STATUS. If the version was recorded on main, run this workflow by hand on main to finish it." >> $env:GITHUB_STEP_SUMMARY
+          }

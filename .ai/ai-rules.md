@@ -128,9 +128,13 @@ the live files against the build by hash. See `readme.md` for what it needs.
   both, and a second bump skips a number.
 - **The commit subject decides the version**, so choose its area by the nature of the change:
   `fix:` is a patch; `model:`, `ui:`, `view:` and `desktop:` are minor; `docs:`, `test:` and
-  `deploy:` release nothing. Add `[major]` to the subject when saved designs would open
-  differently, and `[minor]`, `[patch]` or `[no release]` to overrule the area
-  (`scripts/release-kind.mjs`). A squashed pull request's subject is its title.
+  `deploy:` release nothing. End the subject with `[major]` when saved designs would open
+  differently, and with `[minor]`, `[patch]` or `[no release]` to overrule the area
+  (`scripts/release-kind.mjs`). A squashed pull request's subject is its title. Everything
+  since the last release goes out together, as the largest of its kinds.
+- **A release that failed after the version was recorded** is finished by running the workflow
+  by hand on `main`, which the owner does or asks for. Do not tag, release or deploy by hand to
+  repair it.
 - **`npm run deploy` by hand** is for putting the same thing up again, or for when the workflow
   cannot run. Then move the version on yourself with `--bump=patch`, `minor` or `major`, say
   which was used and the new number, and commit `package.json` and `package-lock.json`.
@@ -185,6 +189,8 @@ status files state the date they were last true.
 
 ## Git
 
+- **Every push to `main` is a public release** of whatever it changes in the app: see
+  "Deploying the web version". The release workflow itself commits the new version to `main`.
 - Small changes go straight to `main`. A change large enough that the owner would want to review
   it as a unit goes on a branch and a pull request.
 - Commit messages: `<area>: <what changed and why>`. Areas: `model`, `ui`, `view`, `desktop`,

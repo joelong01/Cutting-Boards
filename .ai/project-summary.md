@@ -11,7 +11,7 @@ Electron desktop app and, from the same code, a web page at <https://boards.long
 
 ## Where it stands
 
-- Version **0.9.1**, on Electron 45. 545 tests (`npm test`) and 54 checks of the real window
+- Version **0.9.1**, on Electron 45. 547 tests (`npm test`) and 54 checks of the real window
   (`npm run smoke`) pass.
 - No board has been built in wood from its instructions yet. Until one has, the recipes are
   checked by geometry and by reading, not at the bench.

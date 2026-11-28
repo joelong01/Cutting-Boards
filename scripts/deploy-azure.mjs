@@ -25,19 +25,20 @@
  *
  *   node scripts/deploy-azure.mjs --built --site=https://example.com
  *
- * `--built` uploads `dist/` as it stands, without testing or building again. `--site` is the
- * address to verify against, in place of asking Azure for it. The deployment token is then
- * taken from the environment variable SWA_CLI_DEPLOYMENT_TOKEN, which the workflow fills from
- * a secret of the repository.
+ * `--built` uploads `dist/` as it stands, without testing or building again, and takes the
+ * deployment token from the environment variable SWA_CLI_DEPLOYMENT_TOKEN, which the workflow
+ * fills from a secret of the repository. `--site` is the address to verify against, in place of
+ * asking Azure for it.
  *
- * Needs the Azure CLI signed in (`az login`). The site is only files: `dist/` as built, uploaded
+ * Run by hand, without `--built`, it needs the Azure CLI signed in (`az login`), and reads the
+ * token from Azure whatever the environment holds. The site is only files: `dist/` as built, uploaded
  * with Microsoft's Static Web Apps tool (`swa`, a development dependency). No server of ours
  * runs. `public/staticwebapp.config.json`, which the build copies into `dist/`, tells the host to
  * make phones re-check the page on every visit and to keep the hashed files under `assets/` for
  * a year; without the first, a phone keeps showing an old page after a deploy.
  *
- * The deployment token is read from Azure at deploy time, handed to the upload in its
- * environment, and never printed or written anywhere.
+ * The deployment token, wherever it comes from, is handed to the upload in its environment and
+ * never printed or written anywhere.
  *
  * The web version keeps designs in the browser's storage, not in files: it is for showing a
  * board (on a phone, say), not for keeping designs.
@@ -149,13 +150,17 @@ async function verify(site) {
 }
 
 /**
- * The deployment token: from the environment when it is there (the release workflow puts a
- * secret of the repository in it), else read from Azure with the signed-in CLI. It is returned to
- * be handed to the upload in its environment, and is never printed.
+ * The deployment token. With `--built` it is the one in the environment, where the release
+ * workflow puts a secret of the repository; by hand it is read from Azure with the signed-in
+ * CLI, and one left lying in the environment is not used, so the target printed is the target
+ * uploaded to. It is returned to be handed to the upload in its environment, and is never printed.
  */
 function deploymentToken() {
-  const fromEnv = process.env.SWA_CLI_DEPLOYMENT_TOKEN?.trim();
-  if (fromEnv) return fromEnv;
+  if (built) {
+    const fromEnv = process.env.SWA_CLI_DEPLOYMENT_TOKEN?.trim();
+    if (!fromEnv) throw new Error('--built takes the deployment token from SWA_CLI_DEPLOYMENT_TOKEN, and it is not set.');
+    return fromEnv;
+  }
   const token = run('az', ['staticwebapp', 'secrets', 'list', '-n', APP, '-g', GROUP, '--query', 'properties.apiKey', '-o', 'tsv'], { capture: true });
   if (!token) throw new Error('Azure gave no deployment token for the Static Web App.');
   return token;

@@ -694,7 +694,7 @@ grains, a line per stage. A change to how the recipe is run must leave every lin
 ### Checks
 
 ```powershell
-npm test                                   # 545 tests: how a commit subject sets the version (in `scripts/`), the installer's settings and the Start Menu entry (in `electron/`), and of the model: the defects a review found, what each pattern must look like, building every design from Custom, feet, one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
+npm test                                   # 547 tests: how a commit subject sets the version (in `scripts/`), the installer's settings and the Start Menu entry (in `electron/`), and of the model: the defects a review found, what each pattern must look like, building every design from Custom, feet, one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
 npm run smoke                              # builds, then 54 checks of the real window: Instructions on the toolbar, sizes taken up on leaving a Dimensions box, typing a size in the other units, the starting and finished thickness, About, Custom, feet, the wizard list, the Target board and Dimensions tiles, the grain switch, 3D view, wizard, print preview, edge tags, add step, accent strips, removing strips and woods, the Dimensions tile scrolling with the panel, hiding the panel, save and open
 node scripts/run.mjs --selftest            # save, list, read and delete a design through the app
 node scripts/run.mjs --screenshot=out.png --query=preset=brick   # render one frame and exit
@@ -739,19 +739,27 @@ switches, or load code from outside its own package (`electronFuses` in `electro
 
 ### Releasing: what happens when a change lands on main
 
-Nobody builds or uploads a release by hand. When a commit lands on `main`, the workflow in
-`.github/workflows/release.yml` runs on a Windows machine of GitHub's and:
+Nobody builds or uploads a release by hand. Every commit that lands on `main` is a release, if
+it changes anything a person using the app would see. The workflow in
+`.github/workflows/release.yml` runs on Windows machines of GitHub's and:
 
-1. Reads the kind of change from the commit's subject and moves the version on.
+1. Reads the kind of change from the subjects of the commits since the last release and moves
+   the version on.
 2. Runs every test and window check, builds the page and the installer, and runs the packed
    app's own self test. Any failure stops it here, with nothing published.
-3. Commits the new version to `main` and tags it `v<version>`.
+3. Commits the new version to `main` and tags it `v<version>`, in one push. If `main` has
+   moved on meanwhile the push is refused and nothing is published; the next run releases both
+   changes together.
 4. Uploads the web version and compares every file the site serves with the build, by SHA-256.
 5. Publishes the installer as the latest release on GitHub, which is where the link in
    [Install the desktop app](#install-the-desktop-app) leads.
 
-The subject of the commit decides the version (`scripts/release-kind.mjs`; a squashed pull
-request's subject is its title):
+Steps 1 and 2 are a job that can only read the repository, so the code of the project's
+dependencies never runs where it could write to it; steps 3 to 5 are a second job that can
+write and has the deployment token.
+
+The subjects of the commits decide the version (`scripts/release-kind.mjs`; a squashed pull
+request's subject is its title). Several commits are released as the largest of their kinds:
 
 | Subject starts | Version | Meaning |
 | --- | --- | --- |
@@ -760,9 +768,13 @@ request's subject is its title):
 | `docs:`, `test:`, `deploy:` | no release | Nothing a person using the app would see. |
 | anything else | patch | Better a release too many than a change left unpublished. |
 
-A mark anywhere in the subject overrules that: `[major]`, `[minor]`, `[patch]` or
-`[no release]`. To release without a new commit, or to choose the kind yourself, run it by hand:
+A mark at the end of the subject overrules that: `[major]`, `[minor]`, `[patch]` or
+`[no release]`. To choose the kind yourself, run it by hand on `main`:
 **Actions → Release → Run workflow**.
+
+If a run fails after step 3, the version is on `main` with no release behind it. Run the
+workflow by hand on `main`: it sees a version that is tagged and not published, and finishes
+that release without taking a new number.
 
 It needs one secret in the repository's settings, `AZURE_STATIC_WEB_APPS_API_TOKEN`: the
 deployment token of the Static Web App.
