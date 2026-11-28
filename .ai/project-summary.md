@@ -32,9 +32,10 @@ Electron desktop app and, from the same code, a web page at <https://boards.long
 - A Windows installer is built by `npm run installer` (electron-builder, per user, unsigned) and
   attached to a release on GitHub. There is no installer for macOS or Linux.
 - The web version is an Azure Static Web App on the Free plan. A change that lands on `main` is
-  released by `.github/workflows/release.yml`: version moved on by the commit subject, checks,
-  installer, site uploaded and verified by hash, release published. It had not yet run on
-  2026-11-27, and needs the repository secret `AZURE_STATIC_WEB_APPS_API_TOKEN`.
+  released by `.github/workflows/release.yml`: version worked out from the commit subjects and
+  recorded as a tag, unit tests, installer, site uploaded and verified by hash, release
+  published. `main` takes only pull requests that pass `.github/workflows/checks.yml`. Neither
+  workflow runs the window checks. The release workflow had not yet run on 2026-11-27.
 
 ## History
 

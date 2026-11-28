@@ -718,8 +718,9 @@ reachable there as `window.boardScene`.
 ### Building the Windows installer
 
 ```sh
-npm run installer                        # check, build, pack, verify
-node scripts/make-installer.mjs --plan   # say what it would do, change nothing
+npm run installer                            # check, build, pack, verify
+node scripts/make-installer.mjs --no-check   # build, pack, verify: what the release workflow runs
+node scripts/make-installer.mjs --plan       # say what it would do, change nothing
 ```
 
 `npm run installer` runs `npm run check` first and stops on any failure. It then packs the build
@@ -739,17 +740,25 @@ switches, or load code from outside its own package (`electronFuses` in `electro
 
 ### Releasing: what happens when a change lands on main
 
-Nobody builds or uploads a release by hand. Every commit that lands on `main` is a release, if
-it changes anything a person using the app would see. The workflow in
-`.github/workflows/release.yml` runs on Windows machines of GitHub's and:
+Nobody builds or uploads a release by hand, and nothing reaches `main` except through a pull
+request that has passed its checks.
 
-1. Reads the kind of change from the subjects of the commits since the last release and moves
-   the version on.
-2. Runs every test and window check, builds the page and the installer, and runs the packed
-   app's own self test. Any failure stops it here, with nothing published.
-3. Commits the new version to `main` and tags it `v<version>`, in one push. If `main` has
-   moved on meanwhile the push is refused and nothing is published; the next run releases both
-   changes together.
+**Before a merge.** `.github/workflows/checks.yml` runs the unit tests and the build on every
+pull request, and `main` is protected so that a pull request cannot be merged until that has
+passed. The window checks are not run there: they drive the real app on a real desktop, which
+GitHub's machines do not have. Run `npm run check` yourself before opening a pull request.
+
+**After a merge.** Every commit that lands on `main` is a release, if it changes anything a
+person using the app would see. `.github/workflows/release.yml` runs on Windows machines of
+GitHub's and:
+
+1. Reads the kind of change from the subjects of the commits since the last release, and moves
+   the last release's version on by it.
+2. Runs the unit tests, builds the page and the installer with that version in them, and runs
+   the packed app's own self test. Any failure stops it here, with nothing published.
+3. Tags the commit `v<version>`. The tag is the record of the release: nothing is committed to
+   `main`, and the version in `package.json` there is only what a copy built from the source
+   shows.
 4. Uploads the web version and compares every file the site serves with the build, by SHA-256.
 5. Publishes the installer as the latest release on GitHub, which is where the link in
    [Install the desktop app](#install-the-desktop-app) leads.
@@ -772,9 +781,9 @@ A mark at the end of the subject overrules that: `[major]`, `[minor]`, `[patch]`
 `[no release]`. To choose the kind yourself, run it by hand on `main`:
 **Actions → Release → Run workflow**.
 
-If a run fails after step 3, the version is on `main` with no release behind it. Run the
-workflow by hand on `main`: it sees a version that is tagged and not published, and finishes
-that release without taking a new number.
+If a run fails after step 3, the tag is there with no release behind it. Run the workflow by
+hand on `main`: it sees a version that is tagged and not published, and finishes that release
+without taking a new number.
 
 It needs one secret in the repository's settings, `AZURE_STATIC_WEB_APPS_API_TOKEN`: the
 deployment token of the Static Web App.

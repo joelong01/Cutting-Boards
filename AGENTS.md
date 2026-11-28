@@ -19,8 +19,9 @@ npm run installer                      # check, then build and verify the Window
 2. **Recipes are for a person at a bench**: strips not loose blocks, one operation per step, each
    step standing on its own, sizes that can be cut.
 3. **Tests leave no trace**, and the owner's running app is never relaunched.
-4. **One Azure site, released by the workflow.** A push to `main` is a public release, and the
-   commit subject sets the version: do not deploy or bump by hand. Check the signed-in account
+4. **One Azure site, released by the workflow.** `main` takes only pull requests that pass the
+   `test` check; a merge is a public release, and the commit subject sets the version: do not
+   deploy or bump by hand. The workflow runs no window checks, so run `npm run check` first. Check the signed-in account
    before any Azure change; never print the deployment token.
 5. **The repository is public.** No credential, identifier, machine path or email in any file or
    commit message.

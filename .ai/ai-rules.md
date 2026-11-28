@@ -122,22 +122,24 @@ the live files against the build by hash. See `readme.md` for what it needs.
 
 - **One site only.** Never create a second site, app or environment for this project.
 - **A change that lands on `main` is released by the workflow** (`.github/workflows/release.yml`):
-  it moves the version on, runs every check, builds the installer, records the version on
-  `main`, uploads the site and verifies it by hash, and publishes the installer as a release.
-  Do not also deploy by hand, and do not bump the version in a pull request: the workflow does
-  both, and a second bump skips a number.
+  it works out the new version, runs the unit tests, builds the installer, tags the commit
+  `v<version>`, uploads the site and verifies it by hash, and publishes the installer as a
+  release. The version is the tag: nothing is committed to `main`, and `package.json` is not
+  bumped, in a pull request or anywhere else. Do not also deploy by hand.
+- **The workflow does not run the window checks**: GitHub's machines have no desktop to run them
+  on. Run `npm run check` and read its result before opening a pull request; nothing after
+  that will catch a broken window.
 - **The commit subject decides the version**, so choose its area by the nature of the change:
   `fix:` is a patch; `model:`, `ui:`, `view:` and `desktop:` are minor; `docs:`, `test:` and
   `deploy:` release nothing. End the subject with `[major]` when saved designs would open
   differently, and with `[minor]`, `[patch]` or `[no release]` to overrule the area
   (`scripts/release-kind.mjs`). A squashed pull request's subject is its title. Everything
   since the last release goes out together, as the largest of its kinds.
-- **A release that failed after the version was recorded** is finished by running the workflow
+- **A release that failed after its tag was pushed** is finished by running the workflow
   by hand on `main`, which the owner does or asks for. Do not tag, release or deploy by hand to
   repair it.
 - **`npm run deploy` by hand** is for putting the same thing up again, or for when the workflow
-  cannot run. Then move the version on yourself with `--bump=patch`, `minor` or `major`, say
-  which was used and the new number, and commit `package.json` and `package-lock.json`.
+  cannot run, and needs the owner's yes. Say what was uploaded and report the hash verification.
 - **Report the hash verification** of any deploy you run or watch.
 - **Check which account is signed in before any Azure command** that changes something, and stop
   if it is not the owner's own subscription.
@@ -189,10 +191,12 @@ status files state the date they were last true.
 
 ## Git
 
-- **Every push to `main` is a public release** of whatever it changes in the app: see
-  "Deploying the web version". The release workflow itself commits the new version to `main`.
-- Small changes go straight to `main`. A change large enough that the owner would want to review
-  it as a unit goes on a branch and a pull request.
+- **Every change goes on a branch and a pull request.** `main` is protected: nothing can be
+  pushed to it directly, and a pull request cannot be merged until the `test` check
+  (`.github/workflows/checks.yml`: unit tests and the build) has passed. Never weaken or go
+  round that protection.
+- **Every merge to `main` is a public release** of whatever it changes in the app: see
+  "Deploying the web version".
 - Commit messages: `<area>: <what changed and why>`. Areas: `model`, `ui`, `view`, `desktop`,
   `deploy`, `test`, `docs`, `fix`.
 - Stage only what the task touched. Never `git add --all`.

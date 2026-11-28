@@ -1,0 +1,44 @@
+# Check a pull request before it can be merged: the unit tests, and that the app builds.
+#
+# The branch protection on main requires the job below, by its name `test`, to pass. The window
+# checks (`npm run smoke`) are not run here: they drive the real app on a real desktop, which
+# these machines do not have. They are run on the author's machine, with `npm run check`, before
+# the pull request is opened.
+name: Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A new push to a pull request replaces the run of the one before.
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # Windows, as that is where the tests have always been run and where the app is built.
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      # The types, the desktop shell and the page.
+      - name: Build
+        run: npm run build
