@@ -539,9 +539,9 @@ In either recipe each step is one operation at the bench, with its own picture a
 
 **About**, at the end of the toolbar, says who designed the app, that its code was written by
 Claude, and its version. The version is the one in `package.json`, put into the page when it is
-built. A deploy moves it on by how big the change is: `npm run deploy -- --bump=patch` for a
-fix, `--bump=minor` for something new, `--bump=major` when saved designs would open differently.
-Without `--bump` the version stays as it is.
+built. A release moves it on by how big the change is: a patch for a fix, minor for something
+new, major when saved designs would open differently. See
+[Releasing](#releasing-what-happens-when-a-change-lands-on-main).
 
 ### Custom boards
 
@@ -694,7 +694,7 @@ grains, a line per stage. A change to how the recipe is run must leave every lin
 ### Checks
 
 ```powershell
-npm test                                   # 541 tests: the installer's settings and the Start Menu entry (in `electron/`), and of the model: the defects a review found, what each pattern must look like, building every design from Custom, feet, one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
+npm test                                   # 545 tests: how a commit subject sets the version (in `scripts/`), the installer's settings and the Start Menu entry (in `electron/`), and of the model: the defects a review found, what each pattern must look like, building every design from Custom, feet, one operation per stage, dimensions and rounding, the 3D board, the exact fit, reference outputs, the actions, geometry, every step, presets, resizing, both grains, cut list, design files, finish, naming, units
 npm run smoke                              # builds, then 54 checks of the real window: Instructions on the toolbar, sizes taken up on leaving a Dimensions box, typing a size in the other units, the starting and finished thickness, About, Custom, feet, the wizard list, the Target board and Dimensions tiles, the grain switch, 3D view, wizard, print preview, edge tags, add step, accent strips, removing strips and woods, the Dimensions tile scrolling with the panel, hiding the panel, save and open
 node scripts/run.mjs --selftest            # save, list, read and delete a design through the app
 node scripts/run.mjs --screenshot=out.png --query=preset=brick   # render one frame and exit
@@ -737,9 +737,40 @@ switches (`--eval`, `--pdf`, `--screenshot`, `--query` and the rest) and the dev
 address, keeping only `--selftest`; and its Electron will not run as plain Node, take debugger
 switches, or load code from outside its own package (`electronFuses` in `electron-builder.json`).
 
-### Publishing the web version
+### Releasing: what happens when a change lands on main
 
-This is for whoever maintains the public site; you do not need it to use or change the app.
+Nobody builds or uploads a release by hand. When a commit lands on `main`, the workflow in
+`.github/workflows/release.yml` runs on a Windows machine of GitHub's and:
+
+1. Reads the kind of change from the commit's subject and moves the version on.
+2. Runs every test and window check, builds the page and the installer, and runs the packed
+   app's own self test. Any failure stops it here, with nothing published.
+3. Commits the new version to `main` and tags it `v<version>`.
+4. Uploads the web version and compares every file the site serves with the build, by SHA-256.
+5. Publishes the installer as the latest release on GitHub, which is where the link in
+   [Install the desktop app](#install-the-desktop-app) leads.
+
+The subject of the commit decides the version (`scripts/release-kind.mjs`; a squashed pull
+request's subject is its title):
+
+| Subject starts | Version | Meaning |
+| --- | --- | --- |
+| `fix:` | patch | Something that was wrong now works. |
+| `model:`, `ui:`, `view:`, `desktop:` | minor | Something new in the app. |
+| `docs:`, `test:`, `deploy:` | no release | Nothing a person using the app would see. |
+| anything else | patch | Better a release too many than a change left unpublished. |
+
+A mark anywhere in the subject overrules that: `[major]`, `[minor]`, `[patch]` or
+`[no release]`. To release without a new commit, or to choose the kind yourself, run it by hand:
+**Actions → Release → Run workflow**.
+
+It needs one secret in the repository's settings, `AZURE_STATIC_WEB_APPS_API_TOKEN`: the
+deployment token of the Static Web App.
+
+### Publishing the web version by hand
+
+This is for whoever maintains the public site, for putting the same thing up again or for when
+the workflow cannot run; you do not need it to use or change the app.
 
 The site is an Azure Static Web App on the Free plan: only files, with no server of its own.
 `public/staticwebapp.config.json` tells the host to make browsers re-check the page on every visit

@@ -11,3 +11,6 @@ electron-dist/
 
 # Installers and the unpacked app they are made from
 release/
+
+# The package the web upload makes, when it is left behind
+/*-app.zip

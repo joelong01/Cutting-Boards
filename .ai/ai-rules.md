@@ -121,14 +121,25 @@ npm run installer # check, then build and verify the Windows installer in releas
 the live files against the build by hash. See `readme.md` for what it needs.
 
 - **One site only.** Never create a second site, app or environment for this project.
-- **Deploy after a change to the app is checked**, and report the hash verification.
-- **Move the version on by the nature of the change**: `--bump=patch` for a fix, `--bump=minor`
-  for something new, `--bump=major` when saved designs would open differently. No bump only when
-  putting the same thing up again. Say which bump was used and the new number; the bump edits
-  `package.json` and `package-lock.json`, which go in the commit with the change.
+- **A change that lands on `main` is released by the workflow** (`.github/workflows/release.yml`):
+  it moves the version on, runs every check, builds the installer, records the version on
+  `main`, uploads the site and verifies it by hash, and publishes the installer as a release.
+  Do not also deploy by hand, and do not bump the version in a pull request: the workflow does
+  both, and a second bump skips a number.
+- **The commit subject decides the version**, so choose its area by the nature of the change:
+  `fix:` is a patch; `model:`, `ui:`, `view:` and `desktop:` are minor; `docs:`, `test:` and
+  `deploy:` release nothing. Add `[major]` to the subject when saved designs would open
+  differently, and `[minor]`, `[patch]` or `[no release]` to overrule the area
+  (`scripts/release-kind.mjs`). A squashed pull request's subject is its title.
+- **`npm run deploy` by hand** is for putting the same thing up again, or for when the workflow
+  cannot run. Then move the version on yourself with `--bump=patch`, `minor` or `major`, say
+  which was used and the new number, and commit `package.json` and `package-lock.json`.
+- **Report the hash verification** of any deploy you run or watch.
 - **Check which account is signed in before any Azure command** that changes something, and stop
   if it is not the owner's own subscription.
 - **The deployment token is never printed, logged, written to a file or put on a command line.**
+  The workflow has it as a secret of the repository, `AZURE_STATIC_WEB_APPS_API_TOKEN`; only the
+  owner sets or changes that secret.
 - Deleting anything in Azure, and anything that costs money, needs the owner's explicit yes.
 
 ## The installer
@@ -138,7 +149,8 @@ the live files against the build by hash. See `readme.md` for what it needs.
 - **Never run the installer or the uninstaller on the owner's machine to test it.** It writes a
   Start Menu entry and an uninstall record. Test the packed app in `release/win-unpacked/` with
   its `--selftest` or `--screenshot` flags, which run off the screen in a throwaway folder.
-- Publishing a release on GitHub, and attaching an installer to one, needs the owner's yes.
+- Releases on GitHub, with the installer attached, are published by the release workflow.
+  Publishing one by hand, or changing or deleting one, needs the owner's yes.
 - An installed copy obeys no switch that runs code or writes a file where it is told. A new
   test switch in `electron/main.cts` is read through `devArg`, never `arg`.
 - `appId` in `electron-builder.json` and `APP_ID` in `electron/main.cts` are the same string;
